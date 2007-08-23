@@ -3,7 +3,8 @@
 a rete implementation independant of pychinko, that uses IndexedFormula
 
 
-This is based heavily on {}
+This is based heavily on RETE-UL from
+   http://reports-archive.adm.cs.cmu.edu/anon/1995/CMU-CS-95-113.pdf
 Some inspiration for this came from pychinko; though not enough
 
 
@@ -101,9 +102,15 @@ class AlphaFilter(AlphaMemory):
             else:
                 return frozenset()
         existentialVariables = findExistentials(pattern)
-        self.vars = freeVariables | existentialVariables
+        self.vars = pattern.occurringIn(freeVariables | existentialVariables)
+        
         AlphaMemory.__init__(self)
-    def rightActivate(self, s): # Badly named, but ...
+
+    def buildVarIndex(self, successor):
+        return tuple(sorted(list(self.vars & successor.vars)))
+
+        
+    def rightActivate(self, s):
         for env, _ in unify(self.pattern, s, vars = self.vars):
             self.add(TripleWithBinding(s, env))
 
@@ -125,6 +132,9 @@ class AlphaFilter(AlphaMemory):
         for triple in primaryAlpha:
             secondaryAlpha.rightActivate(triple)
         return secondaryAlpha
+
+    def triplesMatching(self, env):
+        return self
 
 
 class Token(object):
@@ -195,6 +205,8 @@ class EmptyRootClass(ReteNode):
         self.empty = False
         self.children = set()
         self.allChildren = set()
+        self.vars = frozenset()
+        self.varTuple = ()
         return self
 EmptyRoot = EmptyRootClass()
 
@@ -208,6 +220,7 @@ class BetaMemory(ReteNode):
         self.items = set()
         self.allChildren = set()
         self.empty = True
+        self.vars = self.parent.vars
         self.updateFromAbove()
         return self
 
@@ -223,8 +236,8 @@ class BetaMemory(ReteNode):
         parent = self.parent
         parentChildren = parent.children
         parent.children = set([self])
-        for triple in parent.alphaNode:
-            parent.rightActivate(triple)
+        for item in parent.parent.items:
+            parent.leftActivate(item)
         parent.children = parentChildren
 
     def removeItem(self, item):
@@ -242,10 +255,12 @@ class JoinNode(ReteNode):
                 return child
         self = ReteNode.__new__(cls, parent)
         self.alphaNode = alphaNode
+        self.vars = self.parent.vars | self.alphaNode.vars
         if not parent.empty:
-            self.alphaNode.successors.appendleft( self)
+            self.alphaNode.successors.appendleft(self)
             if alphaNode.empty:
                 parent.children.remove(self)
+        self.varIndex = self.alphaNode.buildVarIndex(self)
         return self
 
     def leftActivate(self, token):
@@ -253,7 +268,7 @@ class JoinNode(ReteNode):
             self.relinkAlpha()
             if self.alphaNode.empty:
                 self.parent.children.remove(self)
-        for i in self.alphaNode:
+        for i in self.alphaNode.triplesMatching(token.env):
             triple = i.triple
             env = i.env
             newBinding = self.test(token, env)
@@ -262,7 +277,7 @@ class JoinNode(ReteNode):
                     c.leftActivate(token, triple, newBinding)
 
 
-    def test(self, token, env2):
+    def test(self, token, env2):  # Not good enough! need to unify somehow....
         env = token.env
         newEnv = env
         for var, (val, source) in env2.items():

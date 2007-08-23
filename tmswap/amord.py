@@ -165,11 +165,15 @@ class EventLoop(object):
         return len(self.events) + len(self.alternateEvents)
 
 def testPolicy(logURI, policyURI):
-    
+    import time
     store = llyn.RDFStore()
     workingContext = store.newFormula()
     workingContext.keepOpen = True
     formulaTMS = FormulaTMS(workingContext)
+
+## We are done with cwm setup
+    startTime = time.time()
+    
     logFormula = store.load(logURI)
     formulaTMS.getThing(logFormula).assume()
 
@@ -178,6 +182,7 @@ def testPolicy(logURI, policyURI):
     policyFormula = store.load(policyURI)
     rdf = policyFormula.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
     p = policyFormula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/rei+/policy')
+    u = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/s0/university')
     
     rules = [Rule.compileFromTriples(eventLoop, formulaTMS, policyFormula, x)
                       for x in policyFormula.each(pred=rdf['type'], obj=p['Policy'])]
@@ -190,10 +195,15 @@ def testPolicy(logURI, policyURI):
     while eventLoop:
         eventLoop.next()
 
+# See how long it took (minus output)
+    totalTime = time.time() - startTime
+    print 'time reasoning took=', totalTime
+
 #    rete.printRete()
+    formulaTMS.getTriple(u['call-1'], p['incompliantWith'], u['MITProxCardPolicy']).why()
     return workingContext.n3String()
 
 
 if __name__ == '__main__':
     print testPolicy('http://dig.csail.mit.edu/TAMI/2007/s0/log.n3',
-                     'http://dig.csail.mit.edu/TAMI/2007/s0/mit-policywithoutj.n3')
+                     'http://dig.csail.mit.edu/TAMI/2007/s0/mit-policy.n3')

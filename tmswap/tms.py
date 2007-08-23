@@ -194,7 +194,7 @@ import sys
 def writeComment(obj, port=None):
     if port is None:
         port = sys.stdout
-        port.write('; %s \n' % obj)
+        port.write('# %s \n' % obj)
 
 
 def reSupportNodes(retracted):
