@@ -21,6 +21,7 @@ class FormulaTMS(object):
         self.nodes = WVD()
         self.workingContext = workingContext
         workingContext.tms = self
+        self.premises = set()
         
 
     def getTriple(self, subject, predicate, object):
@@ -39,6 +40,8 @@ class FormulaTMS(object):
         return self.workingContext.statementsMatching(subj=subject, pred=predicate, obj=object)[0]
 
     def event(self, node, justification):
+        if isinstance(justification, tms.Premise):
+            self.premises.add(justification)
         if justification is False:
             if isinstance(node.datum, Rule):
                 raise NotImplementedError
@@ -51,6 +54,7 @@ class FormulaTMS(object):
 #            print 'Now supporting %s because of %s' % (node.datum, justification)
             self.workingContext.loadFormulaWithSubstitution(node.datum)
         if isinstance(node.datum, tuple):
+#            print '\t ... Now supporting %s because of %s' % (node, justification)
             self.workingContext.add(*node.datum)
         
 
