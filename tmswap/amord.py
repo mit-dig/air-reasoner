@@ -54,7 +54,7 @@ class FormulaTMS(object):
 #            print 'Now supporting %s because of %s' % (node.datum, justification)
             self.workingContext.loadFormulaWithSubstitution(node.datum)
         if isinstance(node.datum, tuple):
-#            print '\t ... Now supporting %s because of %s' % (node, justification)
+#            print '\t ... now supporting %s because of %s' % (node, justification)
             self.workingContext.add(*node.datum)
         
 
@@ -204,10 +204,13 @@ def testPolicy(logURI, policyURI):
     print 'time reasoning took=', totalTime
 
 #    rete.printRete()
-    formulaTMS.getTriple(u['call-1'], p['incompliantWith'], u['MITProxCardPolicy']).why()
+    try:
+        formulaTMS.getTriple(u['call-1'], p['incompliantWith'], u['MITProxCardPolicy']).why()
+    except AssertionError:
+        print 'No incompliance triple generated --- skipping\n\n'
     return workingContext.n3String()
 
 
 if __name__ == '__main__':
     print testPolicy('http://dig.csail.mit.edu/TAMI/2007/s0/log.n3',
-                     'http://dig.csail.mit.edu/TAMI/2007/s0/mit-policy.n3')
+                     'http://dig.csail.mit.edu/TAMI/2007/s0/mit-policy-incompl.n3')
