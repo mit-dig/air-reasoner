@@ -213,4 +213,4 @@ def testPolicy(logURI, policyURI):
 
 if __name__ == '__main__':
     print testPolicy('http://dig.csail.mit.edu/TAMI/2007/s0/log.n3',
-                     'http://dig.csail.mit.edu/TAMI/2007/s0/mit-policy-incompl.n3')
+                     'http://dig.csail.mit.edu/TAMI/2007/s0/mit-policy.n3')
