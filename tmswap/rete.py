@@ -84,6 +84,7 @@ class AlphaMemory(list):
 
 class AlphaFilter(AlphaMemory):
     def __init__(self, pattern, vars):
+        self.penalty = 10
         self.pattern = pattern
         freeVariables = vars
         def findExistentials(x):
@@ -138,13 +139,14 @@ class AlphaFilter(AlphaMemory):
 
 
 class Token(object):
-    def __init__(self, node, parent, current, env):
+    def __init__(self, node, parent, current, env, penalty=0):
         """It is not the job of this function to compute
         the new env; indeed, because that operation
         could fail.
 
 
         """
+        self.penalty = penalty + parent.penalty
         self.parent = parent
         assert not isinstance(current, TripleWithBinding)
         self.current = current
@@ -177,6 +179,7 @@ class NullTokenClass(object):
         cls.__one__ = self
         self.children = set()
         self.env = Env()
+        self.penalty = 0
         return self
 
     def flatten(self):
@@ -224,8 +227,10 @@ class BetaMemory(ReteNode):
         self.updateFromAbove()
         return self
 
-    def leftActivate(self, token, triple, newBinding):
-        newToken = Token(self, token, triple, newBinding)
+    def leftActivate(self, token, triple, newBinding, penalty=0):
+        newToken = Token(self, token, triple, newBinding, penalty=penalty)
+        if newToken.penalty > 10:
+            return
         self.items.add(newToken)
         for c in self.children:
             c.leftActivate(newToken)
@@ -268,18 +273,43 @@ class JoinNode(ReteNode):
             self.relinkAlpha()
             if self.alphaNode.empty:
                 self.parent.children.remove(self)
+        matchedSomething = False
         for i in self.alphaNode.triplesMatching(token.env):
             triple = i.triple
             env = i.env
             newBinding = self.test(token, env)
             if newBinding is not None:
+                matchedSomething = True
                 for c in self.children:
                     c.leftActivate(token, triple, newBinding)
+        if not matchedSomething:
+            penalty = self.alphaNode.penalty * (1 + len(self.alphaNode.vars.difference(self.parent.vars)))
+            fakeTriple = self.alphaNode.pattern.substitution(token.env.asDict())
+            WMEData.setdefault(fakeTriple, WME())
+            for c in self.children:
+                c.leftActivate(token, fakeTriple, token.env, penalty=penalty)
 
 
     def test(self, token, env2):  # Not good enough! need to unify somehow....
         env = token.env
         newEnv = env
+##        newEnvs = [Env()]
+##        allKeys = frozenset(env1.keys()) | frozenset(env2.keys())
+##        for key in allKeys:
+##            val1, source1 = env1.dereference(key)
+##            val2, source2 = env1.dereference(key)
+##            oldNewEnvs = newEnvs
+##            newEnvs = []
+##            for newEnv in oldNewEnvs:
+##                newEnvs.extend([x[0] for x in unify(val1, val2, vars=self.vars, bindings=newEnv, n1Source=source1, n2Source=source2) ])
+##        print newEnvs
+##        if not newEnvs:
+##            return None
+##        return newEnvs[0]
+                    
+
+
+        
         for var, (val, source) in env2.items():
             if var in env:
                 if env[var] == val:

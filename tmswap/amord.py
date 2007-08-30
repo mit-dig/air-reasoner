@@ -6,6 +6,7 @@ an attempt at an amord implementation built on cwm
 
 import weakref
 WVD = weakref.WeakValueDictionary
+#WVD = dict
 from collections import deque
 
 import llyn
@@ -22,6 +23,7 @@ class FormulaTMS(object):
         self.workingContext = workingContext
         workingContext.tms = self
         self.premises = set()
+        self.falseAssumptions = set()
         
 
     def getTriple(self, subject, predicate, object):
@@ -44,9 +46,9 @@ class FormulaTMS(object):
             self.premises.add(justification)
         if justification is False:
             if isinstance(node.datum, Rule):
-                raise NotImplementedError
+                pass # not worth the work
             if isinstance(node.datum, tuple):
-                workingContext.removeStatement(self.getStatement(node.datum))
+                self.workingContext.removeStatement(self.getStatement(node.datum))
         if isinstance(node.datum, Rule):
 #            print 'Now supporting rule %s because of %s' % (node.datum.label, justification)
             node.datum.compileToRete()
@@ -97,7 +99,9 @@ class Rule(object):
                 r2TMS.justify(self.label, triplesTMS + [self.tms.getThing(self)])
                 assert self.tms.getThing(self).supported
                 for x in triplesTMS:
-                    assert x.supported, x
+                    if not x.supported:
+                        x.assume()
+                        self.tms.falseAssumptions.add(x)
                 assert r2TMS.supported
         self.eventLoop.add(internal)
     def onFailure(self):
@@ -187,6 +191,8 @@ def testPolicy(logURI, policyURI):
     rdf = policyFormula.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
     p = policyFormula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/rei+/policy')
     u = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/s0/university')
+    s9 = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-policy')
+    s9Log = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-log')
     
     rules = [Rule.compileFromTriples(eventLoop, formulaTMS, policyFormula, x)
                       for x in policyFormula.each(pred=rdf['type'], obj=p['Policy'])]
@@ -204,13 +210,43 @@ def testPolicy(logURI, policyURI):
     print 'time reasoning took=', totalTime
 
 #    rete.printRete()
-    try:
-        formulaTMS.getTriple(u['call-1'], p['incompliantWith'], u['MITProxCardPolicy']).why()
-    except AssertionError:
-        print 'No incompliance triple generated --- skipping\n\n'
+    triples = list(workingContext.statementsMatching(pred=p['compliantWith']))
+    supportDict = {}
+    if triples:
+        print 'I can prove the following compliance statements:'
+    else:
+        print 'There is nothing to prove'
+    for triple in triples:
+        print '\n\nready to prove %s\n' % (triple.spo(),)
+        tmsNode = formulaTMS.getTriple(*triple.spo())
+        def f(consequent, just, antecedents, support):
+                if consequent is tmsNode:
+                    supportDict[tmsNode] = formulaTMS.falseAssumptions & support
+        tmsNode.walkSupport(f)
+        if supportDict[tmsNode]:
+            tmsNode.why()
+        else:
+            print "\nI'll print the proof once we give up on false hypotheses"
+        
+    for falsehood in formulaTMS.falseAssumptions:
+        falsehood.retract()
+
+    for triple in triples:
+        tmsNode = formulaTMS.getTriple(*triple.spo())
+        if not tmsNode.supported:
+            print '\n\nHowever, we made false assumptions to get %s' % (triple.spo(),)
+            print '\t', supportDict[tmsNode]
+            print 'if those were true, we would have gotten what we wanted'
+        else:
+            print '\n\nThe real proof of %s is as follows' % (triple.spo(),)
+            tmsNode.why()
+    
+            
     return workingContext.n3String()
 
 
 if __name__ == '__main__':
-    print testPolicy('http://dig.csail.mit.edu/TAMI/2007/s0/log.n3',
-                     'http://dig.csail.mit.edu/TAMI/2007/s0/mit-policy.n3')
+##    print testPolicy('http://dig.csail.mit.edu/TAMI/2007/s0/log.n3',
+##                     'http://dig.csail.mit.edu/TAMI/2007/s0/mit-policy.n3')
+    print testPolicy('http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-log.n3',
+                     'http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-policy.n3')

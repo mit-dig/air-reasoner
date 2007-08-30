@@ -778,6 +778,9 @@ class StoredStatement:
     def __init__(self, q):
         self.quad = q
 
+    def substitution(self, bindings, why=None):
+        return self.__class__([x.substitution(bindings, why=why) for x in self.quad])
+
     def __getitem__(self, i):   # So that we can index the stored thing directly
         return self.quad[i]
 

@@ -170,7 +170,7 @@ class Node(object):
 
     def walkSupport(self, procedure):
         nTree = self.supportTree()
-        assert nTree, 'Bad range argument to %s.walkSupport()' % self
+        assert nTree, 'Bad range argument to %s.walkSupport(), got back %s' % (self, nTree)
         queue = Queue.Queue()  #should I use this? (overkill)
         seen = set()
         def maybeEnqueue(nt):
