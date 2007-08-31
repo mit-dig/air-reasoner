@@ -453,7 +453,7 @@ class IndexedFormula(Formula):
                 return 1
             raise ValueError("You cannot use 'this' except as subject of forAll or forSome")
 
-        self.statements.append(s)
+        self.statements.add(s)
        
         alphaMem = self._index.setdefault((None, None, obj), AlphaMemory())
         alphaMem.add(s)
