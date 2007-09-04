@@ -157,11 +157,16 @@ class Token(object):
         WMEData[current].tokens.add(self)
 
     def delete(self):
+        self.parent.children.remove(self)
         while self.children:
             t = self.children.pop()
             t.delete()
         self.node.removeItem(self)
         W = WMEData[self.current]
+
+    def fail(self):
+        self.parent.children.remove(self)
+        WMEData[self.current].tokens.remove(self)
 
     def flatten(self):
         retVal, _ = self.parent.flatten()
@@ -230,9 +235,10 @@ class BetaMemory(ReteNode):
     def leftActivate(self, token, triple, newBinding, penalty=0):
         newToken = Token(self, token, triple, newBinding, penalty=penalty)
         if newToken.penalty > 10:
+            newToken.fail()
             return
         self.items.add(newToken)
-        for c in self.children:
+        for c in self.children.copy():
             c.leftActivate(newToken)
         self.empty = False
 
@@ -246,7 +252,10 @@ class BetaMemory(ReteNode):
         parent.children = parentChildren
 
     def removeItem(self, item):
-        self.items.remove(item)
+        try:
+            self.items.remove(item)
+        except KeyError:
+            raise ValueError(item.flatten(), [x.flatten() for x in self.items])
         if not self.items:
             self.empty = True
             for c in self.children:
@@ -256,7 +265,7 @@ class BetaMemory(ReteNode):
 class JoinNode(ReteNode):
     def __new__(cls, parent, alphaNode):
         for child in parent.allChildren:
-            if isinstance(child, cls) and child.alphaNode == alphaNode:
+            if isinstance(child, cls) and child.alphaNode is alphaNode:
                 return child
         self = ReteNode.__new__(cls, parent)
         self.alphaNode = alphaNode

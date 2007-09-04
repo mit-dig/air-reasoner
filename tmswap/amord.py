@@ -5,8 +5,8 @@ an attempt at an amord implementation built on cwm
 """
 
 import weakref
-WVD = weakref.WeakValueDictionary
-#WVD = dict
+#WVD = weakref.WeakValueDictionary
+WVD = dict
 from collections import deque
 
 import llyn
@@ -93,6 +93,7 @@ class Rule(object):
 #        print '%s succeeded, with triples %s and env %s' % (self.label, triples, env)
             for r in self.result:
                 r2 = r.substitution(env.asDict())
+                assert isinstance(r2, Rule) or not r2.occurringIn(self.vars), (r2, env, self.label)
 #            print '   ...... so about to assert %s' % r2
                 r2TMS = self.tms.getThing(r2)
                 triplesTMS = [self.tms.getTriple(*x.spo()) for x in triples]
@@ -133,9 +134,9 @@ class Rule(object):
         rdf = F.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
         p = F.newSymbol('http://dig.csail.mit.edu/TAMI/2007/rei+/policy')
         
-        label = F.the(subj=node, pred=rdfs['label'])
+        label = F.the(subj=node, pred=p['label'])
         pattern = F.the(subj=node, pred=p['pattern'])
-        subrules = [cls.compileFromTriples(eventLoop, tms, F, x) for x in F.each(subj=node, pred=p['subrule'])]
+        subrules = [cls.compileFromTriples(eventLoop, tms, F, x) for x in F.each(subj=node, pred=p['rule'])]
         assertions = F.each(subj=node, pred=p['assert'])
         alternate = F.each(subj=node, pred=p['alt'])
         alternateAssertions = []
@@ -193,24 +194,32 @@ def testPolicy(logURI, policyURI):
     u = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/s0/university')
     s9 = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-policy')
     s9Log = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-log')
+
+    policies = policyFormula.each(pred=rdf['type'], obj=p['Policy'])
+
+    compileStartTime = time.time()
     
     rules = [Rule.compileFromTriples(eventLoop, formulaTMS, policyFormula, x)
-                      for x in policyFormula.each(pred=rdf['type'], obj=p['Policy'])]
+                      for x in reduce(list.__add__, [policyFormula.each(subj=y, pred=p['rule']) for y in policies], [])]
     ruleAssumptions = []
     for rule in rules:
         a  = formulaTMS.getThing(rule)
         ruleAssumptions.append(a)
         a.assume()
 
+    eventStartTime = time.time()
+
     while eventLoop:
         eventLoop.next()
 
 # See how long it took (minus output)
-    totalTime = time.time() - startTime
+    now = time.time()
+    totalTime = now - startTime
     print 'time reasoning took=', totalTime
+    print '  of which %s was after loading, and %s was actual reasoning' % (now-compileStartTime, now-eventStartTime)
 
 #    rete.printRete()
-    triples = list(workingContext.statementsMatching(pred=p['compliantWith']))
+    triples = list(workingContext.statementsMatching(pred=p['compliant-with']))
     supportDict = {}
     if triples:
         print 'I can prove the following compliance statements:'
@@ -246,7 +255,7 @@ def testPolicy(logURI, policyURI):
 
 
 if __name__ == '__main__':
-##    print testPolicy('http://dig.csail.mit.edu/TAMI/2007/s0/log.n3',
-##                     'http://dig.csail.mit.edu/TAMI/2007/s0/mit-policy.n3')
-    print testPolicy('http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-log.n3',
-                     'http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-policy.n3')
+    print testPolicy('http://dig.csail.mit.edu/TAMI/2007/s0/log.n3',
+                     'http://dig.csail.mit.edu/TAMI/2007/s0/mit-policy.n3')
+##    print testPolicy('http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-log.n3',
+##                     'http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-policy.n3')
