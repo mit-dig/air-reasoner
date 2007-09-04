@@ -132,7 +132,7 @@ class Rule(object):
         assert tms is not None
         rdfs = F.newSymbol('http://www.w3.org/2000/01/rdf-schema')
         rdf = F.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
-        p = F.newSymbol('http://dig.csail.mit.edu/TAMI/2007/rei+/policy')
+        p = F.newSymbol('http://dig.csail.mit.edu/TAMI/2007/air/policy')
         
         label = F.the(subj=node, pred=p['label'])
         pattern = F.the(subj=node, pred=p['pattern'])
@@ -190,7 +190,7 @@ def testPolicy(logURI, policyURI):
 
     policyFormula = store.load(policyURI)
     rdf = policyFormula.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
-    p = policyFormula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/rei+/policy')
+    p = policyFormula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/air/policy')
     u = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/s0/university')
     s9 = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-policy')
     s9Log = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-log')
@@ -255,7 +255,7 @@ def testPolicy(logURI, policyURI):
 
 
 if __name__ == '__main__':
+    print testPolicy('http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-log.n3',
+                     'http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-policy.n3')
     print testPolicy('http://dig.csail.mit.edu/TAMI/2007/s0/log.n3',
                      'http://dig.csail.mit.edu/TAMI/2007/s0/mit-policy.n3')
-##    print testPolicy('http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-log.n3',
-##                     'http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-policy.n3')
