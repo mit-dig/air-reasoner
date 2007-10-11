@@ -778,6 +778,8 @@ class StoredStatement:
     def __init__(self, q):
         self.quad = q
 
+    requires = frozenset()
+
     def substitution(self, bindings, why=None):
         return self.__class__([x.substitution(bindings, why=why) for x in self.quad])
 
@@ -874,6 +876,8 @@ class StoredStatement:
         notVariables = frozenset([x for x in self.context().freeVariables()
                                   if isinstance(x, Existential)])
         return allFree.difference(notVariables)
+
+    provides = property(freeVariables)
 
     def existentials(self):
         return self.occuringIn(self.quad[CONTEXT].existentials())

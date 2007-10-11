@@ -26,6 +26,19 @@ class FormulaTMS(object):
         self.falseAssumptions = set()
         
 
+    def getAuxTriple(self, auxid, subject, predicate, object):
+        if (auxid, subject, predicate, object) not in self.nodes:
+            a = tms.Node(self.tms, (auxid, subject, predicate, object))
+            self.nodes[(subject, predicate, object)] = a
+        return self.nodes[(auxid, subject, predicate, object)]
+
+    def justifyAuxTriple(self, auxid, subject, predicate, object, rule, antecedents):
+        auxnode = self.getAuxTriple(auxid, subject, predicate, object)
+        node = self.getTriple(subject, predicate, object)
+        a = tms.AndExpression(list(antecedents))
+        n = tms.NotExpression(node)
+        auxnode.justify(rule, [a,n])
+
     def getTriple(self, subject, predicate, object):
         if (subject, predicate, object) not in self.nodes:
             a = tms.Node(self.tms, (subject, predicate, object))
@@ -53,7 +66,7 @@ class FormulaTMS(object):
 #            print 'Now supporting rule %s because of %s' % (node.datum.label, justification)
             node.datum.compileToRete()
         if isinstance(node.datum, Formula):
-#            print 'Now supporting %s because of %s' % (node.datum, justification)
+            print 'Now supporting %s because of %s' % (node.datum, justification)
             self.workingContext.loadFormulaWithSubstitution(node.datum)
         if isinstance(node.datum, tuple):
 #            print '\t ... now supporting %s because of %s' % (node, justification)
@@ -83,17 +96,22 @@ class Rule(object):
         workingContext = self.tms.workingContext
         index = workingContext._index
         patterns = self.pattern.statements
-        bottomBeta = rete.compilePattern(index, patterns, self.vars)
+        bottomBeta = rete.compilePattern(index, patterns, self.vars, self.addTriple, self.retractTriple)
         trueBottom =  rete.ProductionNode(bottomBeta, self.onSuccess, self.onFailure)
         return trueBottom
 
-    def onSuccess(self, (triples, env)):
+    def addTriple(self, triple):
+        self.tms.getTriple(*triple.spo()).assume()
+    def retractTriple(self, triple):
+        self.tms.getTriple(*triple.spo()).retract()
+
+    def onSuccess(self, (triples, env, penalty)):
         self.success = True
         def internal():
 #        print '%s succeeded, with triples %s and env %s' % (self.label, triples, env)
             for r in self.result:
                 r2 = r.substitution(env.asDict())
-                assert isinstance(r2, Rule) or not r2.occurringIn(self.vars), (r2, env, self.label)
+                assert isinstance(r2, Rule) or not r2.occurringIn(self.vars), (r2, env, penalty, self.label)
 #            print '   ...... so about to assert %s' % r2
                 r2TMS = self.tms.getThing(r2)
                 triplesTMS = [self.tms.getTriple(*x.spo()) for x in triples]
@@ -101,6 +119,7 @@ class Rule(object):
                 assert self.tms.getThing(self).supported
                 for x in triplesTMS:
                     if not x.supported:
+                        raise ValueError(x)
                         x.assume()
                         self.tms.falseAssumptions.add(x)
                 assert r2TMS.supported
@@ -128,7 +147,7 @@ class Rule(object):
         return self.__class__(self.eventLoop, self.tms, self.vars, self.label, pattern, result, alternate)
 
     @classmethod
-    def compileFromTriples(cls, eventLoop, tms, F, node):
+    def compileFromTriples(cls, eventLoop, tms, F, node, goal=False):
         assert tms is not None
         rdfs = F.newSymbol('http://www.w3.org/2000/01/rdf-schema')
         rdf = F.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
@@ -137,6 +156,7 @@ class Rule(object):
         label = F.the(subj=node, pred=p['label'])
         pattern = F.the(subj=node, pred=p['pattern'])
         subrules = [cls.compileFromTriples(eventLoop, tms, F, x) for x in F.each(subj=node, pred=p['rule'])]
+        goal_subrules = [cls.compileFromTriples(eventLoop, tms, F, x, goal=True) for x in F.each(subj=node, pred=p['goal-rule'])]
         assertions = F.each(subj=node, pred=p['assert'])
         alternate = F.each(subj=node, pred=p['alt'])
         alternateAssertions = []
@@ -145,12 +165,22 @@ class Rule(object):
         
 
         alternateSubruleNodes = []
-        for x in [F.each(subj=y, pred=p['subrule']) for y in alternate]:
+        for x in [F.each(subj=y, pred=p['rule']) for y in alternate]:
             alternateSubruleNodes.extend(x)
         alternateSubrules = [cls.compileFromTriples(eventLoop, tms, F, x) for x in alternateSubruleNodes]
 
         vars = frozenset(F.each(pred=rdf['type'], obj=p['Variable']))
         self = cls(eventLoop, tms, vars, unicode(label), pattern, subrules + assertions, alternateSubrules + alternateAssertions)
+        return self
+
+    @classmethod
+    def compileCwmRule(cls, eventLoop, tms, F, triple):
+        assert tms is not None
+        label = "Rule from cwm with pattern %s" % triple.subject()
+        pattern = triple.subject()
+        assertions = [triple.object()]
+        vars = frozenset(F.universals())
+        self = cls(eventLoop, tms, vars, unicode(label), pattern, assertions, [])
         return self
 
 
@@ -183,12 +213,15 @@ def testPolicy(logURI, policyURI):
 ## We are done with cwm setup
     startTime = time.time()
     
-    logFormula = store.load(logURI)
+    logFormula = store.load(logURI, flags="p")
     formulaTMS.getThing(logFormula).assume()
 
     eventLoop = EventLoop()
 
     policyFormula = store.load(policyURI)
+
+    rdfsRulesFormula = store.load('http://python-dlp.googlecode.com/files/pD-rules.n3')
+    
     rdf = policyFormula.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
     p = policyFormula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/air/policy')
     u = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/s0/university')
@@ -198,11 +231,13 @@ def testPolicy(logURI, policyURI):
     policies = policyFormula.each(pred=rdf['type'], obj=p['Policy'])
 
     compileStartTime = time.time()
+
+    rdfsRules = [Rule.compileCwmRule(eventLoop, formulaTMS, rdfsRulesFormula, x) for x in rdfsRulesFormula.statementsMatching(pred=store.implies)]
     
     rules = [Rule.compileFromTriples(eventLoop, formulaTMS, policyFormula, x)
                       for x in reduce(list.__add__, [policyFormula.each(subj=y, pred=p['rule']) for y in policies], [])]
     ruleAssumptions = []
-    for rule in rules:
+    for rule in rules + rdfsRules:
         a  = formulaTMS.getThing(rule)
         ruleAssumptions.append(a)
         a.assume()
@@ -255,7 +290,7 @@ def testPolicy(logURI, policyURI):
 
 
 if __name__ == '__main__':
-    print testPolicy('http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-log.n3',
-                     'http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-policy.n3')
+#    print testPolicy('http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-log.n3',
+#                     'http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-policy.n3')
     print testPolicy('http://dig.csail.mit.edu/TAMI/2007/s0/log.n3',
                      'http://dig.csail.mit.edu/TAMI/2007/s0/mit-policy.n3')

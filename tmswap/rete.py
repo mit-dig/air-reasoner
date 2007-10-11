@@ -19,15 +19,63 @@ from formula import Formula
 
 from py25 import dequeRemove
 
-def compilePattern(index, patterns, vars):
+def compilePattern(index, patterns, vars, supportFunc=None, retractFunc=None, builtinMap={}):
     current = EmptyRoot
     patterns.sort()
-    for pattern in patterns:
-        alpha = AlphaFilter.build(index, pattern, vars)
-        current = JoinNode(current, alpha)
+    for pattern in sortPatterns(patterns):
+        alpha = AlphaFilter.build(index, pattern, vars, builtinMap=builtinMap)
+        current = JoinNode(current, alpha, supportFunc, retractFunc)
         current = BetaMemory(current)
     return current
     
+#### Dealing with builtins
+## We need code to do a sort of sort here.
+## A naive topological sort may not work
+## Triples will rely on variables only --- but we are sorting triples, not variables
+
+class CyclicError(ValueError): pass
+
+def sortPatterns(patterns):
+    """return a better order for the patterns, based on a topological - like sort"""
+    requires = {}
+    provides = {}
+    for pattern in patterns:
+        for var in pattern.requires:
+            requires.setdefault(var, set()).add(pattern)
+        for var in pattern.provides:
+            provides.setdefault(var, set()).add(pattern)
+
+
+    def getTopologically():
+        nodes = patterns
+        inDegrees = {}
+        for node in nodes:
+            inDegrees[node] = len(node.requires)
+        zeros = deque()
+        for node in nodes:
+            if inDegrees[node] == 0:
+                zeros.appendleft(node)
+        provided = set()
+        while zeros:
+            top = zeros.pop()
+            yield top
+            for var in top.provides:
+                if var in provided:
+                    continue
+                else:
+                    for node in requires.get(var, []):
+                        inDegrees[node] = inDegrees[node] - 1
+                        if inDegrees[node] == 0:
+                            zeros.appendleft(node)
+                    provided.add(var)
+        if max(inDegrees.values()) != 0:
+            raise CyclicError
+
+    return list(getTopologically())
+
+    
+
+### end builtins
 
 WMEData = WKD()
 
@@ -104,8 +152,15 @@ class AlphaFilter(AlphaMemory):
                 return frozenset()
         existentialVariables = findExistentials(pattern)
         self.vars = pattern.occurringIn(freeVariables | existentialVariables)
-        
         AlphaMemory.__init__(self)
+
+    @property
+    def provides(self):
+        return self.vars
+
+    @property
+    def requires(self):
+        return frozenset()
 
     def buildVarIndex(self, successor):
         return tuple(sorted(list(self.vars & successor.vars)))
@@ -116,7 +171,7 @@ class AlphaFilter(AlphaMemory):
             self.add(TripleWithBinding(s, env))
 
     @classmethod
-    def build(cls, index, pattern, vars):
+    def build(cls, index, pattern, vars, builtinMap):
         def replaceWithNil(x):
             if isinstance(x, Formula) or x.occurringIn(vars):
                 return None
@@ -169,9 +224,9 @@ class Token(object):
         WMEData[self.current].tokens.remove(self)
 
     def flatten(self):
-        retVal, _ = self.parent.flatten()
+        retVal, _, __ = self.parent.flatten()
         retVal.append(self.current)
-        return (retVal, self.env)
+        return (retVal, self.env, self.penalty)
                 
 
 
@@ -188,7 +243,7 @@ class NullTokenClass(object):
         return self
 
     def flatten(self):
-        return ([], self.env)
+        return ([], self.env, 0)
 NullToken = NullTokenClass()
 
 
@@ -247,7 +302,7 @@ class BetaMemory(ReteNode):
         parent = self.parent
         parentChildren = parent.children
         parent.children = set([self])
-        for item in parent.parent.items:
+        for item in parent.parent.items.copy():
             parent.leftActivate(item)
         parent.children = parentChildren
 
@@ -263,7 +318,7 @@ class BetaMemory(ReteNode):
                     dequeRemove(c.alphaNode.successors, c)
 
 class JoinNode(ReteNode):
-    def __new__(cls, parent, alphaNode):
+    def __new__(cls, parent, alphaNode, supportTriple=None, retractTriple=None):
         for child in parent.allChildren:
             if isinstance(child, cls) and child.alphaNode is alphaNode:
                 return child
@@ -275,6 +330,9 @@ class JoinNode(ReteNode):
             if alphaNode.empty:
                 parent.children.remove(self)
         self.varIndex = self.alphaNode.buildVarIndex(self)
+        self.supportTriple = supportTriple
+        self.retractTriple = retractTriple
+        self.falseMatches = {}
         return self
 
     def leftActivate(self, token):
@@ -291,9 +349,12 @@ class JoinNode(ReteNode):
                 matchedSomething = True
                 for c in self.children:
                     c.leftActivate(token, triple, newBinding)
-        if not matchedSomething:
-            penalty = self.alphaNode.penalty * (1 + len(self.alphaNode.vars.difference(self.parent.vars)))
+        if False and not matchedSomething:
+            penalty = self.alphaNode.penalty * (1 + len(self.alphaNode.vars.difference(token.env.keys())))
             fakeTriple = self.alphaNode.pattern.substitution(token.env.asDict())
+            if self.supportTriple is not None:
+                self.supportTriple(fakeTriple)
+            self.falseMatches[token] = fakeTriple
             WMEData.setdefault(fakeTriple, WME())
             for c in self.children:
                 c.leftActivate(token, fakeTriple, token.env, penalty=penalty)
@@ -334,11 +395,16 @@ class JoinNode(ReteNode):
             self.relinkBeta()
             if self.parent.empty:
                 dequeRemove(self.alphaNode.successors, self)
+        triple = triple_holder.triple
+        env = triple_holder.env
         for token in self.parent.items:
-            triple = triple_holder.triple
-            env = triple_holder.env
             newBinding = self.test(token, env)
             if newBinding is not None:
+                if token in self.falseMatches:
+                    falseTriple = self.falseMatches[token]
+                    del self.falseMatches[token]
+                    if False and self.retractTriple is not None:
+                        self.retractTriple(falseTriple)
                 for c in self.children:
                     c.leftActivate(token, triple, newBinding)
         
