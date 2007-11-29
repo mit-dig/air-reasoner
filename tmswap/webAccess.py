@@ -66,6 +66,7 @@ def urlopenForRDF(addr, referer=None):
     """
     return webget(addr,
                   types=['text/rdf+n3',
+                         'application/x-turtle',
                          'application/rdf+xml'],
                   referer = referer)
 
@@ -90,8 +91,7 @@ def webget(addr, referer=None, types=[]):
 
     req = urllib2.Request(addr)
 
-    for t in types:
-        req.add_header('Accept', t)
+    req.add_header('Accept', ','.join(types))
 
     if referer: #consistently misspelt
         req.add_header('Referer', referer)

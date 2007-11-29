@@ -15,16 +15,18 @@ WKD = weakref.WeakKeyDictionary
 from collections import deque
 
 from term import unify, Env
-from formula import Formula
+from formula import Formula, StoredStatement
 
 from py25 import dequeRemove
+VAR_PLACEHOLDER = object()
 
-def compilePattern(index, patterns, vars, supportFunc=None, retractFunc=None, builtinMap={}):
+def compilePattern(index, patterns, vars, buildGoals=False, goalPatterns=False, builtinMap={}):
+    
     current = EmptyRoot
     patterns.sort()
     for pattern in sortPatterns(patterns):
         alpha = AlphaFilter.build(index, pattern, vars, builtinMap=builtinMap)
-        current = JoinNode(current, alpha, supportFunc, retractFunc)
+        current = JoinNode(current, alpha, buildGoals)
         current = BetaMemory(current)
     return current
     
@@ -37,6 +39,7 @@ class CyclicError(ValueError): pass
 
 def sortPatterns(patterns):
     """return a better order for the patterns, based on a topological - like sort"""
+    return patterns
     requires = {}
     provides = {}
     for pattern in patterns:
@@ -76,6 +79,16 @@ def sortPatterns(patterns):
     
 
 ### end builtins
+
+class BogusTriple(StoredStatement):
+    def __init__(self, triple):
+        if hasattr(triple, 'quad'):
+            triple = triple.quad
+        StoredStatement.__init__(self, triple)
+
+    def __repr__(self):
+        return 'BogusTriple(%s)' % (self.quad,)
+
 
 WMEData = WKD()
 
@@ -118,7 +131,7 @@ class TripleWithBinding(object):
 class AlphaMemory(list):
     def __init__(self):
         self.successors = deque()
-        self.empty = True
+        self.empty = False # we can never allow this to be true
         list.__init__(self)
 
     def add(self, s):
@@ -165,9 +178,19 @@ class AlphaFilter(AlphaMemory):
     def buildVarIndex(self, successor):
         return tuple(sorted(list(self.vars & successor.vars)))
 
-        
+
+    varCounter = [0]
     def rightActivate(self, s):
-        for env, _ in unify(self.pattern, s, vars = self.vars):
+        if s.variables:
+            var_bindings = {}
+            for var in s.variables:
+                var_bindings[var] = s.context().newSymbol('http://example.com/alphaFilter#var%s' % self.varCounter[0])
+                self.varCounter[0] += 1
+            s2 = s.substitution(var_bindings)
+            s2.variables  = frozenset(var_bindings.values())
+        else:
+            s2 = s
+        for  _, env in unify(s2, self.pattern, vars = self.vars | s2.variables):
             self.add(TripleWithBinding(s, env))
 
     @classmethod
@@ -176,20 +199,37 @@ class AlphaFilter(AlphaMemory):
             if isinstance(x, Formula) or x.occurringIn(vars):
                 return None
             return x
-        patternTuple = tuple(replaceWithNil(x) for x in (pattern.predicate(),
+        masterPatternTuple = tuple(replaceWithNil(x) for x in (pattern.predicate(),
                                                          pattern.subject(),
                                                          pattern.object()))
-        primaryAlpha = index.setdefault(patternTuple, AlphaMemory())
-        for secondaryAlpha in primaryAlpha.successors:
-            if secondaryAlpha.pattern == pattern:
-                return secondaryAlpha
+        
         secondaryAlpha = cls(pattern, vars)
-        primaryAlpha.successors.appendleft(secondaryAlpha)
-        for triple in primaryAlpha:
-            secondaryAlpha.rightActivate(triple)
+        p, s, o = masterPatternTuple
+        V = VAR_PLACEHOLDER
+        pts = [(p, s, o)]
+        for loc in 0, 1, 2:
+            if masterPatternTuple is not None:
+                newpts = []
+                for t in pts:
+                    newtuple = list(t)
+                    newtuple[loc] = V
+                    newtuple = tuple(newtuple)
+                    newpts.append(t)
+                    newpts.append(newtuple)
+                pts = newpts
+        for patternTuple in pts:
+            primaryAlpha = index.setdefault(patternTuple, AlphaMemory())
+            for secondaryAlpha2 in primaryAlpha.successors:
+                if secondaryAlpha2.pattern == pattern:
+                    return secondaryAlpha2
+            primaryAlpha.successors.appendleft(secondaryAlpha)
+            for triple in primaryAlpha:
+                secondaryAlpha.rightActivate(triple)
         return secondaryAlpha
 
-    def triplesMatching(self, env):
+    def triplesMatching(self, env, includeMissing=False):
+        if includeMissing:
+            return self + [TripleWithBinding(BogusTriple(self.pattern), Env())]
         return self
 
 
@@ -209,7 +249,7 @@ class Token(object):
         self.children = set()
         self.env = env
         parent.children.add(self)
-        WMEData[current].tokens.add(self)
+        WMEData.setdefault(current, WME()).tokens.add(self)
 
     def delete(self):
         self.parent.children.remove(self)
@@ -318,7 +358,7 @@ class BetaMemory(ReteNode):
                     dequeRemove(c.alphaNode.successors, c)
 
 class JoinNode(ReteNode):
-    def __new__(cls, parent, alphaNode, supportTriple=None, retractTriple=None):
+    def __new__(cls, parent, alphaNode, buildGoals=False):
         for child in parent.allChildren:
             if isinstance(child, cls) and child.alphaNode is alphaNode:
                 return child
@@ -330,9 +370,7 @@ class JoinNode(ReteNode):
             if alphaNode.empty:
                 parent.children.remove(self)
         self.varIndex = self.alphaNode.buildVarIndex(self)
-        self.supportTriple = supportTriple
-        self.retractTriple = retractTriple
-        self.falseMatches = {}
+        self.makesGoals = buildGoals
         return self
 
     def leftActivate(self, token):
@@ -341,7 +379,7 @@ class JoinNode(ReteNode):
             if self.alphaNode.empty:
                 self.parent.children.remove(self)
         matchedSomething = False
-        for i in self.alphaNode.triplesMatching(token.env):
+        for i in self.alphaNode.triplesMatching(token.env, self.makesGoals):
             triple = i.triple
             env = i.env
             newBinding = self.test(token, env)
@@ -349,15 +387,6 @@ class JoinNode(ReteNode):
                 matchedSomething = True
                 for c in self.children:
                     c.leftActivate(token, triple, newBinding)
-        if False and not matchedSomething:
-            penalty = self.alphaNode.penalty * (1 + len(self.alphaNode.vars.difference(token.env.keys())))
-            fakeTriple = self.alphaNode.pattern.substitution(token.env.asDict())
-            if self.supportTriple is not None:
-                self.supportTriple(fakeTriple)
-            self.falseMatches[token] = fakeTriple
-            WMEData.setdefault(fakeTriple, WME())
-            for c in self.children:
-                c.leftActivate(token, fakeTriple, token.env, penalty=penalty)
 
 
     def test(self, token, env2):  # Not good enough! need to unify somehow....
@@ -400,11 +429,11 @@ class JoinNode(ReteNode):
         for token in self.parent.items:
             newBinding = self.test(token, env)
             if newBinding is not None:
-                if token in self.falseMatches:
-                    falseTriple = self.falseMatches[token]
-                    del self.falseMatches[token]
-                    if False and self.retractTriple is not None:
-                        self.retractTriple(falseTriple)
+##                if token in self.falseMatches:
+##                    falseTriple = self.falseMatches[token]
+##                    del self.falseMatches[token]
+##                    if False and self.retractTriple is not None:
+##                        self.retractTriple(falseTriple)
                 for c in self.children:
                     c.leftActivate(token, triple, newBinding)
         

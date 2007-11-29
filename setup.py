@@ -35,7 +35,7 @@ from distutils.core import setup
 #from swap import __version__
 __version__='1.2.0a1'
 setup(
-    name = 'cwm',
+    name = 'cwm with tms',
     version = __version__,
     description = "Semantic Web Area for Play",
     author = "TimBL, Dan Connolly and contributors",
@@ -43,8 +43,8 @@ setup(
     maintainer = "Tim Berners-Lee",
     maintainer_email = "timbl@w3.org",
     url = "http://www.w3.org/2000/10/swap/",
-    package_dir = {'swap': 'swap'},
-    packages = ['swap'],
+    package_dir = {'tmswap': 'tmswap'},
+    packages = ['tmswap'],
 #    py_modules = ['cwm', 'delta', 'cant'],
     scripts = ['cwm', 'delta', 'cant'],
    )

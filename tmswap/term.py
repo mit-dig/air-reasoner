@@ -1124,19 +1124,6 @@ class ListView(object):
     def __len__(self):
         return len(self.list) - self.start
             
-def unify(self, other, vars=Set([]), existentials=Set([]),  bindings={}):
-    """Unify something whatever it is
-    See Term.unify
-    """
-    if diag.chatty_flag > 100: progress("Unifying %s with %s" %(self, other))
-    if isinstance(self, (Set, ImmutableSet)):
-        return unifySet(self, other, vars, existentials, bindings)
-    if type(self) is type([]):
-        return unifySequence(self, other, vars, existentials, bindings)
-    k = self.unify(other, vars, existentials, bindings)
-    if k == 0:
-        raise RuntimeError(other, other.__class__)
-    return k
 
 def pickEnv(choice, *envs):
     for env in envs:

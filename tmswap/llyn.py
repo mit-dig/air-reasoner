@@ -68,7 +68,7 @@ import xml.dom.minidom
 from why import smushedFormula, Premise, newTopLevelFormula, isTopLevel
 
 import rete
-from rete import AlphaMemory
+from rete import AlphaMemory, VAR_PLACEHOLDER
 
 import notation3    # N3 parsers and generators, and RDF generator
 from webAccess import webget
@@ -129,6 +129,9 @@ META_run = META_NS_URI + "run"
 
 doMeta = 0  # wait until we have written the code! :-)
     
+
+def isVariable(statement, node):
+    return node in statement.variables
 
 class DataObject:
     """The info about a term in the context of a specific formula
@@ -316,6 +319,15 @@ class IndexedFormula(Formula):
         and newLiteral(), or else literal values which can be interned.
         why     may be a reason for use when a proof will be required.
         """
+        s = self._buildStoredStatement(subj, pred, obj, why)
+        if isinstance(s, int):
+            if s == 0:
+                return 0
+            raise ValueError(subj, pred, obj, s)
+        return self._addStatement(s)
+
+
+    def _buildStoredStatement(self, subj, pred, obj, why):
         if self.canonical != None:
             raise RuntimeError("Attempt to add statement to closed formula "+`self`)
         store = self.store
@@ -408,6 +420,7 @@ class IndexedFormula(Formula):
                     var, val = obj, subj
                 elif ((subj in self.existentials() and obj not in self.existentials())
                     or (subj.generated() and not obj.generated())
+                    or isinstance(obj, BuiltIn)
                     or Term.compareAnyTerm(obj, subj) < 0): var, val = subj, obj
                 else: var, val = obj, subj
                 newBindings[var] = val
@@ -452,6 +465,29 @@ class IndexedFormula(Formula):
                     self._existentialVariables.add(obj)
                 return 1
             raise ValueError("You cannot use 'this' except as subject of forAll or forSome")
+
+        return s
+
+    def _addStatement(self, s):
+        """Add a storedStatement
+
+you should never be calling this
+
+"""
+        
+        subj, pred, obj = s.spo()
+
+### for internal checks
+        alphaMem = self._index.setdefault((pred, subj, obj), AlphaMemory())
+        alphaMem.add(s)
+
+        
+        if isVariable(s, obj):
+            obj = VAR_PLACEHOLDER
+        if isVariable(s, subj):
+            subj = VAR_PLACEHOLDER
+        if isVariable(s, pred):
+            pred = VAR_PLACEHOLDER
 
         self.statements.add(s)
        
@@ -1473,35 +1509,35 @@ class RDFStore(RDFSink) :
         self.li = self.intern(N3_li)
         self.List = self.intern(N3_List)
 
-        import cwm_string  # String builtins
-        import cwm_os      # OS builtins
-        import cwm_time    # time and date builtins
-        import cwm_math    # Mathematics
-        import cwm_trigo   # Trignometry
-        import cwm_times    # time and date builtins
-        import cwm_maths   # Mathematics, perl/string style
-        import cwm_list    # List handling operations
-        import cwm_set     # Set operations
-        import cwm_sparql  # builtins for sparql
-        import cwm_xml     # XML Document Object Model operations
-        cwm_string.register(self)
-        cwm_math.register(self)
-        cwm_trigo.register(self)
-        cwm_maths.register(self)
-        cwm_os.register(self)
-        cwm_time.register(self)
-        cwm_times.register(self)
-        cwm_list.register(self)
-        cwm_set.register(self)
-        cwm_sparql.register(self)
-        cwm_xml.register(self)
-        import cwm_crypto  # Cryptography
-        if crypto:
-            if cwm_crypto.USE_PKC == 0:
-                raise RuntimeError("Try installing pycrypto, and make sure it is in you PYTHONPATH")
-        else:
-            cwm_crypto.USE_PKC = 0       
-        cwm_crypto.register(self)  # would like to anyway to catch bug if used but not available
+##        import cwm_string  # String builtins
+##        import cwm_os      # OS builtins
+##        import cwm_time    # time and date builtins
+##        import cwm_math    # Mathematics
+##        import cwm_trigo   # Trignometry
+##        import cwm_times    # time and date builtins
+##        import cwm_maths   # Mathematics, perl/string style
+##        import cwm_list    # List handling operations
+##        import cwm_set     # Set operations
+##        import cwm_sparql  # builtins for sparql
+##        import cwm_xml     # XML Document Object Model operations
+##        cwm_string.register(self)
+##        cwm_math.register(self)
+##        cwm_trigo.register(self)
+##        cwm_maths.register(self)
+##        cwm_os.register(self)
+##        cwm_time.register(self)
+##        cwm_times.register(self)
+##        cwm_list.register(self)
+##        cwm_set.register(self)
+##        cwm_sparql.register(self)
+##        cwm_xml.register(self)
+##        import cwm_crypto  # Cryptography
+##        if crypto:
+##            if cwm_crypto.USE_PKC == 0:
+##                raise RuntimeError("Try installing pycrypto, and make sure it is in you PYTHONPATH")
+##        else:
+##            cwm_crypto.USE_PKC = 0       
+##        cwm_crypto.register(self)  # would like to anyway to catch bug if used but not available
 
     def newLiteral(self, str, dt=None, lang=None):
         "Interned version: generate new literal object as stored in this store"

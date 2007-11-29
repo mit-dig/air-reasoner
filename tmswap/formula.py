@@ -769,6 +769,7 @@ For future reference, use newUniversal
         return retVal.copy()
 
 
+
 #################################################################################
 
 
@@ -779,6 +780,7 @@ class StoredStatement:
         self.quad = q
 
     requires = frozenset()
+    variables = frozenset()
 
     def substitution(self, bindings, why=None):
         return self.__class__([x.substitution(bindings, why=why) for x in self.quad])
@@ -787,7 +789,16 @@ class StoredStatement:
         return self.quad[i]
 
     def __repr__(self):
-        return "{"+`self[SUBJ]`+" "+`self[PRED]`+" "+`self[OBJ]`+"}"
+        subjString = `self[SUBJ]`
+        predString = `self[PRED]`
+        objString = `self[OBJ]`
+        if self[SUBJ] in self.variables:
+            subjString = '?' + subjString
+        if self[PRED] in self.variables:
+            predString = '?' + predString
+        if self[OBJ] in self.variables:
+            objString = '?' + objString
+        return "{"+subjString+" "+predString+" "+objString+"}"
 
 #   The order of statements is only for canonical output
 #   We cannot override __cmp__ or the object becomes unhashable,
