@@ -38,10 +38,13 @@ class FormulaTMS(object):
 
     def justifyAuxTriple(self, auxid, subject, predicate, object, variables, rule, antecedents):
         auxnode = self.getAuxTriple(auxid, subject, predicate, object, variables)
-        node = self.getTriple(subject, predicate, object)
-        a = tms.AndExpression(list(antecedents))
-        n = tms.NotExpression(node)
-        auxnode.justify(rule, [a,n])
+        if variables.intersection([subject, predicate, object]):
+            auxnode.justify(rule, list(antecedents))
+        else:
+            node = self.getTriple(subject, predicate, object)
+            a = tms.AndExpression(list(antecedents))
+            n = tms.NotExpression(node)
+            auxnode.justify(rule, [a,n])
 
 
     def getContext(self, id):
@@ -389,7 +392,7 @@ def testPolicy(logURI, policyURI):
                              [])]
         totalRules += rules
         totalRules += goal_rules
-    print 'rules = ', rules
+    print 'rules = ', totalRules
     ruleAssumptions = []
     for rule in rdfsRules + totalRules:
         a  = formulaTMS.getThing(rule)
