@@ -80,7 +80,10 @@ class FormulaTMS(object):
                 else:
                     self.getContext(GOAL).removeStatement(self.getAuxStatement(node.datum))
         if isinstance(node.datum, Rule):
-#            print 'Now supporting rule %s because of %s' % (node.datum, justification)
+            if node.datum.goal:
+                print 'Now supporting GOAL rule %s because of %s' % (node.datum, justification)
+            else:
+                print 'Now supporting rule %s because of %s' % (node.datum, justification)
             node.datum.compileToRete()
         if isinstance(node.datum, Formula):
 #            print 'Now supporting %s because of %s' % (node.datum, justification)
@@ -133,7 +136,7 @@ class Rule(object):
         self.generatedLabel = False
         if label is None or label=='None':
             self.generatedLabel = True
-            label = '[pattern=%s]' % pattern
+            label = '[pattern=%s]' % pattern.statements
         self.label = label
         self.eventLoop = eventLoop
         self.success = False
@@ -149,17 +152,34 @@ class Rule(object):
 ##    pattern=%s
 ##    result=%s ''' % (tms, self.vars, label, pattern, result)
 
+    def __eq__(self, other):
+        return isinstance(other, Rule) and \
+               self.eventLoop is other.eventLoop and \
+               self.tms is other.tms and \
+               self.vars == other.vars and \
+               self.pattern == other.pattern and \
+               self.result == other.result and \
+               self.goal == other.goal
+
+    def __hash__(self):
+        return hash((self.eventLoop, self.tms, self.vars, self.pattern, frozenset(self.result), self.goal))
+
     def __repr__(self):
         return '%s with vars %s' % (self.label.encode('utf_8'), self.vars)
 
     def compileToRete(self):
+        patterns = self.pattern.statements
         if self.goal:
             workingContext = self.tms.getContext(GOAL)
         else:
             workingContext = self.tms.workingContext
+            # We are on! make goals!
+            for statement in patterns:
+                (s, p, o), newVars = canonicalizeVariables(statement, self.vars)
+                self.tms.justifyAuxTriple(GOAL, s, p, o, newVars, self.label, [self.tms.getThing(self)])
+            
         index = workingContext._index
-        patterns = self.pattern.statements
-        bottomBeta = rete.compilePattern(index, patterns, self.vars, buildGoals=(not self.goal), goalPatterns=self.goal)
+        bottomBeta = rete.compilePattern(index, patterns, self.vars, buildGoals=False, goalPatterns=self.goal)
         trueBottom =  rete.ProductionNode(bottomBeta, self.onSuccess, self.onFailure)
         return trueBottom
 
@@ -208,6 +228,7 @@ class Rule(object):
                     assert r2TMS.supported                
 #                raise NotImplementedError(goals) #todo: handle goals
             elif unSupported:
+                raise RuntimeError("I should no longer be able to get here")
                 for triple in unSupported:
                     assert isinstance(triple, rete.BogusTriple), triple
                     boundTriple = triple.substitution(env.asDict())
@@ -334,43 +355,43 @@ def testPolicy(logURI, policyURI):
 #    formulaTMS.getThing(AIRFormula).assume()
         
     formulaTMS.getTriple(p['data'], rdf['type'], owl['TransitiveProperty']).assume()
-
-
-    policies = policyFormula.each(pred=rdf['type'], obj=p['Policy'])
-    print 'policies = ', policies
+    
 
     compileStartTime = time.time()
 
     rdfsRules = [] #[Rule.compileCwmRule(eventLoop, formulaTMS, rdfsRulesFormula, x) for x in rdfsRulesFormula.statementsMatching(pred=store.implies)]
-
-    globalVars = frozenset(policyFormula.each(pred=rdf['type'], obj=p['Variable']))
+    totalRules = []
+    for rf in (policyFormula, baseRulesFormula):
+        globalVars = frozenset(rf.each(pred=rdf['type'], obj=p['Variable']))
+        policies = rf.each(pred=rdf['type'], obj=p['Policy'])
     
-    rules = [Rule.compileFromTriples(eventLoop,
-                                                         formulaTMS,
-                                                         policyFormula,
-                                                         x,
-                                                         vars=globalVars.union(policyFormula.each(subj=y, pred=p['variable'])))
-                      for x in reduce(list.__add__, [policyFormula.each(subj=y, pred=p['rule']) for y in policies], [])]
-    goal_rules = [] #[Rule.compileFromTriples(eventLoop, formulaTMS, policyFormula, x, goal=True,
-                            #            vars=globalVars.union(policyFormula.each(subj=y, pred=p['variable'])))
-                    #  for x in reduce(list.__add__, [policyFormula.each(subj=y, pred=p['goal-rule']) for y in policies], [])]
-
-    base_policies = baseRulesFormula.each(pred=rdf['type'], obj=p['Policy'])
-    base_rules = [Rule.compileFromTriples(eventLoop,
-                                                         formulaTMS,
-                                                         baseRulesFormula,
-                                                         x,
-                                                         vars=globalVars.union(baseRulesFormula.each(subj=y, pred=p['variable'])))
-                      for x in reduce(list.__add__, [baseRulesFormula.each(subj=y, pred=p['rule']) for y in base_policies], [])]
-    base_goal_rules = [Rule.compileFromTriples(eventLoop,
-                                                         formulaTMS,
-                                                         baseRulesFormula,
-                                                         x,
-                                                         vars=globalVars.union(baseRulesFormula.each(subj=y, pred=p['variable'])))
-                      for x in reduce(list.__add__, [baseRulesFormula.each(subj=y, pred=p['goal-rule']) for y in base_policies], [])]
+        rules = [Rule.compileFromTriples(eventLoop,
+                  formulaTMS,
+                  rf,
+                  x,
+                  goal=False,
+                  vars=globalVars.union(rf.each(subj=y, pred=p['variable'])))
+                  for x in reduce(list.__add__,
+                                  [rf.each(subj=y,
+                                           pred=p['rule'])
+                                   for y in policies],
+                                [])]
+        goal_rules = [Rule.compileFromTriples(eventLoop,
+                  formulaTMS,
+                  rf,
+                  x,
+                  goal=True,
+                  vars=globalVars.union(rf.each(subj=y, pred=p['variable'])))
+                for x in reduce(list.__add__,
+                                [rf.each(subj=y,
+                                         pred=p['goal-rule'])
+                                 for y in policies],
+                             [])]
+        totalRules += rules
+        totalRules += goal_rules
     print 'rules = ', rules
     ruleAssumptions = []
-    for rule in rdfsRules + rules + goal_rules + base_rules + base_goal_rules:
+    for rule in rdfsRules + totalRules:
         a  = formulaTMS.getThing(rule)
         ruleAssumptions.append(a)
         a.assume()
