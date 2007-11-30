@@ -208,7 +208,7 @@ class AlphaFilter(AlphaMemory):
         V = VAR_PLACEHOLDER
         pts = [(p, s, o)]
         for loc in 0, 1, 2:
-            if masterPatternTuple is not None:
+            if masterPatternTuple[loc] is not None:
                 newpts = []
                 for t in pts:
                     newtuple = list(t)

@@ -83,10 +83,10 @@ class FormulaTMS(object):
                 else:
                     self.getContext(GOAL).removeStatement(self.getAuxStatement(node.datum))
         if isinstance(node.datum, Rule):
-            if node.datum.goal:
-                print 'Now supporting GOAL rule %s because of %s' % (node.datum, justification)
-            else:
-                print 'Now supporting rule %s because of %s' % (node.datum, justification)
+##            if node.datum.goal:
+##                print 'Now supporting GOAL rule %s because of %s' % (node.datum, justification)
+##            else:
+##                print 'Now supporting rule %s because of %s' % (node.datum, justification)
             node.datum.compileToRete()
         if isinstance(node.datum, Formula):
 #            print 'Now supporting %s because of %s' % (node.datum, justification)
