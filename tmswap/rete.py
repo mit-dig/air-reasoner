@@ -80,8 +80,12 @@ def sortPatterns(patterns):
 
 ### end builtins
 
-class BogusTriple(StoredStatement):
+class BogusTripleError(RuntimeError):
+    pass
+
+class BogusTriple(StoredStatement):  
     def __init__(self, triple):
+        raise BogusTripleError('The building of BogusTriples should have been stopped')
         if hasattr(triple, 'quad'):
             triple = triple.quad
         StoredStatement.__init__(self, triple)
@@ -131,7 +135,7 @@ class TripleWithBinding(object):
 class AlphaMemory(list):
     def __init__(self):
         self.successors = deque()
-        self.empty = False # we can never allow this to be true
+        self.empty = True
         list.__init__(self)
 
     def add(self, s):
@@ -190,8 +194,9 @@ class AlphaFilter(AlphaMemory):
             s2.variables  = frozenset(var_bindings.values())
         else:
             s2 = s
-        for  _, env in unify(s2, self.pattern, vars = self.vars | s2.variables):
-            self.add(TripleWithBinding(s, env))
+        for  unWantedBindings, env in unify(s2, self.pattern, vars = self.vars | s2.variables):
+            if not unWantedBindings:
+                self.add(TripleWithBinding(s, env))
 
     @classmethod
     def build(cls, index, pattern, vars, builtinMap):
@@ -370,6 +375,8 @@ class JoinNode(ReteNode):
             if alphaNode.empty:
                 parent.children.remove(self)
         self.varIndex = self.alphaNode.buildVarIndex(self)
+        if buildGoals:
+            raise BogusTripleError('Goal building is dead. Long live goal building')
         self.makesGoals = buildGoals
         return self
 

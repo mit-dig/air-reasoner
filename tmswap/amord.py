@@ -11,7 +11,7 @@ from collections import deque
 
 import llyn
 from formula import Formula, StoredStatement
-from term import List
+from term import List, Env
 
 import tms
 import rete
@@ -38,13 +38,10 @@ class FormulaTMS(object):
 
     def justifyAuxTriple(self, auxid, subject, predicate, object, variables, rule, antecedents):
         auxnode = self.getAuxTriple(auxid, subject, predicate, object, variables)
-        if variables.intersection([subject, predicate, object]):
-            auxnode.justify(rule, list(antecedents))
-        else:
-            node = self.getTriple(subject, predicate, object)
-            a = tms.AndExpression(list(antecedents))
-            n = tms.NotExpression(node)
-            auxnode.justify(rule, [a,n])
+        node = self.getTriple(subject, predicate, object)
+        a = tms.AndExpression(list(antecedents))
+        n = tms.NotExpression(node)
+        auxnode.justify(rule, [a,n])
 
 
     def getContext(self, id):
@@ -52,11 +49,11 @@ class FormulaTMS(object):
             self.contexts[id] = self.workingContext.newFormula()
         return self.contexts[id]
 
-    def getTriple(self, subject, predicate, object):
-        if (subject, predicate, object) not in self.nodes:
-            a = tms.Node(self.tms, (subject, predicate, object))
-            self.nodes[(subject, predicate, object)] = a
-        return self.nodes[(subject, predicate, object)]
+    def getTriple(self, subject, predicate, object, variables=None):
+        if (subject, predicate, object, variables) not in self.nodes:
+            a = tms.Node(self.tms, (subject, predicate, object, variables))
+            self.nodes[(subject, predicate, object, variables)] = a
+        return self.nodes[(subject, predicate, object, variables)]
 
     def getThing(self, thing):
         if thing not in self.nodes:
@@ -64,7 +61,7 @@ class FormulaTMS(object):
             self.nodes[thing] = a
         return self.nodes[thing]
 
-    def getStatement(self, (subject, predicate, object)):
+    def getStatement(self, (subject, predicate, object, variables)):
         return self.workingContext.statementsMatching(subj=subject, pred=predicate, obj=object)[0]
 
     def getAuxStatement(self, (auxid, subject, predicate, object, variables)):
@@ -77,25 +74,47 @@ class FormulaTMS(object):
             if isinstance(node.datum, Rule):
                 pass # not worth the work
             if isinstance(node.datum, tuple):
-                if len(node.datum) == 3:
+                if len(node.datum) == 4:
                     self.workingContext.removeStatement(self.getStatement(node.datum))
                     self.getContext(GOAL).removeStatement(self.getStatement(node.datum))
                 else:
                     self.getContext(GOAL).removeStatement(self.getAuxStatement(node.datum))
         if isinstance(node.datum, Rule):
-##            if node.datum.goal:
-##                print 'Now supporting GOAL rule %s because of %s' % (node.datum, justification)
-##            else:
-##                print 'Now supporting rule %s because of %s' % (node.datum, justification)
+            if node.datum.goal:
+                print '\tNow supporting goal rule %s because of %s' % (node.datum, justification)
+            else:
+                print '\tNow supporting rule %s because of %s' % (node.datum, justification)
             node.datum.compileToRete()
         if isinstance(node.datum, Formula):
-#            print 'Now supporting %s because of %s' % (node.datum, justification)
+            print 'Now supporting %s because of %s' % (node.datum, justification)
             self.workingContext.loadFormulaWithSubstitution(node.datum)
         if isinstance(node.datum, tuple):
 #            print '\t ... now supporting %s because of %s' % (node, justification)
-            if len(node.datum) == 3:
-                self.workingContext.add(*node.datum)
-                self.getContext(GOAL).add(*node.datum)
+            if len(node.datum) == 4:
+                triple = node.datum[:3]
+                variables = node.datum[3]
+                if variables is None:
+                    self.workingContext.add(*triple)                
+                    self.getContext(GOAL).add(*triple)
+                else:  # slow path --- do we need it?
+                    s, p, o = triple
+                    s1 = self.workingContext._buildStoredStatement(subj=s,
+                                                                 pred=p,
+                                                                 obj=o,
+                                                                why=None)
+                    if isinstance(s1, int):
+                        raise TypeError(node)
+                    s1.variables = v
+                    result = self.workingContext. _addStatement(s1)
+                    
+                    s2 = getContext(GOAL)._buildStoredStatement(subj=s,
+                                                                 pred=p,
+                                                                 obj=o,
+                                                                why=None)
+                    if isinstance(s2, int):
+                        raise TypeError(node)
+                    s2.variables = v
+                    result = self.getContext(GOAL). _addStatement(s1)
             else:
                 c, s, p, o, v = node.datum
                 statement = self.getContext(c)._buildStoredStatement(subj=s,
@@ -133,39 +152,81 @@ def canonicalizeVariables(statement, variables):
         return node
     return (canNode(subj), canNode(pred), canNode(obj)), frozenset(varMapping.values())
 
+class Assertion(object):
+    def __init__(self, pattern, support=None, rule=None):
+        self.pattern = pattern
+        self.support = support
+        self.rule = rule
+
+    def substitution(self, bindings):
+        if self.support is None:
+            support = None
+        else:
+            supportList = []
+            for x in self.support:
+                if isinstance(x, frozenset):
+                    supportList.append(x)
+                else:
+                    supportList.append(x.substitution(bindings))
+            support = frozenset(supportList)
+
+        return Assertion(self.pattern.substitution(bindings), support, self.rule)
+
+    def __repr__(self):
+        return 'Assertion(%s,%s,%s)' % (self.pattern, self.support, self.rule)
+
+    def __eq__(self, other):
+        return isinstance(other, Assertion) and self.pattern == other.pattern
+
+    def __hash__(self):
+        return hash((self.pattern, self.__class__)) 
+
+    
+        
+
+
 
 class Rule(object):
-    def __init__(self, eventLoop, tms, vars, label, pattern, result, goal=False):
+    def __init__(self, eventLoop, tms, vars, label, pattern, result, goal=False, matchName=None):
         self.generatedLabel = False
         if label is None or label=='None':
             self.generatedLabel = True
-            label = '[pattern=%s]' % pattern.statements
+            if not goal:
+                label = '[pattern=%s]' % pattern
+            else:
+                label= '[goal=%s]' % pattern
         self.label = label
         self.eventLoop = eventLoop
         self.success = False
         self.tms = tms
         self.vars = vars | pattern.existentials()
         self.pattern = pattern
+        self.patternToCompare = frozenset([x.spo() for x in pattern])
         self.result = result
         self.goal = goal
+        self.matchName = matchName
+        
 ##        print '''just made a rule, with
 ##    tms=%s,
 ##    vars=%s
 ##    label=%s
 ##    pattern=%s
-##    result=%s ''' % (tms, self.vars, label, pattern, result)
+##    result=%s
+##    matchName=%s''' % (tms, self.vars, label, pattern, result, matchName)
+
 
     def __eq__(self, other):
         return isinstance(other, Rule) and \
                self.eventLoop is other.eventLoop and \
                self.tms is other.tms and \
+               self.goal == other.goal and \
                self.vars == other.vars and \
-               self.pattern == other.pattern and \
+               self.patternToCompare == other.patternToCompare and \
                self.result == other.result and \
-               self.goal == other.goal
+               self.matchName == other.matchName
 
     def __hash__(self):
-        return hash((self.eventLoop, self.tms, self.vars, self.pattern, frozenset(self.result), self.goal))
+        return hash((Rule, self.eventLoop, self.tms, self.vars, self.pattern, frozenset(self.result), self.goal, self.matchName))
 
     def __repr__(self):
         return '%s with vars %s' % (self.label.encode('utf_8'), self.vars)
@@ -176,11 +237,9 @@ class Rule(object):
             workingContext = self.tms.getContext(GOAL)
         else:
             workingContext = self.tms.workingContext
-            # We are on! make goals!
-            for statement in patterns:
-                (s, p, o), newVars = canonicalizeVariables(statement, self.vars)
-                self.tms.justifyAuxTriple(GOAL, s, p, o, newVars, self.label, [self.tms.getThing(self)])
-            
+            for triple in patterns:
+                    (s, p, o), newVars = canonicalizeVariables(triple, self.vars)
+                    self.tms.justifyAuxTriple(GOAL, s, p, o, newVars, self.label, [self.tms.getThing(self)])
         index = workingContext._index
         bottomBeta = rete.compilePattern(index, patterns, self.vars, buildGoals=False, goalPatterns=self.goal)
         trueBottom =  rete.ProductionNode(bottomBeta, self.onSuccess, self.onFailure)
@@ -191,10 +250,11 @@ class Rule(object):
     def retractTriple(self, triple):
         self.tms.getTriple(*triple.spo()).retract()
 
-    def onSuccess(self, (triples, env, penalty)):
+    def onSuccess(self, (triples, environment, penalty)):
         self.success = True
         def internal():
 #            print '%s succeeded, with triples %s and env %s' % (self.label, triples, env)
+            env = environment
             triplesTMS = []
             goals = []
             unSupported = []
@@ -208,11 +268,16 @@ class Rule(object):
                         goals.append((triple, t2))
                     else:
                         unSupported.append(triple)
+
+            if self.matchName:
+                if self.matchName in env:
+                    return
+                env = env.bind(self.matchName, (frozenset(triplesTMS + [x[1] for x in goals]), Env()))
             if goals and unSupported:
                 raise RuntimeError(goals, unSupported) #This will never do!
             elif goals:
                 if not self.goal:
-                    raise RuntimeError('how did I get here?')
+                    raise RuntimeError('how did I get here?\nI matched %s, which are goals, but I don\'t want goals' % goals)
 #                print 'we goal succeeded! %s, %s' % (triples, self.result)
                 envDict = env.asDict()
                 for triple, _ in goals:
@@ -222,16 +287,22 @@ class Rule(object):
                         raise NotImplementedError("I don't know how to add variables")
                 
                 for r in self.result:
-                    r2 = r.substitution(env.asDict())
+                    r12 = r.substitution(env.asDict())
+                    r2 = r12.pattern
+                    support = r12.support
+                    ruleId = r12.rule
                     assert isinstance(r2, Rule) or not r2.occurringIn(self.vars), (r2, env, penalty, self.label)
     #            print '   ...... so about to assert %s' % r2
                     r2TMS = self.tms.getThing(r2)
-                    r2TMS.justify(self.label, triplesTMS + [self.tms.getThing(self)])
+                    if support is None:
+                        r2TMS.justify(self.label, triplesTMS + [self.tms.getThing(self)])
+                    else:
+                        supportTMS = reduce(frozenset.union, support, frozenset())
+                        r2TMS.justify(ruleId, supportTMS)
                     assert self.tms.getThing(self).supported
                     assert r2TMS.supported                
 #                raise NotImplementedError(goals) #todo: handle goals
             elif unSupported:
-                raise RuntimeError("I should no longer be able to get here")
                 for triple in unSupported:
                     assert isinstance(triple, rete.BogusTriple), triple
                     boundTriple = triple.substitution(env.asDict())
@@ -242,11 +313,18 @@ class Rule(object):
                     return
 #                print 'we succeeded! %s, %s' % (triples, self.result)
                 for r in self.result:
-                    r2 = r.substitution(env.asDict())
+                    r12 = r.substitution(env.asDict())
+                    r2 = r12.pattern
+                    support = r12.support
+                    ruleId = r12.rule
                     assert isinstance(r2, Rule) or not r2.occurringIn(self.vars), (r2, env, penalty, self.label)
     #            print '   ...... so about to assert %s' % r2
                     r2TMS = self.tms.getThing(r2)
-                    r2TMS.justify(self.label, triplesTMS + [self.tms.getThing(self)])
+                    if support is None:
+                        r2TMS.justify(self.label, triplesTMS + [self.tms.getThing(self)])
+                    else:
+                        supportTMS = reduce(frozenset.union, support, frozenset())
+                        r2TMS.justify(ruleId, supportTMS)
                     assert self.tms.getThing(self).supported
                     assert r2TMS.supported
         self.eventLoop.add(internal)
@@ -273,7 +351,7 @@ class Rule(object):
             label = None
         else:
             label = self.label
-        return self.__class__(self.eventLoop, self.tms, self.vars, label, pattern, result, self.goal)
+        return self.__class__(self.eventLoop, self.tms, self.vars, label, pattern, result, self.goal, self.matchName)
 
     @classmethod
     def compileFromTriples(cls, eventLoop, tms, F, node, goal=False, vars=frozenset()):
@@ -286,11 +364,22 @@ class Rule(object):
         
         label = F.the(subj=node, pred=p['label'])
         pattern = F.the(subj=node, pred=p['pattern'])
-        subrules = [cls.compileFromTriples(eventLoop, tms, F, x, vars=vars) for x in F.each(subj=node, pred=p['rule'])]
-        goal_subrules = [cls.compileFromTriples(eventLoop, tms, F, x, goal=True, vars=vars) for x in F.each(subj=node, pred=p['goal-rule'])]
-        assertions = F.each(subj=node, pred=p['assert'])
+        subrules = [Assertion(cls.compileFromTriples(eventLoop, tms, F, x, vars=vars)) for x in F.each(subj=node, pred=p['rule'])]
+        goal_subrules = [Assertion(cls.compileFromTriples(eventLoop, tms, F, x, goal=True, vars=vars)) for x in F.each(subj=node, pred=p['goal-rule'])]
+        simple_assertions = F.each(subj=node, pred=p['assert'])
+        complex_assertions = F.each(subj=node, pred=p['assertion'])
+        assertions = []
+        for assertion in simple_assertions:
+            assertions.append(Assertion(assertion))
+        for assertion in complex_assertions:
+            statement = F.the(subj=assertion, pred=p['statement'])
+            justNode = F.the(subj=assertion, pred=p['justification'])
+            antecedents = frozenset(F.each(subj=justNode, pred=p['antecedent']))
+            rule_id = F.the(subj=justNode, pred=p['rule-id'])
+            assertions.append(Assertion(statement, antecedents, rule_id))
+        matchedGraph = F.the(subj=node, pred=p['matched-graph'])
         
-        self = cls(eventLoop, tms, vars, unicode(label), pattern, subrules + assertions + goal_subrules, goal=goal)
+        self = cls(eventLoop, tms, vars, unicode(label), pattern, subrules + assertions + goal_subrules, goal=goal, matchName=matchedGraph)
         return self
 
     @classmethod
@@ -343,6 +432,8 @@ def testPolicy(logURI, policyURI):
 
     policyFormula = store.load(policyURI)
     baseRulesFormula = store.load('http://dig.csail.mit.edu/TAMI/2007/amord/base-rules.ttl')
+    baseFactsFormula = store.load('http://dig.csail.mit.edu/TAMI/2007/amord/base-assumptions.ttl')
+    formulaTMS.getThing(baseFactsFormula).assume()
 
 #    rdfsRulesFormula = store.load('http://python-dlp.googlecode.com/files/pD-rules.n3')
     
@@ -358,43 +449,43 @@ def testPolicy(logURI, policyURI):
 #    formulaTMS.getThing(AIRFormula).assume()
         
     formulaTMS.getTriple(p['data'], rdf['type'], owl['TransitiveProperty']).assume()
-    
+
+
+    policies = policyFormula.each(pred=rdf['type'], obj=p['Policy'])
+    print 'policies = ', policies
 
     compileStartTime = time.time()
 
     rdfsRules = [] #[Rule.compileCwmRule(eventLoop, formulaTMS, rdfsRulesFormula, x) for x in rdfsRulesFormula.statementsMatching(pred=store.implies)]
-    totalRules = []
-    for rf in (policyFormula, baseRulesFormula):
-        globalVars = frozenset(rf.each(pred=rdf['type'], obj=p['Variable']))
-        policies = rf.each(pred=rdf['type'], obj=p['Policy'])
+
+    globalVars = frozenset(policyFormula.each(pred=rdf['type'], obj=p['Variable']))
     
-        rules = [Rule.compileFromTriples(eventLoop,
-                  formulaTMS,
-                  rf,
-                  x,
-                  goal=False,
-                  vars=globalVars.union(rf.each(subj=y, pred=p['variable'])))
-                  for x in reduce(list.__add__,
-                                  [rf.each(subj=y,
-                                           pred=p['rule'])
-                                   for y in policies],
-                                [])]
-        goal_rules = [Rule.compileFromTriples(eventLoop,
-                  formulaTMS,
-                  rf,
-                  x,
-                  goal=True,
-                  vars=globalVars.union(rf.each(subj=y, pred=p['variable'])))
-                for x in reduce(list.__add__,
-                                [rf.each(subj=y,
-                                         pred=p['goal-rule'])
-                                 for y in policies],
-                             [])]
-        totalRules += rules
-        totalRules += goal_rules
-    print 'rules = ', totalRules
+    rules = [Rule.compileFromTriples(eventLoop,
+                                                         formulaTMS,
+                                                         policyFormula,
+                                                         x,
+                                                         vars=globalVars.union(policyFormula.each(subj=y, pred=p['variable'])))
+                      for x in reduce(list.__add__, [policyFormula.each(subj=y, pred=p['rule']) for y in policies], [])]
+    goal_rules = [] #[Rule.compileFromTriples(eventLoop, formulaTMS, policyFormula, x, goal=True,
+##                            #            vars=globalVars.union(policyFormula.each(subj=y, pred=p['variable'])))
+##                    #  for x in reduce(list.__add__, [policyFormula.each(subj=y, pred=p['goal-rule']) for y in policies], [])]
+
+    base_policies = baseRulesFormula.each(pred=rdf['type'], obj=p['Policy'])
+    base_rules = [Rule.compileFromTriples(eventLoop,
+                                                         formulaTMS,
+                                                         baseRulesFormula,
+                                                         x,
+                                                         vars=globalVars.union(baseRulesFormula.each(subj=y, pred=p['variable'])))
+                      for x in reduce(list.__add__, [baseRulesFormula.each(subj=y, pred=p['rule']) for y in base_policies], [])]
+    base_goal_rules = [Rule.compileFromTriples(eventLoop,
+                                                         formulaTMS,
+                                                         baseRulesFormula,
+                                                         x,
+                                                         vars=globalVars.union(baseRulesFormula.each(subj=y, pred=p['variable'])))
+                      for x in reduce(list.__add__, [baseRulesFormula.each(subj=y, pred=p['goal-rule']) for y in base_policies], [])]
+    print 'rules = ', rules
     ruleAssumptions = []
-    for rule in rdfsRules + totalRules:
+    for rule in rdfsRules + rules + goal_rules + base_rules + base_goal_rules:
         a  = formulaTMS.getThing(rule)
         ruleAssumptions.append(a)
         a.assume()
