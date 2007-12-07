@@ -583,7 +583,7 @@ you should never be calling this
 
         F.store._equivalentFormulae.add(F)
 
-        if (diag.tracking and isTopLevel(F)) or (F._renameVarsMaps and not cannon):  ## we are sitting in renameVars --- don't bother
+        if (diag.tracking and isTopLevel(F)) or (F._isReasoning and not cannon):  ## we are sitting in renameVars --- don't bother
             F.canonical = F
             return F
  

@@ -412,11 +412,12 @@ For future reference, use newUniversal
 
             if self.tms:
                 self.tms.getTriple(subj, pred, obj).justify('FormulaContents', [self.tms.getThing(old)])
-                
-            total += self.add(subj=subj,
-                              pred=pred,
-                              obj=obj,
-                              why=why)
+                total += 1 #This is bunk
+            else:
+                total += self.add(subj=subj,
+                                  pred=pred,
+                                  obj=obj,
+                                  why=why)
         return bindings3, total
 
     def subSet(self, statements, why=None):
@@ -517,6 +518,7 @@ For future reference, use newUniversal
             Formula._renameVarsMaps.pop()
     resetRenames = staticmethod(resetRenames)
     _renameVarsMaps = []
+    _isReasoning = False
 
 ##    def unify(self, other, vars=Set([]), existentials=Set([]),  bindings={}):
 ##      """See Term.unify()
@@ -783,7 +785,7 @@ class StoredStatement:
     variables = frozenset()
 
     def substitution(self, bindings, why=None):
-        return self.__class__([x.substitution(bindings, why=why) for x in self.quad])
+        return self.__class__([self.quad[0]] + [x.substitution(bindings, why=why) for x in self.quad if x is not self.quad[0]])
 
     def __getitem__(self, i):   # So that we can index the stored thing directly
         return self.quad[i]

@@ -13,10 +13,15 @@ import llyn
 from formula import Formula, StoredStatement
 from term import List, Env
 
+import diag
+progress = diag.progress
+
 import tms
 import rete
 
 GOAL = 1
+
+debugLevel = 0
 
 
 class FormulaTMS(object):
@@ -80,14 +85,17 @@ class FormulaTMS(object):
                 else:
                     self.getContext(GOAL).removeStatement(self.getAuxStatement(node.datum))
         if isinstance(node.datum, Rule):
-            if node.datum.goal:
-                print '\tNow supporting goal rule %s because of %s' % (node.datum, justification)
-            else:
-                print '\tNow supporting rule %s because of %s' % (node.datum, justification)
+            if debugLevel >= 2:
+                if node.datum.goal:
+                    progress('\tNow supporting goal rule %s because of %s' % (node.datum, justification))
+                else:
+                    progress('\tNow supporting rule %s because of %s' % (node.datum, justification))
             node.datum.compileToRete()
-            print '\t\t ... built rule'
+            if debugLevel >= 3:
+                progress('\t\t ... built rule')
         if isinstance(node.datum, Formula):
-            print 'Now supporting %s because of %s' % (node.datum, justification)
+            if debugLevel >= 10:
+                progress('Now supporting %s because of %s' % (node.datum, justification))
             self.workingContext.loadFormulaWithSubstitution(node.datum)
         if isinstance(node.datum, tuple):
 #            print '\t ... now supporting %s because of %s' % (node, justification)
@@ -117,7 +125,8 @@ class FormulaTMS(object):
                     s2.variables = v
                     result = self.getContext(GOAL). _addStatement(s1)
             else:
-                print '\t ... now supporting goal %s because of %s' % (node, justification)
+                if debugLevel > 7:
+                    progress('\t ... now supporting goal %s because of %s' % (node, justification))
                 c, s, p, o, v = node.datum
                 statement = self.getContext(c)._buildStoredStatement(subj=s,
                                                                  pred=p,
@@ -214,14 +223,14 @@ class Rule(object):
         self.result = result
         self.goal = goal
         self.matchName = matchName
-        
-##        print '''just made a rule, with
-##    tms=%s,
-##    vars=%s
-##    label=%s
-##    pattern=%s
-##    result=%s
-##    matchName=%s''' % (tms, self.vars, label, pattern, result, matchName)
+        if debugLevel > 15:        
+            print '''just made a rule, with
+        tms=%s,
+        vars=%s
+        label=%s
+        pattern=%s
+        result=%s
+        matchName=%s''' % (tms, self.vars, label, pattern, result, matchName)
 
 
     def __eq__(self, other):
@@ -262,7 +271,8 @@ class Rule(object):
     def onSuccess(self, (triples, environment, penalty)):
         self.success = True
         def internal():
-#            print '%s succeeded, with triples %s and env %s' % (self.label, triples, env)
+            if debugLevel > 12:
+                progress('%s succeeded, with triples %s and env %s' % (self.label, triples, env))
             env = environment
             triplesTMS = []
             goals = []
@@ -497,9 +507,10 @@ def testPolicy(logURI, policyURI):
         a.assume()
 
     eventStartTime = time.time()
-
+    Formula._isReasoning = True
     while eventLoop:
         eventLoop.next()
+    Formula._isReasoning = False        
 
 # See how long it took (minus output)
     now = time.time()
