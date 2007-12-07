@@ -666,6 +666,7 @@ def main():
         args = ['s0']
     call = lambda : runScenario(args[0])
     if options.profile:
+        import sys
         stdout = sys.stdout
         import hotshot, hotshot.stats
         import tempfile
