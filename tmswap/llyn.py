@@ -213,6 +213,7 @@ class IndexedFormula(Formula):
         self._closureAgenda = []
         self._closureAlready = []
         self.reallyCanonical = False
+        self.inAdd = False
 
 
     def statementsMatching(self, pred=None, subj=None, obj=None):
@@ -310,7 +311,6 @@ class IndexedFormula(Formula):
 #        progress("searchable  %s, %s" %(self.statements, (pred, subj, obj))
         return len(res), res
 
-
     def add(self, subj, pred, obj, why=None):
         """Add a triple to the formula.
         
@@ -323,8 +323,10 @@ class IndexedFormula(Formula):
         if isinstance(s, int):
             if s == 0:
                 return 0
-            raise ValueError(subj, pred, obj, s)
-        return self._addStatement(s)
+            return s
+#            raise ValueError(subj, pred, obj, s)
+        retVal = self._addStatement(s)
+        return retVal
 
 
     def _buildStoredStatement(self, subj, pred, obj, why):

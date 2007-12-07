@@ -188,14 +188,19 @@ class AlphaFilter(AlphaMemory):
         if s.variables:
             var_bindings = {}
             for var in s.variables:
-                var_bindings[var] = s.context().newSymbol('http://example.com/alphaFilter#var%s' % self.varCounter[0])
+                newVar = s.context().newSymbol('http://example.com/alphaFilter#var%s' % self.varCounter[0])
+                var_bindings[var] = newVar
+                newVar.isVariable = True
                 self.varCounter[0] += 1
             s2 = s.substitution(var_bindings)
             s2.variables  = frozenset(var_bindings.values())
         else:
             s2 = s
         for  unWantedBindings, env in unify(s2, self.pattern, vars = self.vars | s2.variables): #
-            if not frozenset(unWantedBindings.asDict().values()).difference(self.vars):
+            if s2.variables.intersection(env.asDict().values()):
+                print 'we have trouble with %s' % s2.variables.intersection(env.asDict().values())
+                # We are in trouble here!
+            if not frozenset(unWantedBindings.asDict().values()).difference(self.vars): # bad, but speeds things up
                 self.add(TripleWithBinding(s, env))
 
     @classmethod

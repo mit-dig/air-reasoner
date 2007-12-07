@@ -205,7 +205,7 @@ class AuxTripleJustifier(object):
 
 
 class Rule(object):
-    def __init__(self, eventLoop, tms, vars, label, pattern, result, goal=False, matchName=None):
+    def __init__(self, eventLoop, tms, vars, label, pattern, result, goal=False, matchName=None, sourceNode=None):
         self.generatedLabel = False
         if label is None or label=='None':
             self.generatedLabel = True
@@ -223,6 +223,7 @@ class Rule(object):
         self.result = result
         self.goal = goal
         self.matchName = matchName
+        self.sourceNode = sourceNode
         if debugLevel > 15:        
             print '''just made a rule, with
         tms=%s,
@@ -384,8 +385,10 @@ class Rule(object):
         
         label = F.the(subj=node, pred=p['label'])
         pattern = F.the(subj=node, pred=p['pattern'])
-        subrules = [Assertion(cls.compileFromTriples(eventLoop, tms, F, x, vars=vars)) for x in F.each(subj=node, pred=p['rule'])]
-        goal_subrules = [Assertion(cls.compileFromTriples(eventLoop, tms, F, x, goal=True, vars=vars)) for x in F.each(subj=node, pred=p['goal-rule'])]
+        subrules = [Assertion(cls.compileFromTriples(eventLoop, tms, F, x, vars=vars))
+                    for x in F.each(subj=node, pred=p['rule'])]
+        goal_subrules = [Assertion(cls.compileFromTriples(eventLoop, tms, F, x, goal=True, vars=vars))
+                         for x in F.each(subj=node, pred=p['goal-rule'])]
         simple_assertions = F.each(subj=node, pred=p['assert'])
         complex_assertions = F.each(subj=node, pred=p['assertion'])
         assertions = []
@@ -399,7 +402,11 @@ class Rule(object):
             assertions.append(Assertion(statement, antecedents, rule_id))
         matchedGraph = F.the(subj=node, pred=p['matched-graph'])
         
-        self = cls(eventLoop, tms, vars, unicode(label), pattern, subrules + assertions + goal_subrules, goal=goal, matchName=matchedGraph)
+        self = cls(eventLoop, tms,
+                   vars, unicode(label),
+                   pattern,
+                   subrules + assertions + goal_subrules,
+                   goal=goal, matchName=matchedGraph, sourceNode=node)
         return self
 
     @classmethod
@@ -411,6 +418,32 @@ class Rule(object):
         vars = frozenset(F.universals())
         self = cls(eventLoop, tms, vars, unicode(label), pattern, assertions, [])
         return self
+
+
+    @classmethod
+    def compileFormula(cls, eventLoop, formulaTMS, pf):
+        rdf = pf.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
+        p = pf.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
+        policies = pf.each(pred=rdf['type'], obj=p['Policy'])
+        globalVars = frozenset(pf.each(pred=rdf['type'], obj=p['Variable']))
+        cwm_rules = [cls.compileCwmRule(eventLoop,
+                                        formulaTMS,
+                                        pf,
+                                        x)
+                     for x in pf.each(pred=pf.store.implies)]
+        rules = [cls.compileFromTriples(eventLoop,
+                                                             formulaTMS,
+                                                             pf,
+                                                             x,
+                                                             vars=globalVars.union(pf.each(subj=y, pred=p['variable'])))
+                          for x in reduce(list.__add__, [pf.each(subj=y, pred=p['rule']) for y in policies], [])]
+        goal_rules = [cls.compileFromTriples(eventLoop,
+                                                             formulaTMS,
+                                                             pf,
+                                                             x,
+                                                             vars=globalVars.union(pf.each(subj=y, pred=p['variable'])))
+                          for x in reduce(list.__add__, [pf.each(subj=y, pred=p['goal-rule']) for y in policies], [])]
+        return rules, goal_rules, cwm_rules               
 
 
 class EventLoop(object):
@@ -432,34 +465,121 @@ class EventLoop(object):
     def __len__(self):
         return len(self.events) + len(self.alternateEvents)
 
-def testPolicy(logURI, policyURI):
-    import time
-    store = llyn.RDFStore()
+
+def supportTrace(tmsNodes):
+    pending = set()
+    reasons = {}
+    premises = set()
+    def nf(self):
+#            print 'running nf(%s), %s, %s' % (self, self.__class__, self.justifications)
+        if self in reasons:
+            return True
+        if self in pending:
+            return False
+        if self.assumed():
+            premises.add(self)
+            reasons[self] = '[premise]'
+        pending.add(self)
+        for just in self.justifications:
+            if just.evaluate(nf):
+                reasons[self] = just
+                return True
+        return False
+    for tmsNode in tmsNodes:
+        a = nf(tmsNode)
+    return reasons, premises
+
+def removeFormulae(reasons, premises):
+    newReasons = {}
+    for node, reason in reasons.items():
+        if node in premises:
+            newReasons[node] = reason
+        else:
+            nodes = reasons[node].expression.nodes()
+            if len(nodes) == 1:
+                parent = list(nodes)[0]
+                if isinstance(parent.datum, Formula):
+                    newReasons[node] = reasons[parent]
+                else:
+                    newReasons[node] = reason
+            else:
+                newReasons[node] = reason
+    return newReasons
+
+def removeBaseRules(baseRule, reasons, premises):
+    newReasons = {}
+    for node, reason in reasons.items():
+        if isinstance(node.datum, Rule):
+            if node.datum.sourceNode is not None and baseRule(node.datum.sourceNode):
+                pass # What goes here?
+        else:
+            newReasons[node] = reason
+
+def simpleTraceOutput(tmsNodes, reasons, premises):
+    done = set()
+    strings = []
+    def nf2(self):
+        if self in done:
+            return True
+        done.add(self)
+        if self in premises:
+            retVal = True
+            strings.append('%s [premise]' % self)
+        else:
+            retVal = reasons[self].evaluate(nf2)
+            strings.append('%s <= (%s)' % (self, ', '.join([str(x) for x in reasons[self].expression.nodes()])))
+        return retVal
+    for tmsNode in tmsNodes:
+        nf2(tmsNode)
+    return strings
+
+
+def setupTMS(store):
     workingContext = store.newFormula()
     workingContext.keepOpen = True
     formulaTMS = FormulaTMS(workingContext)
+    return formulaTMS
+    
+
+def loadFactFormula(formulaTMS, uri, closureMode=""):
+    store = formulaTMS.workingContext.store
+    f = store.newFormula()
+    f.setClosureMode(closureMode)
+    f = store.load(uri, openFormula=f)
+    formulaTMS.getThing(f).assume()
+    return f
+
+    
+
+baseFactsURI = 'http://dig.csail.mit.edu/TAMI/2007/amord/base-assumptions.ttl'
+baseRulesURI = 'http://dig.csail.mit.edu/TAMI/2007/amord/base-rules.ttl'
+
+def testPolicy(logURIs, policyURIs):
+    import time
+    store = llyn.RDFStore()
+    formulaTMS = setupTMS(store)
+    workingContext = formulaTMS.workingContext
 
 ## We are done with cwm setup
     startTime = time.time()
 
-    logFormula = store.newFormula()
-    logFormula.setClosureMode("") # should it be "p"?
-    logFormula = store.load(logURI, openFormula=logFormula)
-    formulaTMS.getThing(logFormula).assume()
-
+    logFormulae = []
+    for logURI in logURIs:
+        logFormulae.append(loadFactFormula(formulaTMS, logURI, "")) # should it be "p"?
+    baseFactsFormula = loadFactFormula(formulaTMS, baseFactsURI)
 
     eventLoop = EventLoop()
 
-    policyFormula = store.load(policyURI)
-    baseRulesFormula = store.load('http://dig.csail.mit.edu/TAMI/2007/amord/base-rules.ttl')
-    baseFactsFormula = store.load('http://dig.csail.mit.edu/TAMI/2007/amord/base-assumptions.ttl')
-    formulaTMS.getThing(baseFactsFormula).assume()
+    policyFormulae = []
+    for policyURI in policyURIs:
+        policyFormulae.append(store.load(policyURI))
+    baseRulesFormula = store.load(baseRulesURI)
 
 #    rdfsRulesFormula = store.load('http://python-dlp.googlecode.com/files/pD-rules.n3')
     
-    rdf = policyFormula.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
-    owl = policyFormula.newSymbol('http://www.w3.org/2002/07/owl')
-    p = policyFormula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
+    rdf = workingContext.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
+    owl = workingContext.newSymbol('http://www.w3.org/2002/07/owl')
+    p = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
     u = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/s0/university')
     s9 = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-policy')
     s9Log = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-log')
@@ -468,11 +588,7 @@ def testPolicy(logURI, policyURI):
 #    AIRFormula = store.load(p.uriref() + '.ttl')
 #    formulaTMS.getThing(AIRFormula).assume()
         
-    formulaTMS.getTriple(p['data'], rdf['type'], owl['TransitiveProperty']).assume()
-
-
-    policies = policyFormula.each(pred=rdf['type'], obj=p['Policy'])
-    print 'policies = ', policies
+#    formulaTMS.getTriple(p['data'], rdf['type'], owl['TransitiveProperty']).assume()
 
     compileStartTime = time.time()
 
@@ -482,24 +598,12 @@ def testPolicy(logURI, policyURI):
 
     allRules = []
     allGoalRules = []
-    for pf in (policyFormula, baseRulesFormula):    
-        policies = pf.each(pred=rdf['type'], obj=p['Policy'])
-        globalVars = frozenset(pf.each(pred=rdf['type'], obj=p['Variable']))
-        rules = [Rule.compileFromTriples(eventLoop,
-                                                             formulaTMS,
-                                                             pf,
-                                                             x,
-                                                             vars=globalVars.union(pf.each(subj=y, pred=p['variable'])))
-                          for x in reduce(list.__add__, [pf.each(subj=y, pred=p['rule']) for y in policies], [])]
-        goal_rules = [Rule.compileFromTriples(eventLoop,
-                                                             formulaTMS,
-                                                             pf,
-                                                             x,
-                                                             vars=globalVars.union(pf.each(subj=y, pred=p['variable'])))
-                          for x in reduce(list.__add__, [pf.each(subj=y, pred=p['goal-rule']) for y in policies], [])]
+    for pf in policyFormulae + [baseRulesFormula]:    
+        rules, goal_rules, cwm_rules = Rule.compileFormula(eventLoop, formulaTMS, pf)
         allRules += rules
         allGoalRules += goal_rules
     print 'rules = ', allRules
+    print 'goal rules = ', goal_rules
     ruleAssumptions = []
     for rule in rdfsRules + allRules + allGoalRules:
         a  = formulaTMS.getThing(rule)
@@ -521,54 +625,47 @@ def testPolicy(logURI, policyURI):
 #    rete.printRete()
     triples = list(workingContext.statementsMatching(pred=p['compliant-with']) +
                    workingContext.statementsMatching(pred=p['non-compliant-with']))
-    supportDict = {}
     if triples:
         print 'I can prove the following compliance statements:'
     else:
         print 'There is nothing to prove'
-    for triple in triples:
-        print '\n\nready to prove %s\n' % (triple.spo(),)
-        tmsNode = formulaTMS.getTriple(triple.subject(), triple.predicate(), triple.object(), None)
-        pending = set()
-        reasons = {}
-        def nf(self):
-#            print 'running nf(%s), %s, %s' % (self, self.__class__, self.justifications)
-            if self in reasons:
-                return True
-            if self in pending:
-                return False
-            pending.add(self)
-            for just in self.justifications:
-                if just.evaluate(nf):
-                    reasons[self] = just
-                    return True
-            return False
-        a = nf(tmsNode)
-        done = set()
-        strings = []
-        def nf2(self):
-            if self in done:
-                return True
-            done.add(self)
-            retVal = reasons[self].evaluate(nf2)
-            strings.append('%s <= (%s)' % (self, ', '.join([str(x) for x in reasons[self].expression.nodes()])))
-            return retVal
         
-        nf2(tmsNode)
-        print '\n'.join(strings)
+    tmsNodes = [formulaTMS.getTriple(triple.subject(), triple.predicate(), triple.object(), None) for triple in triples]
+    reasons, premises = supportTrace(tmsNodes)
+    strings = simpleTraceOutput(tmsNodes, reasons, premises)
+    print '\n'.join(strings)
             
     return workingContext.n3String()
 
 
-if __name__ == '__main__':
-    import sys
-#    call =  testPolicy('http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-log.n3',
-#                     'http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-policy.n3')
-    call = lambda : testPolicy('http://dig.csail.mit.edu/TAMI/2007/s0/log.n3',
-                     'http://dig.csail.mit.edu/TAMI/2007/s0/mit-policy.n3')
-##    call = testPolicy('../../s0/log.n3',
-##                     '../../amord/base-rules.ttl')
-    if sys.argv[1:] == ['perf']:
+knownScenarios = {
+    's0' : ( ['http://dig.csail.mit.edu/TAMI/2007/s0/log.n3'],
+             ['http://dig.csail.mit.edu/TAMI/2007/s0/mit-policy.n3'] ),
+    's0Local' : ( ['../../s0/log.n3'],
+                  [  '../../s0/mit-policy.n3'] )
+
+}
+
+def runScenario(s):
+    if s not in knownScenarios:
+        raise ValueError("I don't know about scenario %s" % s)
+    facts, rules = knownScenarios[s]
+    return testPolicy(facts, rules)
+
+def main():
+    from optparse import OptionParser
+    usage = "usage: %prog [options] scenarioName"
+    parser = OptionParser(usage)
+    parser.add_option('--profile', dest="profile", action="store_true", default=False,
+                      help="""Instead of displaying output, display profile information.
+                      This requires the hotshot module, and is a bit slow
+                      """)
+
+    (options, args) = parser.parse_args()
+    if not args:
+        args = ['s0']
+    call = lambda : runScenario(args[0])
+    if options.profile:
         stdout = sys.stdout
         import hotshot, hotshot.stats
         import tempfile
@@ -589,4 +686,10 @@ if __name__ == '__main__':
         stats.print_stats(60)
     else:
         print call()
+
+        
+
+
+if __name__ == '__main__':
+    main()
 
