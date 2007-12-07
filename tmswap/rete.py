@@ -194,8 +194,8 @@ class AlphaFilter(AlphaMemory):
             s2.variables  = frozenset(var_bindings.values())
         else:
             s2 = s
-        for  unWantedBindings, env in unify(s2, self.pattern, vars = self.vars | s2.variables):
-            if not unWantedBindings:
+        for  unWantedBindings, env in unify(s2, self.pattern, vars = self.vars | s2.variables): #
+            if not frozenset(unWantedBindings.asDict().values()).difference(self.vars):
                 self.add(TripleWithBinding(s, env))
 
     @classmethod

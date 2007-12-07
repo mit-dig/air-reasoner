@@ -83,7 +83,7 @@ from term import BuiltIn, LightBuiltIn, RDFBuiltIn, HeavyBuiltIn, Function, \
     CompoundTerm, List, EmptyList, NonEmptyList, AnonymousNode, N3Set, \
     UnknownType
 from formula import Formula, StoredStatement
-import reify
+### import reify   --- better without
 
 from weakref import WeakValueDictionary
 
@@ -1322,23 +1322,6 @@ class BI_n3String(LightBuiltIn, Function):      # Light? well, I suppose so.
         if isinstance(subj, Formula):
             return self.store.intern((LITERAL, subj.n3String()))
 
-class BI_reification(HeavyBuiltIn, Function, ReverseFunction):
-    """
-
-
-
-    """
-    def evalSubj(self, obj, queue, bindings, proof, query):
-        f = obj.store.newFormula()
-        return reify.dereification(obj, f, obj.store)
-
-    def evalObj(self, subj, queue, bindings, proof, query):
-        f = subj.store.newFormula()
-        q = subj.reification(f, {}, why=None)
-        f=f.close()
-        self.store.storeQuad((self.store._experience, self.store.type, f, 3), why=BecauseOfExperience("SomethingOrOther"))
-        return q
-
 import weakref
 
 class Disjoint_set(object):
@@ -1455,7 +1438,6 @@ class RDFStore(RDFSink) :
         log.internFrag("uri", BI_uri)
         log.internFrag("equalTo", BI_EqualTo)
         log.internFrag("notEqualTo", BI_notEqualTo)
-        log.internFrag("reification", BI_reification)
 
         owl = self.symbol(OWL_NS[:-1])
         self.sameAs = owl.internFrag("sameAs", BI_SameAs)

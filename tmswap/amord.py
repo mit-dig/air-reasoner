@@ -85,6 +85,7 @@ class FormulaTMS(object):
             else:
                 print '\tNow supporting rule %s because of %s' % (node.datum, justification)
             node.datum.compileToRete()
+            print '\t\t ... built rule'
         if isinstance(node.datum, Formula):
             print 'Now supporting %s because of %s' % (node.datum, justification)
             self.workingContext.loadFormulaWithSubstitution(node.datum)
@@ -116,6 +117,7 @@ class FormulaTMS(object):
                     s2.variables = v
                     result = self.getContext(GOAL). _addStatement(s1)
             else:
+                print '\t ... now supporting goal %s because of %s' % (node, justification)
                 c, s, p, o, v = node.datum
                 statement = self.getContext(c)._buildStoredStatement(subj=s,
                                                                  pred=p,
@@ -184,6 +186,13 @@ class Assertion(object):
     
         
 
+class AuxTripleJustifier(object):
+    def __init__(self, tms, *args):
+        self.tms = tms
+        self.args = args
+
+    def __call__(self):
+        self.tms.justifyAuxTriple(*self.args)
 
 
 class Rule(object):
@@ -239,7 +248,7 @@ class Rule(object):
             workingContext = self.tms.workingContext
             for triple in patterns:
                     (s, p, o), newVars = canonicalizeVariables(triple, self.vars)
-                    self.tms.justifyAuxTriple(GOAL, s, p, o, newVars, self.label, [self.tms.getThing(self)])
+                    self.eventLoop.add(AuxTripleJustifier(self.tms, GOAL, s, p, o, newVars, self.label, [self.tms.getThing(self)]))
         index = workingContext._index
         bottomBeta = rete.compilePattern(index, patterns, self.vars, buildGoals=False, goalPatterns=self.goal)
         trueBottom =  rete.ProductionNode(bottomBeta, self.onSuccess, self.onFailure)
@@ -303,6 +312,7 @@ class Rule(object):
                     assert r2TMS.supported                
 #                raise NotImplementedError(goals) #todo: handle goals
             elif unSupported:
+                raise RuntimeError(triple, self)
                 for triple in unSupported:
                     assert isinstance(triple, rete.BogusTriple), triple
                     boundTriple = triple.substitution(env.asDict())
@@ -458,34 +468,30 @@ def testPolicy(logURI, policyURI):
 
     rdfsRules = [] #[Rule.compileCwmRule(eventLoop, formulaTMS, rdfsRulesFormula, x) for x in rdfsRulesFormula.statementsMatching(pred=store.implies)]
 
-    globalVars = frozenset(policyFormula.each(pred=rdf['type'], obj=p['Variable']))
-    
-    rules = [Rule.compileFromTriples(eventLoop,
-                                                         formulaTMS,
-                                                         policyFormula,
-                                                         x,
-                                                         vars=globalVars.union(policyFormula.each(subj=y, pred=p['variable'])))
-                      for x in reduce(list.__add__, [policyFormula.each(subj=y, pred=p['rule']) for y in policies], [])]
-    goal_rules = [] #[Rule.compileFromTriples(eventLoop, formulaTMS, policyFormula, x, goal=True,
-##                            #            vars=globalVars.union(policyFormula.each(subj=y, pred=p['variable'])))
-##                    #  for x in reduce(list.__add__, [policyFormula.each(subj=y, pred=p['goal-rule']) for y in policies], [])]
 
-    base_policies = baseRulesFormula.each(pred=rdf['type'], obj=p['Policy'])
-    base_rules = [Rule.compileFromTriples(eventLoop,
-                                                         formulaTMS,
-                                                         baseRulesFormula,
-                                                         x,
-                                                         vars=globalVars.union(baseRulesFormula.each(subj=y, pred=p['variable'])))
-                      for x in reduce(list.__add__, [baseRulesFormula.each(subj=y, pred=p['rule']) for y in base_policies], [])]
-    base_goal_rules = [Rule.compileFromTriples(eventLoop,
-                                                         formulaTMS,
-                                                         baseRulesFormula,
-                                                         x,
-                                                         vars=globalVars.union(baseRulesFormula.each(subj=y, pred=p['variable'])))
-                      for x in reduce(list.__add__, [baseRulesFormula.each(subj=y, pred=p['goal-rule']) for y in base_policies], [])]
-    print 'rules = ', rules
+
+    allRules = []
+    allGoalRules = []
+    for pf in (policyFormula, baseRulesFormula):    
+        policies = pf.each(pred=rdf['type'], obj=p['Policy'])
+        globalVars = frozenset(pf.each(pred=rdf['type'], obj=p['Variable']))
+        rules = [Rule.compileFromTriples(eventLoop,
+                                                             formulaTMS,
+                                                             pf,
+                                                             x,
+                                                             vars=globalVars.union(pf.each(subj=y, pred=p['variable'])))
+                          for x in reduce(list.__add__, [pf.each(subj=y, pred=p['rule']) for y in policies], [])]
+        goal_rules = [Rule.compileFromTriples(eventLoop,
+                                                             formulaTMS,
+                                                             pf,
+                                                             x,
+                                                             vars=globalVars.union(pf.each(subj=y, pred=p['variable'])))
+                          for x in reduce(list.__add__, [pf.each(subj=y, pred=p['goal-rule']) for y in policies], [])]
+        allRules += rules
+        allGoalRules += goal_rules
+    print 'rules = ', allRules
     ruleAssumptions = []
-    for rule in rdfsRules + rules + goal_rules + base_rules + base_goal_rules:
+    for rule in rdfsRules + allRules + allGoalRules:
         a  = formulaTMS.getThing(rule)
         ruleAssumptions.append(a)
         a.assume()
@@ -502,7 +508,8 @@ def testPolicy(logURI, policyURI):
     print '  of which %s was after loading, and %s was actual reasoning' % (now-compileStartTime, now-eventStartTime)
 
 #    rete.printRete()
-    triples = list(workingContext.statementsMatching(pred=p['compliant-with']))
+    triples = list(workingContext.statementsMatching(pred=p['compliant-with']) +
+                   workingContext.statementsMatching(pred=p['non-compliant-with']))
     supportDict = {}
     if triples:
         print 'I can prove the following compliance statements:'
@@ -510,37 +517,65 @@ def testPolicy(logURI, policyURI):
         print 'There is nothing to prove'
     for triple in triples:
         print '\n\nready to prove %s\n' % (triple.spo(),)
-        tmsNode = formulaTMS.getTriple(*triple.spo())
-        def f(consequent, just, antecedents, support):
-                if consequent is tmsNode:
-                    supportDict[tmsNode] = formulaTMS.falseAssumptions & support
-        tmsNode.walkSupport(f)
-        if supportDict[tmsNode]:
-            tmsNode.why()
-        else:
-            print "\nI'll print the proof once we give up on false hypotheses"
+        tmsNode = formulaTMS.getTriple(triple.subject(), triple.predicate(), triple.object(), None)
+        pending = set()
+        reasons = {}
+        def nf(self):
+#            print 'running nf(%s), %s, %s' % (self, self.__class__, self.justifications)
+            if self in reasons:
+                return True
+            if self in pending:
+                return False
+            pending.add(self)
+            for just in self.justifications:
+                if just.evaluate(nf):
+                    reasons[self] = just
+                    return True
+            return False
+        a = nf(tmsNode)
+        done = set()
+        strings = []
+        def nf2(self):
+            if self in done:
+                return True
+            done.add(self)
+            retVal = reasons[self].evaluate(nf2)
+            strings.append('%s <= (%s)' % (self, ', '.join([str(x) for x in reasons[self].expression.nodes()])))
+            return retVal
         
-    for falsehood in formulaTMS.falseAssumptions:
-        falsehood.retract()
-
-    for triple in triples:
-        tmsNode = formulaTMS.getTriple(*triple.spo())
-        if not tmsNode.supported:
-            print '\n\nHowever, we made false assumptions to get %s' % (triple.spo(),)
-            print '\t', supportDict[tmsNode]
-            print 'if those were true, we would have gotten what we wanted'
-        else:
-            print '\n\nThe real proof of %s is as follows' % (triple.spo(),)
-            tmsNode.why()
-    
+        nf2(tmsNode)
+        print '\n'.join(strings)
             
     return workingContext.n3String()
 
 
 if __name__ == '__main__':
-#    print testPolicy('http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-log.n3',
+    import sys
+#    call =  testPolicy('http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-log.n3',
 #                     'http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-policy.n3')
-    print testPolicy('http://dig.csail.mit.edu/TAMI/2007/s0/log.n3',
+    call = lambda : testPolicy('http://dig.csail.mit.edu/TAMI/2007/s0/log.n3',
                      'http://dig.csail.mit.edu/TAMI/2007/s0/mit-policy.n3')
-##    print testPolicy('../../s0/log.n3',
+##    call = testPolicy('../../s0/log.n3',
 ##                     '../../amord/base-rules.ttl')
+    if sys.argv[1:] == ['perf']:
+        stdout = sys.stdout
+        import hotshot, hotshot.stats
+        import tempfile
+        fname = tempfile.mkstemp()[1]
+        print fname
+        sys.stdout = null = file('/dev/null', 'w')
+        profiler = hotshot.Profile(fname)
+        profiler.runcall(call)
+        profiler.close()
+        sys.stdout = stdout
+        null.close()
+        print 'done running. Ready to do stats'
+        stats = hotshot.stats.load(fname)
+        stats.strip_dirs()
+        stats.sort_stats('cumulative', 'time', 'calls')
+        stats.print_stats(60)
+        stats.sort_stats('time', 'cumulative', 'calls')
+        stats.print_stats(60)
+    else:
+        print call()
+
