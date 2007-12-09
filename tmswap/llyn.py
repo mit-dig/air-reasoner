@@ -1741,7 +1741,7 @@ class RDFStore(RDFSink) :
         if typ == LITERAL_LANG:
             return self.newLiteral(urirefString[0], None, urirefString[1])
         else:
-            urirefString = canonical(urirefString)
+#            urirefString = canonical(urirefString) I never liked this
             assert ':' in urirefString, "must be absolute: %s" % urirefString
 
 

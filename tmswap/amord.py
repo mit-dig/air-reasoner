@@ -204,6 +204,91 @@ class AuxTripleJustifier(object):
         self.tms.justifyAuxTriple(*self.args)
 
 
+class RuleFire(object):
+    def __init__(self, rule, triples, env, penalty):
+        self.rule = rule
+        self.args = (triples, env, penalty)
+
+    def __call__(self):
+        triples, env, penalty = self.args
+        self = self.rule
+        if debugLevel > 12:
+            progress('%s succeeded, with triples %s and env %s' % (self.label, triples, env))
+        triplesTMS = []
+        goals = []
+        unSupported = []
+        for triple in triples:
+            t = self.tms.getTriple(*triple.spo())
+            if t.supported:
+                triplesTMS.append(t)
+            else:
+                t2 = self.tms.getAuxTriple(GOAL, triple.subject(), triple.predicate(), triple.object(), triple.variables)
+                if t2.supported:
+                    goals.append((triple, t2))
+                else:
+                    unSupported.append(triple)
+
+        if self.matchName:
+            if self.matchName in env:
+                return
+            env = env.bind(self.matchName, (frozenset(triplesTMS + [x[1] for x in goals]), Env()))
+        if goals and unSupported:
+            raise RuntimeError(goals, unSupported) #This will never do!
+        elif goals:
+            if not self.goal:
+                raise RuntimeError('how did I get here?\nI matched %s, which are goals, but I don\'t want goals' % goals)
+#                print 'we goal succeeded! %s, %s' % (triples, self.result)
+            envDict = env.asDict()
+            for triple, _ in goals:
+                assert not triple.variables.intersection(env.keys())
+                newVars = triple.variables.intersection(envDict.values())
+                if newVars:
+                    raise NotImplementedError("I don't know how to add variables")
+            
+            for r in self.result:
+                r12 = r.substitution(env.asDict())
+                r2 = r12.pattern
+                support = r12.support
+                ruleId = r12.rule
+                assert isinstance(r2, Rule) or not r2.occurringIn(self.vars), (r2, env, penalty, self.label)
+#            print '   ...... so about to assert %s' % r2
+                r2TMS = self.tms.getThing(r2)
+                if support is None:
+                    r2TMS.justify(self.label, triplesTMS + [self.tms.getThing(self)])
+                else:
+                    supportTMS = reduce(frozenset.union, support, frozenset())
+                    r2TMS.justify(ruleId, supportTMS)
+                assert self.tms.getThing(self).supported
+                assert r2TMS.supported                
+#                raise NotImplementedError(goals) #todo: handle goals
+        elif unSupported:
+            raise RuntimeError(triple, self)
+            for triple in unSupported:
+                assert isinstance(triple, rete.BogusTriple), triple
+                boundTriple = triple.substitution(env.asDict())
+                (s, p, o), newVars = canonicalizeVariables(boundTriple, self.vars)
+                self.tms.justifyAuxTriple(GOAL, s, p, o, newVars, self.label, [self.tms.getThing(self)])
+        else:
+            if self.goal:
+                return
+#                print 'we succeeded! %s, %s' % (triples, self.result)
+            for r in self.result:
+                r12 = r.substitution(env.asDict())
+                r2 = r12.pattern
+                support = r12.support
+                ruleId = r12.rule
+                assert isinstance(r2, Rule) or not r2.occurringIn(self.vars), (r2, env, penalty, self.label)
+#            print '   ...... so about to assert %s' % r2
+                r2TMS = self.tms.getThing(r2)
+                if support is None:
+                    r2TMS.justify(self.label, triplesTMS + [self.tms.getThing(self)])
+                else:
+                    supportTMS = reduce(frozenset.union, support, frozenset())
+                    r2TMS.justify(ruleId, supportTMS)
+                assert self.tms.getThing(self).supported
+                assert r2TMS.supported
+
+
 class Rule(object):
     def __init__(self, eventLoop, tms, vars, label, pattern, result, goal=False, matchName=None, sourceNode=None):
         self.generatedLabel = False
@@ -261,7 +346,7 @@ class Rule(object):
                     self.eventLoop.add(AuxTripleJustifier(self.tms, GOAL, s, p, o, newVars, self.label, [self.tms.getThing(self)]))
         index = workingContext._index
         bottomBeta = rete.compilePattern(index, patterns, self.vars, buildGoals=False, goalPatterns=self.goal)
-        trueBottom =  rete.ProductionNode(bottomBeta, self.onSuccess, self.onFailure)
+        trueBottom =  rete.ProductionNode(bottomBeta, self.onSuccess)
         return trueBottom
 
     def addTriple(self, triple):
@@ -271,99 +356,7 @@ class Rule(object):
 
     def onSuccess(self, (triples, environment, penalty)):
         self.success = True
-        def internal():
-            if debugLevel > 12:
-                progress('%s succeeded, with triples %s and env %s' % (self.label, triples, env))
-            env = environment
-            triplesTMS = []
-            goals = []
-            unSupported = []
-            for triple in triples:
-                t = self.tms.getTriple(*triple.spo())
-                if t.supported:
-                    triplesTMS.append(t)
-                else:
-                    t2 = self.tms.getAuxTriple(GOAL, triple.subject(), triple.predicate(), triple.object(), triple.variables)
-                    if t2.supported:
-                        goals.append((triple, t2))
-                    else:
-                        unSupported.append(triple)
-
-            if self.matchName:
-                if self.matchName in env:
-                    return
-                env = env.bind(self.matchName, (frozenset(triplesTMS + [x[1] for x in goals]), Env()))
-            if goals and unSupported:
-                raise RuntimeError(goals, unSupported) #This will never do!
-            elif goals:
-                if not self.goal:
-                    raise RuntimeError('how did I get here?\nI matched %s, which are goals, but I don\'t want goals' % goals)
-#                print 'we goal succeeded! %s, %s' % (triples, self.result)
-                envDict = env.asDict()
-                for triple, _ in goals:
-                    assert not triple.variables.intersection(env.keys())
-                    newVars = triple.variables.intersection(envDict.values())
-                    if newVars:
-                        raise NotImplementedError("I don't know how to add variables")
-                
-                for r in self.result:
-                    r12 = r.substitution(env.asDict())
-                    r2 = r12.pattern
-                    support = r12.support
-                    ruleId = r12.rule
-                    assert isinstance(r2, Rule) or not r2.occurringIn(self.vars), (r2, env, penalty, self.label)
-    #            print '   ...... so about to assert %s' % r2
-                    r2TMS = self.tms.getThing(r2)
-                    if support is None:
-                        r2TMS.justify(self.label, triplesTMS + [self.tms.getThing(self)])
-                    else:
-                        supportTMS = reduce(frozenset.union, support, frozenset())
-                        r2TMS.justify(ruleId, supportTMS)
-                    assert self.tms.getThing(self).supported
-                    assert r2TMS.supported                
-#                raise NotImplementedError(goals) #todo: handle goals
-            elif unSupported:
-                raise RuntimeError(triple, self)
-                for triple in unSupported:
-                    assert isinstance(triple, rete.BogusTriple), triple
-                    boundTriple = triple.substitution(env.asDict())
-                    (s, p, o), newVars = canonicalizeVariables(boundTriple, self.vars)
-                    self.tms.justifyAuxTriple(GOAL, s, p, o, newVars, self.label, [self.tms.getThing(self)])
-            else:
-                if self.goal:
-                    return
-#                print 'we succeeded! %s, %s' % (triples, self.result)
-                for r in self.result:
-                    r12 = r.substitution(env.asDict())
-                    r2 = r12.pattern
-                    support = r12.support
-                    ruleId = r12.rule
-                    assert isinstance(r2, Rule) or not r2.occurringIn(self.vars), (r2, env, penalty, self.label)
-    #            print '   ...... so about to assert %s' % r2
-                    r2TMS = self.tms.getThing(r2)
-                    if support is None:
-                        r2TMS.justify(self.label, triplesTMS + [self.tms.getThing(self)])
-                    else:
-                        supportTMS = reduce(frozenset.union, support, frozenset())
-                        r2TMS.justify(ruleId, supportTMS)
-                    assert self.tms.getThing(self).supported
-                    assert r2TMS.supported
-        self.eventLoop.add(internal)
-    def onFailure(self):
-        self.success = False
-        def internal():
-            if self.success:
-                return
-#        print '%s failed, so about to do %s' % (self.label, self.alternate)
-##            for r in self.alternate:
-##                r2 = r
-###            print '   ...... so about to assert %s' % r2
-##                r2TMS = self.tms.getThing(r2)
-##                r2TMS.justify(self.label, [self.tms.getThing(self)])
-##                assert self.tms.getThing(self).supported
-##                assert r2TMS.supported
-##        if self.alternate:
-##            self.eventLoop.addAlternate(internal)
+        self.eventLoop.add(RuleFire(self, triples, environment, penalty))
 
     def substitution(self, env):
         pattern = self.pattern.substitution(env)
@@ -542,12 +535,16 @@ def setupTMS(store):
     
 
 def loadFactFormula(formulaTMS, uri, closureMode=""):
+    if loadFactsFormula.pClosureMode:
+        closureMode += "p"
     store = formulaTMS.workingContext.store
     f = store.newFormula()
     f.setClosureMode(closureMode)
     f = store.load(uri, openFormula=f)
     formulaTMS.getThing(f).assume()
     return f
+
+loadFactsFormula.pClosureMode = False
 
     
 
@@ -660,11 +657,44 @@ def main():
                       help="""Instead of displaying output, display profile information.
                       This requires the hotshot module, and is a bit slow
                       """)
+    parser.add_option('--psyco', '-j', dest='psyco', action="store_true", default=False,
+                      help="""Try to use psyco to speed up the program.
+                      Don't try to do this while profiling --- it won't work.
+                      If you do not have psyco, it will throw an ImportError
+
+                      There are no guarentees this will speed things up instead of
+                      slowing them down. In fact, it seems to slow them down quite
+                      a bit right now
+                      """)
+    parser.add_option('--full-unify', dest='fullUnify', action="store_true", default=False,
+                      help="""Run full unification (as opposed to simple implication)
+                      of goals. This may compute (correct) answers it would otherwise miss
+                      It is much more likely to simply kill your performance at this time
+                      """)
+    parser.add_option('--lookup-ontologies', '-L', dest="lookupOntologies", action="store_true", default=False,
+                      help="""Set the cwm closure flag of "p" on all facts loaded.
+                      This will load the ontologies for all properties, until that
+                      converges. This may compute (correct) answers it would otherwise miss
+                      It is much more likely to simply kill your performance at this time.
+                      It may even cause the computation to fail, if a URI 404's or is not RDF.
+                      """)
 
     (options, args) = parser.parse_args()
     if not args:
         args = ['s0']
     call = lambda : runScenario(args[0])
+    if options.lookupOntologies:
+        loadFactsFormula.pClosureMode = True
+    if options.fullUnify:
+        rete.fullUnify = True
+    if options.psyco:
+        if options.profile:
+            raise ValueError("I can't profile with psyco")
+        import psyco
+        psyco.log()
+        psyco.full()
+##        psyco.profile(0.05, memory=100)
+##        psyco.profile(0.2)
     if options.profile:
         import sys
         stdout = sys.stdout

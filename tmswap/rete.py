@@ -15,10 +15,12 @@ WKD = weakref.WeakKeyDictionary
 from collections import deque
 
 from term import unify, Env
-from formula import Formula, StoredStatement
+from formula import Formula, StoredStatement, WME
 
 from py25 import dequeRemove
 VAR_PLACEHOLDER = object()
+
+fullUnify = False
 
 def compilePattern(index, patterns, vars, buildGoals=False, goalPatterns=False, builtinMap={}):
     
@@ -94,16 +96,12 @@ class BogusTriple(StoredStatement):
         return 'BogusTriple(%s)' % (self.quad,)
 
 
-WMEData = WKD()
+#WMEData = WKD()
 
-class WME(object):
-    def __init__(self):
-        self.alphaMemItems = []
-        self.tokens = set()
 
 
 def removeStatement(s):
-    W = WMEData[s]
+    W = s.WME
     for item in W.alphaMemItems:
         item.remove(s)
         if not item:
@@ -121,6 +119,7 @@ class TripleWithBinding(object):
     def __init__(self, triple, env):
         self.triple = triple
         self.env = env
+        self.WME = WME()
 
     def __eq__(self, other):
         if isinstance(other, TripleWithBinding):
@@ -140,7 +139,7 @@ class AlphaMemory(list):
 
     def add(self, s):
         self.append(s)
-        W = WMEData.setdefault(s, WME())
+        W = s.WME
         W.alphaMemItems.append(self)
         for c in self.successors:
             c.rightActivate(s)
@@ -192,7 +191,10 @@ class AlphaFilter(AlphaMemory):
                 var_bindings[var] = newVar
                 newVar.isVariable = True
                 self.varCounter[0] += 1
-            s2 = s.substitution(var_bindings)
+            try:
+                s2 = s.substitution(var_bindings)
+            except TypeError:
+                raise ValueError(s, type(s))
             s2.variables  = frozenset(var_bindings.values())
         else:
             s2 = s
@@ -200,7 +202,7 @@ class AlphaFilter(AlphaMemory):
             if s2.variables.intersection(env.asDict().values()):
                 print 'we have trouble with %s' % s2.variables.intersection(env.asDict().values())
                 # We are in trouble here!
-            if not frozenset(unWantedBindings.asDict().values()).difference(self.vars): # bad, but speeds things up
+            if fullUnify or not frozenset(unWantedBindings.asDict().values()).difference(self.vars): # bad, but speeds things up
                 self.add(TripleWithBinding(s, env))
 
     @classmethod
@@ -237,10 +239,11 @@ class AlphaFilter(AlphaMemory):
                 secondaryAlpha.rightActivate(triple)
         return secondaryAlpha
 
-    def triplesMatching(self, env, includeMissing=False):
+    def triplesMatching(self, successor, env, includeMissing=False): # This is fast enough
+        retVal = self   # No reason to do additional work here
         if includeMissing:
-            return self + [TripleWithBinding(BogusTriple(self.pattern), Env())]
-        return self
+            return retVal + [TripleWithBinding(BogusTriple(self.pattern), Env())]
+        return retVal
 
 
 class Token(object):
@@ -259,7 +262,7 @@ class Token(object):
         self.children = set()
         self.env = env
         parent.children.add(self)
-        WMEData.setdefault(current, WME()).tokens.add(self)
+        current.WME.tokens.add(self)
 
     def delete(self):
         self.parent.children.remove(self)
@@ -267,11 +270,11 @@ class Token(object):
             t = self.children.pop()
             t.delete()
         self.node.removeItem(self)
-        W = WMEData[self.current]
+        W = self.current.WME
 
     def fail(self):
         self.parent.children.remove(self)
-        WMEData[self.current].tokens.remove(self)
+        self.current.WME.tokens.remove(self)
 
     def flatten(self):
         retVal, _, __ = self.parent.flatten()
@@ -391,7 +394,7 @@ class JoinNode(ReteNode):
             if self.alphaNode.empty:
                 self.parent.children.remove(self)
         matchedSomething = False
-        for i in self.alphaNode.triplesMatching(token.env, self.makesGoals):
+        for i in self.alphaNode.triplesMatching(self, token.env, self.makesGoals):
             triple = i.triple
             env = i.env
             newBinding = self.test(token, env)
@@ -465,8 +468,8 @@ class ProductionNode(ReteNode):
         self.task = task
         self.alternative = alternative
         self.updateFromAbove()
-        if not self.items:
-            self.alternative()
+##        if not self.items:
+##            self.alternative()
         return self
 
     def leftActivate(self, token):

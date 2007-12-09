@@ -775,14 +775,21 @@ For future reference, use newUniversal
 #################################################################################
 
 
-class StoredStatement:
+class WME(object):
+    def __init__(self):
+        self.alphaMemItems = []
+        self.tokens = set()
+
+class StoredStatement(object):
     """A statememnt as an element of a formula
     """
     def __init__(self, q):
         self.quad = q
+        self.WME = WME()
 
     requires = frozenset()
     variables = frozenset()
+    
 
     def substitution(self, bindings, why=None):
         return self.__class__([self.quad[0]] + [x.substitution(bindings, why=why) for x in self.quad if x is not self.quad[0]])
