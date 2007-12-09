@@ -535,7 +535,7 @@ def setupTMS(store):
     
 
 def loadFactFormula(formulaTMS, uri, closureMode=""):
-    if loadFactsFormula.pClosureMode:
+    if loadFactFormula.pClosureMode:
         closureMode += "p"
     store = formulaTMS.workingContext.store
     f = store.newFormula()
@@ -544,7 +544,7 @@ def loadFactFormula(formulaTMS, uri, closureMode=""):
     formulaTMS.getThing(f).assume()
     return f
 
-loadFactsFormula.pClosureMode = False
+loadFactFormula.pClosureMode = False
 
     
 

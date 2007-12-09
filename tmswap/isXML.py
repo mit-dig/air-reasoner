@@ -6,7 +6,7 @@ $ ID:   $
 """
 
 import string
-from unicodedata import category
+#from unicodedata import category
 from set_importer import Set
 
 LETTER_CATEGORIES = Set(["Ll", "Lu", "Lo", "Lt", "Nl"])
