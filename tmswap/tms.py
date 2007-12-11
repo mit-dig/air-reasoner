@@ -372,6 +372,7 @@ class Premise(Justification):
 class ExpressionJustification(Justification):
     def __init__(self, consequent, rule, expression, hypotheses=None):
         Justification.__init__(self, consequent)
+        assert not isinstance(rule, (str, unicode)), rule
         self.rule = rule
         self.expression = expression
         if hypotheses is None:

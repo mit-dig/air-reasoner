@@ -8,6 +8,7 @@ import weakref
 #WVD = weakref.WeakValueDictionary
 WVD = dict
 from collections import deque
+from itertools import chain
 
 import llyn
 from formula import Formula, StoredStatement
@@ -25,17 +26,25 @@ debugLevel = 0
 
 
 class FormulaTMS(object):
+    """This is the interface between the TMS and the rdf side of things
+It keeps a Formula of all facts currently believed.
+The job of activating rules also goes on this
+"""
     def __init__(self, workingContext):
         self.tms = tms.TMS('FormulaTMS', self.event)
         self.nodes = WVD()
         self.workingContext = workingContext
         workingContext.tms = self
+        self.formulaContents = workingContext.newSymbol('http://dig.csail.mit.edu/2007/cwmrete/tmswap/amord#FormulaContents')
         self.premises = set()
         self.falseAssumptions = set()
         self.contexts = {}
         
 
     def getAuxTriple(self, auxid, subject, predicate, object, variables):
+        """An aux triple is a triple supported for something other than belief
+This is currently only used for goals
+"""
         if (auxid, subject, predicate, object, variables) not in self.nodes:
             a = tms.Node(self.tms, (auxid, subject, predicate, object, variables))
             self.nodes[(auxid, subject, predicate, object, variables)] = a
@@ -111,7 +120,7 @@ class FormulaTMS(object):
                                                                  pred=p,
                                                                  obj=o,
                                                                 why=None)
-                    if isinstance(s1, int):
+                    if isinstance(s1, int): # It is possible for cwm to not directly add things
                         raise TypeError(node)
                     s1.variables = v
                     result = self.workingContext. _addStatement(s1)
@@ -164,6 +173,8 @@ def canonicalizeVariables(statement, variables):
     return (canNode(subj), canNode(pred), canNode(obj)), frozenset(varMapping.values())
 
 class Assertion(object):
+    """An assertion can be asserted. It tracks what its support will be when asserted
+"""
     def __init__(self, pattern, support=None, rule=None):
         self.pattern = pattern
         self.support = support
@@ -196,6 +207,10 @@ class Assertion(object):
         
 
 class AuxTripleJustifier(object):
+    """A thunk, to separate the work of creating aux triples from
+building the rules whose support created them.
+These are then passed to the scheduler
+"""
     def __init__(self, tms, *args):
         self.tms = tms
         self.args = args
@@ -205,6 +220,8 @@ class AuxTripleJustifier(object):
 
 
 class RuleFire(object):
+    """A thunk, passed to the scheduler when a rule fires
+"""
     def __init__(self, rule, triples, env, penalty):
         self.rule = rule
         self.args = (triples, env, penalty)
@@ -254,7 +271,7 @@ class RuleFire(object):
 #            print '   ...... so about to assert %s' % r2
                 r2TMS = self.tms.getThing(r2)
                 if support is None:
-                    r2TMS.justify(self.label, triplesTMS + [self.tms.getThing(self)])
+                    r2TMS.justify(self.sourceNode, triplesTMS + [self.tms.getThing(self)])
                 else:
                     supportTMS = reduce(frozenset.union, support, frozenset())
                     r2TMS.justify(ruleId, supportTMS)
@@ -267,7 +284,7 @@ class RuleFire(object):
                 assert isinstance(triple, rete.BogusTriple), triple
                 boundTriple = triple.substitution(env.asDict())
                 (s, p, o), newVars = canonicalizeVariables(boundTriple, self.vars)
-                self.tms.justifyAuxTriple(GOAL, s, p, o, newVars, self.label, [self.tms.getThing(self)])
+                self.tms.justifyAuxTriple(GOAL, s, p, o, newVars, self.sourceNode, [self.tms.getThing(self)])
         else:
             if self.goal:
                 return
@@ -281,7 +298,7 @@ class RuleFire(object):
 #            print '   ...... so about to assert %s' % r2
                 r2TMS = self.tms.getThing(r2)
                 if support is None:
-                    r2TMS.justify(self.label, triplesTMS + [self.tms.getThing(self)])
+                    r2TMS.justify(self.sourceNode, triplesTMS + [self.tms.getThing(self)])
                 else:
                     supportTMS = reduce(frozenset.union, support, frozenset())
                     r2TMS.justify(ruleId, supportTMS)
@@ -290,7 +307,11 @@ class RuleFire(object):
 
 
 class Rule(object):
-    def __init__(self, eventLoop, tms, vars, label, pattern, result, goal=False, matchName=None, sourceNode=None):
+    """A Rule contains all of the information necessary to build the rete
+for a rule, and to handle when the rule fires. It does not care
+much how the rule was represented in the rdf network
+"""
+    def __init__(self, eventLoop, tms, vars, label, pattern, result, sourceNode, goal=False, matchName=None):
         self.generatedLabel = False
         if label is None or label=='None':
             self.generatedLabel = True
@@ -330,7 +351,7 @@ class Rule(object):
                self.matchName == other.matchName
 
     def __hash__(self):
-        return hash((Rule, self.eventLoop, self.tms, self.vars, self.pattern, frozenset(self.result), self.goal, self.matchName))
+        return hash((Rule, self.eventLoop, self.tms, self.vars, self.pattern, frozenset(self.result), self.sourceNode, self.goal, self.matchName))
 
     def __repr__(self):
         return '%s with vars %s' % (self.label.encode('utf_8'), self.vars)
@@ -343,7 +364,7 @@ class Rule(object):
             workingContext = self.tms.workingContext
             for triple in patterns:
                     (s, p, o), newVars = canonicalizeVariables(triple, self.vars)
-                    self.eventLoop.add(AuxTripleJustifier(self.tms, GOAL, s, p, o, newVars, self.label, [self.tms.getThing(self)]))
+                    self.eventLoop.add(AuxTripleJustifier(self.tms, GOAL, s, p, o, newVars, self.sourceNode, [self.tms.getThing(self)]))
         index = workingContext._index
         bottomBeta = rete.compilePattern(index, patterns, self.vars, buildGoals=False, goalPatterns=self.goal)
         trueBottom =  rete.ProductionNode(bottomBeta, self.onSuccess)
@@ -365,7 +386,7 @@ class Rule(object):
             label = None
         else:
             label = self.label
-        return self.__class__(self.eventLoop, self.tms, self.vars, label, pattern, result, self.goal, self.matchName)
+        return self.__class__(self.eventLoop, self.tms, self.vars, label, pattern, result, self.sourceNode, self.goal, self.matchName)
 
     @classmethod
     def compileFromTriples(cls, eventLoop, tms, F, node, goal=False, vars=frozenset()):
@@ -439,7 +460,24 @@ class Rule(object):
         return rules, goal_rules, cwm_rules               
 
 
+uriGenCount = [0]
+def nameRules(pf, uriBase):
+    rdf = pf.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
+    p = pf.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
+    bindings = {}
+    for statement in chain(pf.statementsMatching(pred=p['rule']),
+                                        pf.statementsMatching(pred=['goal-rule'])):
+        node = statement.subject()
+        if node in pf.existentials():
+            bindings[node] = uriBase + str(uriGenCount[0])
+            uriGenCount[0] += 1
+    return pf.substitution(bindings)
+
+
 class EventLoop(object):
+    """The eventloop (there should only be one)
+is a FIFO of thunks to be called.
+"""
     def __init__(self):
         self.events = deque()
         self.alternateEvents = deque()
@@ -484,6 +522,7 @@ def supportTrace(tmsNodes):
 
 def removeFormulae(reasons, premises):
     newReasons = {}
+    premises = premises.copy()
     for node, reason in reasons.items():
         if node in premises:
             newReasons[node] = reason
@@ -493,11 +532,13 @@ def removeFormulae(reasons, premises):
                 parent = list(nodes)[0]
                 if isinstance(parent.datum, Formula):
                     newReasons[node] = reasons[parent]
+                    if parent in premises:
+                        premises.add(node)
                 else:
                     newReasons[node] = reason
             else:
                 newReasons[node] = reason
-    return newReasons
+    return newReasons, premises
 
 def removeBaseRules(baseRule, reasons, premises):
     newReasons = {}
@@ -520,12 +561,70 @@ def simpleTraceOutput(tmsNodes, reasons, premises):
             strings.append('%s [premise]' % self)
         else:
             retVal = reasons[self].evaluate(nf2)
-            strings.append('%s <= (%s)' % (self, ', '.join([str(x) for x in reasons[self].expression.nodes()])))
+            strings.append('%s <= %s(%s)' % (self, reasons[self].rule.uriref(), ', '.join([str(x) for x in reasons[self].expression.nodes()])))
         return retVal
     for tmsNode in tmsNodes:
         nf2(tmsNode)
     return strings
 
+
+def rdfTraceOutput(store, tmsNodes, reasons, premises):
+    formula = store.newFormula()
+    t = formula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/tms')
+    done = set()
+    termsFor = {}
+
+    def booleanExpressionToRDF(expr):
+        if expr in termsFor:
+            return termsFor[expr]
+        node = formula.newBlankNode()
+        termsFor[expr] = node
+##        formula.add(node, store.type, {tms.NotExpression: t['NotExpression'],
+##                                       tms.AndExpression: t['AndExpression'],
+##                                       tms.OrExpression: t['OrExpression']}[expr.__class__])
+##        for arg in expr.args:
+##            formula.add(node, t['sub-expr'], booleanExpressionToRDF(arg))
+        return node
+
+    class OddError(RuntimeError):
+        pass
+    
+    def nf2(self):
+        if self in done:
+            return True
+        done.add(self)
+        datum = self.datum
+        if isinstance(datum, Rule):
+            #datum is a rule!
+            termsFor[self] = datum.sourceNode
+        else:
+            newFormula = store.newFormula()
+            newFormula.add(*self.datum[:3])
+            newFormula = newFormula.close()
+            termsFor[self] = newFormula
+        if self in premises:
+            retVal = True
+#            formula.add(termsFor[self], store.type, t['Premise'])
+        else:
+            retVal = reasons[self].evaluate(nf2)
+            antecedents = reasons[self].expression.nodes()
+            rule = reasons[self].rule
+            antecedentExpr = booleanExpressionToRDF(reasons[self].expression)
+            antecedentExpr = t['Nothing']
+            selfTerm = termsFor[self]
+            formula.add(selfTerm, t['rule-name'], rule)
+            assert formula.contains(subj=selfTerm, pred=t['rule-name'], obj=rule)
+            formula.add(selfTerm, t['antecedent-expr'], antecedentExpr)
+            print 'adding (%s, %s, %s), (%s, %s, %s)' % (selfTerm, t['rule-name'], rule, selfTerm, t['antecedent-expr'], antecedentExpr)
+            raise OddError
+        return retVal
+    try:
+        for tmsNode in tmsNodes:
+            nf2(tmsNode)
+    except OddError:
+        pass
+    return formula.close()
+            
 
 def setupTMS(store):
     workingContext = store.newFormula()
@@ -629,9 +728,13 @@ def testPolicy(logURIs, policyURIs):
         
     tmsNodes = [formulaTMS.getTriple(triple.subject(), triple.predicate(), triple.object(), None) for triple in triples]
     reasons, premises = supportTrace(tmsNodes)
+    reasons, premises = removeFormulae(reasons, premises)
     strings = simpleTraceOutput(tmsNodes, reasons, premises)
+#    f = rdfTraceOutput(store, tmsNodes, reasons, premises)
     print '\n'.join(strings)
-            
+#    import diag
+#    diag.chatty_flag = 1000
+#    return f.n3String() 
     return workingContext.n3String()
 
 

@@ -411,7 +411,7 @@ For future reference, use newUniversal
                 bindings2[s[OBJ]] = obj
 
             if self.tms:
-                self.tms.getTriple(subj, pred, obj).justify('FormulaContents', [self.tms.getThing(old)])
+                self.tms.getTriple(subj, pred, obj).justify(self.tms.formulaContents, [self.tms.getThing(old)])
                 total += 1 #This is bunk
             else:
                 total += self.add(subj=subj,

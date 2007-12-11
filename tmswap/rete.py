@@ -23,7 +23,7 @@ VAR_PLACEHOLDER = object()
 fullUnify = False
 
 def compilePattern(index, patterns, vars, buildGoals=False, goalPatterns=False, builtinMap={}):
-    
+    """This builds the RETE network"""
     current = EmptyRoot
     patterns.sort()
     for pattern in sortPatterns(patterns):
@@ -41,7 +41,7 @@ class CyclicError(ValueError): pass
 
 def sortPatterns(patterns):
     """return a better order for the patterns, based on a topological - like sort"""
-    return patterns
+    return patterns # This is not used right now
     requires = {}
     provides = {}
     for pattern in patterns:
@@ -116,6 +116,8 @@ def removeStatement(s):
 
 
 class TripleWithBinding(object):
+    """A (triple, binding) pair to pass from an alpha node to a beta node
+"""
     def __init__(self, triple, env):
         self.triple = triple
         self.env = env
@@ -132,6 +134,9 @@ class TripleWithBinding(object):
 
 
 class AlphaMemory(list):
+    """An alpha memory node matched triples against one triple of the pattern.
+This base class only knows variables, and is part of the IndexedFormula.
+"""
     def __init__(self):
         self.successors = deque()
         self.empty = True
@@ -147,6 +152,9 @@ class AlphaMemory(list):
 
 
 class AlphaFilter(AlphaMemory):
+    """An alphaFilter connects an alpha node to a join node. It has the full pattern, and
+generates variable bindings
+"""
     def __init__(self, pattern, vars):
         self.penalty = 10
         self.pattern = pattern
@@ -247,6 +255,8 @@ class AlphaFilter(AlphaMemory):
 
 
 class Token(object):
+    """A token is a partial match, stored in a beta node
+"""
     def __init__(self, node, parent, current, env, penalty=0):
         """It is not the job of this function to compute
         the new env; indeed, because that operation
@@ -284,6 +294,8 @@ class Token(object):
 
 
 class NullTokenClass(object):
+    """There is one empty null token, representing an unstarted match.
+"""
     __one__ = None
     def __new__(cls):
         if cls.__one__:
@@ -311,6 +323,9 @@ class ReteNode(object):
         return self
 
 class EmptyRootClass(ReteNode):
+    """There is one empty root node, the root of the tree of rete nodes
+It has nothing matched yet.
+"""
     __one__ = None
     def __new__(cls):
         if cls.__one__:
@@ -328,6 +343,8 @@ EmptyRoot = EmptyRootClass()
 
 
 class BetaMemory(ReteNode):
+    """A beta memory stores Tokens, received from the one parent join node
+"""
     def __new__(cls, parent):
         for B in parent.children:
             if isinstance(B, cls):
@@ -371,6 +388,9 @@ class BetaMemory(ReteNode):
                     dequeRemove(c.alphaNode.successors, c)
 
 class JoinNode(ReteNode):
+    """A join node combines matches from a beta memory and an alphaFilter
+to get larger matches.
+"""
     def __new__(cls, parent, alphaNode, buildGoals=False):
         for child in parent.allChildren:
             if isinstance(child, cls) and child.alphaNode is alphaNode:
@@ -462,6 +482,9 @@ class JoinNode(ReteNode):
 
     
 class ProductionNode(ReteNode):
+    """A production node sits at the leaf of the node tree,
+with a method to call when the match succeeds
+"""
     def __new__(cls, parent, task, alternative = None):
         self = ReteNode.__new__(cls, parent)
         self.items = set()
