@@ -787,7 +787,7 @@ def main():
         args = ['s0']
     call = lambda : runScenario(args[0])
     if options.lookupOntologies:
-        loadFactsFormula.pClosureMode = True
+        loadFactFormula.pClosureMode = True
     if options.fullUnify:
         rete.fullUnify = True
     if options.psyco:
