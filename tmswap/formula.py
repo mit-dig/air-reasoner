@@ -718,9 +718,9 @@ For future reference, use newUniversal
         """Yes, any identifier you see for this is arbitrary."""
         return 1
 
-    def asPair(self):
-        """Return an old representation. Obsolete"""
-        return (FORMULA, self.uriref())
+##    def asPair(self):
+##        """Return an old representation. Obsolete"""
+##        return (FORMULA, self.uriref())
 
     def subjects(self, pred=None, obj=None):
         """Obsolete - use each(pred=..., obj=...)"""

@@ -579,15 +579,13 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises):
             return termsFor[expr]
         node = formula.newBlankNode()
         termsFor[expr] = node
-##        formula.add(node, store.type, {tms.NotExpression: t['NotExpression'],
-##                                       tms.AndExpression: t['AndExpression'],
-##                                       tms.OrExpression: t['OrExpression']}[expr.__class__])
-##        for arg in expr.args:
-##            formula.add(node, t['sub-expr'], booleanExpressionToRDF(arg))
+        formula.add(node, store.type, {tms.NotExpression: t['NotExpression'],
+                                       tms.AndExpression: t['AndExpression'],
+                                       tms.OrExpression: t['OrExpression']}[expr.__class__])
+        for arg in expr.args:
+            formula.add(node, t['sub-expr'], booleanExpressionToRDF(arg))
         return node
 
-    class OddError(RuntimeError):
-        pass
     
     def nf2(self):
         if self in done:
@@ -604,25 +602,21 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises):
             termsFor[self] = newFormula
         if self in premises:
             retVal = True
-#            formula.add(termsFor[self], store.type, t['Premise'])
+            formula.add(termsFor[self], store.type, t['Premise'])
         else:
             retVal = reasons[self].evaluate(nf2)
             antecedents = reasons[self].expression.nodes()
             rule = reasons[self].rule
             antecedentExpr = booleanExpressionToRDF(reasons[self].expression)
-            antecedentExpr = t['Nothing']
             selfTerm = termsFor[self]
             formula.add(selfTerm, t['rule-name'], rule)
             assert formula.contains(subj=selfTerm, pred=t['rule-name'], obj=rule)
             formula.add(selfTerm, t['antecedent-expr'], antecedentExpr)
             print 'adding (%s, %s, %s), (%s, %s, %s)' % (selfTerm, t['rule-name'], rule, selfTerm, t['antecedent-expr'], antecedentExpr)
-            raise OddError
         return retVal
-    try:
-        for tmsNode in tmsNodes:
-            nf2(tmsNode)
-    except OddError:
-        pass
+    
+    for tmsNode in tmsNodes:
+        nf2(tmsNode)
     return formula.close()
             
 
@@ -730,11 +724,11 @@ def testPolicy(logURIs, policyURIs):
     reasons, premises = supportTrace(tmsNodes)
     reasons, premises = removeFormulae(reasons, premises)
     strings = simpleTraceOutput(tmsNodes, reasons, premises)
-#    f = rdfTraceOutput(store, tmsNodes, reasons, premises)
-    print '\n'.join(strings)
+    f = rdfTraceOutput(store, tmsNodes, reasons, premises)
+#    print '\n'.join(strings)
 #    import diag
 #    diag.chatty_flag = 1000
-#    return f.n3String() 
+    return f.n3String() 
     return workingContext.n3String()
 
 
