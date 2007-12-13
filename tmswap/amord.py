@@ -311,7 +311,11 @@ class Rule(object):
 for a rule, and to handle when the rule fires. It does not care
 much how the rule was represented in the rdf network
 """
-    def __init__(self, eventLoop, tms, vars, label, pattern, result, sourceNode, goal=False, matchName=None):
+
+    baseRules = set()
+    
+    def __init__(self, eventLoop, tms, vars, label,
+                 pattern, result, sourceNode, goal=False, matchName=None, base=False):
         self.generatedLabel = False
         if label is None or label=='None':
             self.generatedLabel = True
@@ -330,6 +334,9 @@ much how the rule was represented in the rdf network
         self.goal = goal
         self.matchName = matchName
         self.sourceNode = sourceNode
+        self.isBase = base
+        if base:
+            self.baseRules.add(sourceNode)
         if debugLevel > 15:        
             print '''just made a rule, with
         tms=%s,
@@ -386,10 +393,12 @@ much how the rule was represented in the rdf network
             label = None
         else:
             label = self.label
-        return self.__class__(self.eventLoop, self.tms, self.vars, label, pattern, result, self.sourceNode, self.goal, self.matchName)
+        return self.__class__(self.eventLoop, self.tms, self.vars,
+                              label, pattern, result, self.sourceNode,
+                              self.goal, self.matchName, base=self.isBase)
 
     @classmethod
-    def compileFromTriples(cls, eventLoop, tms, F, node, goal=False, vars=frozenset()):
+    def compileFromTriples(cls, eventLoop, tms, F, node, goal=False, vars=frozenset(), base=False):
         assert tms is not None
         rdfs = F.newSymbol('http://www.w3.org/2000/01/rdf-schema')
         rdf = F.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
@@ -399,9 +408,10 @@ much how the rule was represented in the rdf network
         
         label = F.the(subj=node, pred=p['label'])
         pattern = F.the(subj=node, pred=p['pattern'])
-        subrules = [Assertion(cls.compileFromTriples(eventLoop, tms, F, x, vars=vars))
+        base = base or (F.any(subj=node, pred=F.store.type, obj=p['Base-rule']) is not None)
+        subrules = [Assertion(cls.compileFromTriples(eventLoop, tms, F, x, vars=vars, base=base))
                     for x in F.each(subj=node, pred=p['rule'])]
-        goal_subrules = [Assertion(cls.compileFromTriples(eventLoop, tms, F, x, goal=True, vars=vars))
+        goal_subrules = [Assertion(cls.compileFromTriples(eventLoop, tms, F, x, goal=True, vars=vars, base=base))
                          for x in F.each(subj=node, pred=p['goal-rule'])]
         simple_assertions = F.each(subj=node, pred=p['assert'])
         complex_assertions = F.each(subj=node, pred=p['assertion'])
@@ -420,7 +430,7 @@ much how the rule was represented in the rdf network
                    vars, unicode(label),
                    pattern,
                    subrules + assertions + goal_subrules,
-                   goal=goal, matchName=matchedGraph, sourceNode=node)
+                   goal=goal, matchName=matchedGraph, sourceNode=node, base=base)
         return self
 
     @classmethod
@@ -435,7 +445,7 @@ much how the rule was represented in the rdf network
 
 
     @classmethod
-    def compileFormula(cls, eventLoop, formulaTMS, pf):
+    def compileFormula(cls, eventLoop, formulaTMS, pf, base=False):
         rdf = pf.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
         p = pf.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
         policies = pf.each(pred=rdf['type'], obj=p['Policy'])
@@ -449,13 +459,15 @@ much how the rule was represented in the rdf network
                                                              formulaTMS,
                                                              pf,
                                                              x,
-                                                             vars=globalVars.union(pf.each(subj=y, pred=p['variable'])))
+                                                             vars=globalVars.union(pf.each(subj=y, pred=p['variable'])),
+                                                             base=base)
                           for x in reduce(list.__add__, [pf.each(subj=y, pred=p['rule']) for y in policies], [])]
         goal_rules = [cls.compileFromTriples(eventLoop,
                                                              formulaTMS,
                                                              pf,
                                                              x,
-                                                             vars=globalVars.union(pf.each(subj=y, pred=p['variable'])))
+                                                             vars=globalVars.union(pf.each(subj=y, pred=p['variable'])),
+                                                             base=base)
                           for x in reduce(list.__add__, [pf.each(subj=y, pred=p['goal-rule']) for y in policies], [])]
         return rules, goal_rules, cwm_rules               
 
@@ -540,14 +552,46 @@ def removeFormulae(reasons, premises):
                 newReasons[node] = reason
     return newReasons, premises
 
-def removeBaseRules(baseRule, reasons, premises):
-    newReasons = {}
-    for node, reason in reasons.items():
-        if isinstance(node.datum, Rule):
-            if node.datum.sourceNode is not None and baseRule(node.datum.sourceNode):
-                pass # What goes here?
-        else:
-            newReasons[node] = reason
+def removeBaseRules(reasons, premises):
+    newExpressions = dict((node, reasons[node].expression)
+                          for node in reasons
+                          if node not in premises)
+    baseNodes = frozenset(node for node in reasons
+                          if node not in premises and reasons[node].rule in Rule.baseRules)
+    
+    changed = True
+    doneNewExpressions = {}
+
+    def expressionSubstitution(expression, bindings):
+        nodes = []
+        for node in expression.args:
+            if isinstance(node, tms.BooleanExpression):
+                nodes.append(expressionSubstitution(node, bindings))
+            else:
+                nodes.append(bindings.get(node, node))
+        if isinstance(expression, tms.NotExpression):
+            return tms.NotExpression(nodes[0])
+        return expression.__class__(nodes)
+        
+
+    
+    while newExpressions:
+        for node in list(newExpressions.keys()):
+            expression = newExpressions[node]
+            nodes = expression.nodes()
+            problemNodes = nodes.intersection(baseNodes)
+            if problemNodes:
+                replacementExpressions = {}
+                for probNode in problemNodes:
+                    if probNode in doneNewExpressions:
+                        replacementExpressions[probNode] = doneNewExpressions[probNode]
+                    else:
+                        replacementExpressions[probNode] = newExpressions[probNode]
+                newExpressions[node] = expressionSubstitution(expression, replacementExpressions)
+            else:
+                doneNewExpressions[node] = expression
+                del newExpressions[node]
+    return doneNewExpressions
 
 def simpleTraceOutput(tmsNodes, reasons, premises):
     done = set()
@@ -573,6 +617,10 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises):
     t = formula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/tms')
     done = set()
     termsFor = {}
+    expressions = removeBaseRules(reasons, premises)
+##    expressions = dict((node, reasons[node].expression)
+##                       for node in reasons
+##                       if node not in premises)
     for justification in reasons.values():
         termsFor[justification] = formula.newBlankNode()
 
@@ -606,10 +654,10 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises):
             retVal = True
             formula.add(termsFor[self], t['justification'], t['premise'])
         else:
-            retVal = reasons[self].evaluate(nf2)
-            antecedents = reasons[self].expression.nodes()
+            retVal = expressions[self].evaluate(nf2)
+            antecedents = expressions[self].nodes()
             rule = reasons[self].rule
-            antecedentExpr = booleanExpressionToRDF(reasons[self].expression)
+            antecedentExpr = booleanExpressionToRDF(expressions[self])
             selfTerm = termsFor[self]
             justTerm = termsFor[reasons[self]]
             formula.add(selfTerm, t['justification'], justTerm)
@@ -693,8 +741,12 @@ def testPolicy(logURIs, policyURIs):
 
     allRules = []
     allGoalRules = []
-    for pf in policyFormulae + [baseRulesFormula]:    
-        rules, goal_rules, cwm_rules = Rule.compileFormula(eventLoop, formulaTMS, pf)
+    for pf in policyFormulae + [baseRulesFormula]:
+        if pf is baseRulesFormula:
+            base=True
+        else:
+            base=False
+        rules, goal_rules, cwm_rules = Rule.compileFormula(eventLoop, formulaTMS, pf, base=base)
         allRules += rules
         allGoalRules += goal_rules
     print 'rules = ', allRules
