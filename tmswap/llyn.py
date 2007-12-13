@@ -63,7 +63,7 @@ import uripath
 from uripath import canonical
 
 from sax2rdf import XMLtoDOM
-import xml.dom.minidom
+# import xml.dom.minidom
 
 from why import smushedFormula, Premise, newTopLevelFormula, isTopLevel
 
@@ -1690,8 +1690,8 @@ class RDFStore(RDFSink) :
             return self.newLiteral(str(x), self.decimal)
         elif isinstance(x, bool):
             return self.newLiteral(x and 'true' or 'false', self.boolean)
-        elif isinstance(x, xml.dom.minidom.Document):
-            return self.newXMLLiteral(x)
+##        elif isinstance(x, xml.dom.minidom.Document):
+##            return self.newXMLLiteral(x)
         elif type(x) is types.FloatType:
             if `x`.lower() == "nan":  # We can get these form eg 2.math:asin
                 return None

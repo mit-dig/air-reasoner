@@ -91,10 +91,12 @@ you can hash it (if you want to)
     __slots__ = ['_hashval', '__weakref__', 'id']
 
     def __init__(self, other=None, keywords={}):
+        self.id = None
         if other is None:
             dict.__init__(self)
         else:
-            dict.__init__(self, other, **keywords)
+            keywords.update(other.iteritems())
+            dict.__init__(self, keywords)
         self.id = self
         for k, (a,b) in self.iteritems():
             if isinstance(a, tuple):
@@ -118,13 +120,16 @@ you can hash it (if you want to)
         return retVal
     
     def newBinding(self, var, val):
+        assert isinstance(val, tuple) and len(val) == 2, val
         retVal = Env(self, {var: val})
         retVal.id = self.id
         return retVal
     bind = newBinding
 
     def __setitem__(self, item, val):
-        raise TypeError
+        if self.id is not None:
+            raise TypeError
+        dict.__setitem__(self, item, val)
 
     def __getitem__(self, item):
         return dict.__getitem__(self, item)[0]

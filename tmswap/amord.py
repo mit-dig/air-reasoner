@@ -604,7 +604,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises):
             termsFor[self] = newFormula
         if self in premises:
             retVal = True
-            formula.add(termsFor[self], store.type, t['Premise'])
+            formula.add(termsFor[self], t['justification'], t['premise'])
         else:
             retVal = reasons[self].evaluate(nf2)
             antecedents = reasons[self].expression.nodes()

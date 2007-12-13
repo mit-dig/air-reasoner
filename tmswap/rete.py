@@ -13,6 +13,7 @@ Some inspiration for this came from pychinko; though not enough
 import weakref
 WKD = weakref.WeakKeyDictionary
 from collections import deque
+import itertools
 
 from term import unify, Env
 from formula import Formula, StoredStatement, WME
@@ -190,15 +191,14 @@ generates variable bindings
         return tuple(sorted(list(self.vars & successor.vars)))
 
 
-    varCounter = [0]
+    varCounter = itertools.count()
     def rightActivate(self, s):
         if s.variables:
             var_bindings = {}
             for var in s.variables:
-                newVar = s.context().newSymbol('http://example.com/alphaFilter#var%s' % self.varCounter[0])
+                newVar = s.context().newSymbol('http://example.com/alphaFilter#var%s' % self.varCounter.next())
                 var_bindings[var] = newVar
                 newVar.isVariable = True
-                self.varCounter[0] += 1
             try:
                 s2 = s.substitution(var_bindings)
             except TypeError:
