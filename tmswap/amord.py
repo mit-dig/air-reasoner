@@ -573,15 +573,17 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises):
     t = formula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/tms')
     done = set()
     termsFor = {}
+    for justification in reasons.values():
+        termsFor[justification] = formula.newBlankNode()
 
     def booleanExpressionToRDF(expr):
         if expr in termsFor:
             return termsFor[expr]
         node = formula.newBlankNode()
         termsFor[expr] = node
-        formula.add(node, store.type, {tms.NotExpression: t['NotExpression'],
-                                       tms.AndExpression: t['AndExpression'],
-                                       tms.OrExpression: t['OrExpression']}[expr.__class__])
+        formula.add(node, store.type, {tms.NotExpression: t['Not-justification'],
+                                       tms.AndExpression: t['And-justification'],
+                                       tms.OrExpression: t['Or-justification']}[expr.__class__])
         for arg in expr.args:
             formula.add(node, t['sub-expr'], booleanExpressionToRDF(arg))
         return node
@@ -609,14 +611,17 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises):
             rule = reasons[self].rule
             antecedentExpr = booleanExpressionToRDF(reasons[self].expression)
             selfTerm = termsFor[self]
-            formula.add(selfTerm, t['rule-name'], rule)
-            assert formula.contains(subj=selfTerm, pred=t['rule-name'], obj=rule)
-            formula.add(selfTerm, t['antecedent-expr'], antecedentExpr)
+            justTerm = termsFor[reasons[self]]
+            formula.add(selfTerm, t['justification'], justTerm)
+            formula.add(justTerm, t['rule-name'], rule)
+            assert formula.contains(subj=justTerm, pred=t['rule-name'], obj=rule)
+            formula.add(justTerm, t['antecedent-expr'], antecedentExpr)
             print 'adding (%s, %s, %s), (%s, %s, %s)' % (selfTerm, t['rule-name'], rule, selfTerm, t['antecedent-expr'], antecedentExpr)
         return retVal
     
     for tmsNode in tmsNodes:
         nf2(tmsNode)
+        formula.add(*tmsNode.datum[:3])
     return formula.close()
             
 
@@ -742,8 +747,11 @@ knownScenarios = {
 
 def runScenario(s):
     if s not in knownScenarios:
-        raise ValueError("I don't know about scenario %s" % s)
-    facts, rules = knownScenarios[s]
+        facts = ['http://dig.csail.mit.edu/TAMI/2007/%s/log.n3' % s]
+        rules = ['http://dig.csail.mit.edu/TAMI/2007/%s/policy.n3' % s]
+ #       raise ValueError("I don't know about scenario %s" % s)
+    else:
+        facts, rules = knownScenarios[s]
     return testPolicy(facts, rules)
 
 def main():

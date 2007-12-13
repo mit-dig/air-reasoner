@@ -287,13 +287,25 @@ class NotExpression(BooleanExpression):
 
 class OrExpression(BooleanExpression):
     def __init__(self, args=[]):
-        BooleanExpression.__init__(self, self.OR, args)
+        new_args = []
+        for arg in args:
+            if isinstance(arg, OrExpression):
+                new_args.extend(arg.args)
+            else:
+                new_args.append(arg)
+        BooleanExpression.__init__(self, self.OR, new_args)
     def evaluate(self, node_value):
         return any(x.evaluate(node_value) for x in self.args)
 
 class AndExpression(BooleanExpression):
     def __init__(self, args=[]):
-        BooleanExpression.__init__(self, self.AND, args)
+        new_args = []
+        for arg in args:
+            if isinstance(arg, AndExpression):
+                new_args.extend(arg.args)
+            else:
+                new_args.append(arg)
+        BooleanExpression.__init__(self, self.AND, new_args)
     def evaluate(self, node_value):
         return all(x.evaluate(node_value) for x in self.args)
 
