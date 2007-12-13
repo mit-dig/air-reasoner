@@ -632,10 +632,22 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises):
         formula.add(node, store.type, {tms.NotExpression: t['Not-justification'],
                                        tms.AndExpression: t['And-justification'],
                                        tms.OrExpression: t['Or-justification']}[expr.__class__])
-        for arg in expr.args:
-            formula.add(node, t['sub-expr'], booleanExpressionToRDF(arg))
+        if isinstance(expr, tms.AndExpression):
+            #We have a shorthand!
+            newFormula = formula.newFormula()
+            for arg in expr.args:
+                node2 = booleanExpressionToRDF(arg)
+                if isinstance(node2, Formula):
+                    newFormula.loadFormulaWithSubstitution(node2)
+                else:
+                    formula.add(node, t['sub-expr'], node2)
+            formula.add(node, t['sub-expr'], newFormula.close())
+        else:
+            for arg in expr.args:
+                formula.add(node, t['sub-expr'], booleanExpressionToRDF(arg))
         return node
 
+    premiseFormula = formula.newFormula()
     
     def nf2(self):
         if self in done:
@@ -652,7 +664,10 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises):
             termsFor[self] = newFormula
         if self in premises:
             retVal = True
-            formula.add(termsFor[self], t['justification'], t['premise'])
+            if isinstance(termsFor[self], Formula):
+                premiseFormula.loadFormulaWithSubstitution(termsFor[self])
+            else:
+                formula.add(termsFor[self], t['justification'], t['premise'])
         else:
             retVal = expressions[self].evaluate(nf2)
             antecedents = expressions[self].nodes()
@@ -664,12 +679,14 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises):
             formula.add(justTerm, t['rule-name'], rule)
             assert formula.contains(subj=justTerm, pred=t['rule-name'], obj=rule)
             formula.add(justTerm, t['antecedent-expr'], antecedentExpr)
-            print 'adding (%s, %s, %s), (%s, %s, %s)' % (selfTerm, t['rule-name'], rule, selfTerm, t['antecedent-expr'], antecedentExpr)
+#            print 'adding (%s, %s, %s), (%s, %s, %s)' % (selfTerm, t['rule-name'], rule, selfTerm, t['antecedent-expr'], antecedentExpr)
         return retVal
     
     for tmsNode in tmsNodes:
         nf2(tmsNode)
         formula.add(*tmsNode.datum[:3])
+
+    formula.add(premiseFormula.close(), t['justification'], t['premise'])
     return formula.close()
             
 
