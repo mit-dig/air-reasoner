@@ -94,16 +94,16 @@ This is currently only used for goals
                 else:
                     self.getContext(GOAL).removeStatement(self.getAuxStatement(node.datum))
         if isinstance(node.datum, Rule):
-            if debugLevel >= 2:
-                if node.datum.goal:
+            if debugLevel >= 3:
+                if node.datum.goal and debugLevel >= 4:
                     progress('\tNow supporting goal rule %s because of %s' % (node.datum, justification))
                 else:
                     progress('\tNow supporting rule %s because of %s' % (node.datum, justification))
             node.datum.compileToRete()
-            if debugLevel >= 3:
+            if debugLevel >= 4:
                 progress('\t\t ... built rule')
         if isinstance(node.datum, Formula):
-            if debugLevel >= 10:
+            if debugLevel >= 2:
                 progress('Now supporting %s because of %s' % (node.datum, justification))
             self.workingContext.loadFormulaWithSubstitution(node.datum)
         if isinstance(node.datum, tuple):
@@ -358,6 +358,12 @@ much how the rule was represented in the rdf network
                self.matchName == other.matchName
 
     def __hash__(self):
+        assert not isinstance(Rule, list)
+        assert not isinstance(self.eventLoop, list)
+        assert not isinstance(self.tms, list)
+        assert not isinstance(self.vars, list)
+        assert not isinstance(self.pattern, list)
+        assert not isinstance(self.sourceNode, list)
         return hash((Rule, self.eventLoop, self.tms, self.vars, self.pattern, frozenset(self.result), self.sourceNode, self.goal, self.matchName))
 
     def __repr__(self):
@@ -408,7 +414,7 @@ much how the rule was represented in the rdf network
         
         label = F.the(subj=node, pred=p['label'])
         pattern = F.the(subj=node, pred=p['pattern'])
-        base = base or (F.any(subj=node, pred=F.store.type, obj=p['Base-rule']) is not None)
+        base = base or (F.any(subj=node, pred=F.store.type, obj=p['Hidden-rule']) is not None)
         subrules = [Assertion(cls.compileFromTriples(eventLoop, tms, F, x, vars=vars, base=base))
                     for x in F.each(subj=node, pred=p['rule'])]
         goal_subrules = [Assertion(cls.compileFromTriples(eventLoop, tms, F, x, goal=True, vars=vars, base=base))
@@ -438,9 +444,16 @@ much how the rule was represented in the rdf network
         assert tms is not None
         label = "Rule from cwm with pattern %s" % triple.subject()
         pattern = triple.subject()
-        assertions = [triple.object()]
+        assertions = [Assertion(triple.object())]
         vars = frozenset(F.universals())
-        self = cls(eventLoop, tms, vars, unicode(label), pattern, assertions, [])
+        self = cls(eventLoop, tms,
+                   vars, unicode(label),
+                   pattern,
+                   assertions,
+                   goal=False,
+                   matchName=None,
+                   sourceNode=pattern,
+                   base=True)
         return self
 
 
@@ -454,21 +467,23 @@ much how the rule was represented in the rdf network
                                         formulaTMS,
                                         pf,
                                         x)
-                     for x in pf.each(pred=pf.store.implies)]
-        rules = [cls.compileFromTriples(eventLoop,
-                                                             formulaTMS,
-                                                             pf,
-                                                             x,
-                                                             vars=globalVars.union(pf.each(subj=y, pred=p['variable'])),
-                                                             base=base)
-                          for x in reduce(list.__add__, [pf.each(subj=y, pred=p['rule']) for y in policies], [])]
-        goal_rules = [cls.compileFromTriples(eventLoop,
-                                                             formulaTMS,
-                                                             pf,
-                                                             x,
-                                                             vars=globalVars.union(pf.each(subj=y, pred=p['variable'])),
-                                                             base=base)
-                          for x in reduce(list.__add__, [pf.each(subj=y, pred=p['goal-rule']) for y in policies], [])]
+                     for x in pf.statementsMatching(pred=pf.store.implies)]
+        rules = reduce(list.__add__, [[cls.compileFromTriples(eventLoop,
+                                        formulaTMS,
+                                        pf,
+                                        x,
+                                        vars=globalVars.union(pf.each(subj=y, pred=p['variable'])),
+                                        base=base)
+                        for x in pf.each(subj=y, pred=p['rule'])]
+                    for y in policies], [])
+        goal_rules = reduce(list.__add__, [[cls.compileFromTriples(eventLoop,
+                                                       formulaTMS,
+                                                       pf,
+                                                       x,
+                                                       vars=globalVars.union(pf.each(subj=y, pred=p['variable'])),
+                                                       base=base)
+                        for x in pf.each(subj=y, pred=p['goal-rule'])]
+                    for y in policies], [])
         return rules, goal_rules, cwm_rules               
 
 
@@ -562,7 +577,7 @@ def removeBaseRules(reasons, premises):
     changed = True
     doneNewExpressions = {}
 
-    def expressionSubstitution(expression, bindings):
+    def expressionSubstitutionFunc(expression, bindings):
         nodes = []
         for node in expression.args:
             if isinstance(node, tms.BooleanExpression):
@@ -574,6 +589,14 @@ def removeBaseRules(reasons, premises):
         return expression.__class__(nodes)
         
 
+    mem = {}
+    def expressionSubstitution(expression, bindings):
+        bindingsVal = frozenset(bindings.items())
+        try:
+            return mem[(expression, bindingsVal)]
+        except KeyError:
+            mem[(expression, bindingsVal)] = expressionSubstitutionFunc(expression, bindings)
+            return mem[(expression, bindingsVal)]
     
     while newExpressions:
         for node in list(newExpressions.keys()):
@@ -714,6 +737,9 @@ loadFactFormula.pClosureMode = False
 baseFactsURI = 'http://dig.csail.mit.edu/TAMI/2007/amord/base-assumptions.ttl'
 baseRulesURI = 'http://dig.csail.mit.edu/TAMI/2007/amord/base-rules.ttl'
 
+#baseFactsURI =
+#baseRulesURI = 'data:text/rdf+n3;charset=utf-8,' # quite empty
+
 def testPolicy(logURIs, policyURIs):
     import time
     store = llyn.RDFStore()
@@ -759,12 +785,13 @@ def testPolicy(logURIs, policyURIs):
     allRules = []
     allGoalRules = []
     for pf in policyFormulae + [baseRulesFormula]:
-        if pf is baseRulesFormula:
+        if pf is baseRulesFormula: ## Realy bad hack!
             base=True
         else:
             base=False
         rules, goal_rules, cwm_rules = Rule.compileFormula(eventLoop, formulaTMS, pf, base=base)
         allRules += rules
+        allRules += cwm_rules
         allGoalRules += goal_rules
     print 'rules = ', allRules
     print 'goal rules = ', goal_rules
@@ -802,7 +829,7 @@ def testPolicy(logURIs, policyURIs):
 #    print '\n'.join(strings)
 #    import diag
 #    diag.chatty_flag = 1000
-    return f.n3String() 
+#    return f.n3String() 
     return workingContext.n3String()
 
 
@@ -810,7 +837,9 @@ knownScenarios = {
     's0' : ( ['http://dig.csail.mit.edu/TAMI/2007/s0/log.n3'],
              ['http://dig.csail.mit.edu/TAMI/2007/s0/mit-policy.n3'] ),
     's0Local' : ( ['../../s0/log.n3'],
-                  [  '../../s0/mit-policy.n3'] )
+                  [  '../../s0/mit-policy.n3'] ),
+    's9var2Local' : (['../../s9/variation2/log.n3'],
+                     ['../../s9/variation2/policy.n3'])
 
 }
 

@@ -46,7 +46,7 @@ try:
     from collection import defaultdict
 except ImportError:
     class defaultdict(dict):
-        __slots__ = ['__weakref__']
+        __slots__ = ['__weakref__', 'default_factory']
         def __init__(self, default_factory=None, *a, **kw):
             if (default_factory is not None and
                 not callable(default_factory)):
