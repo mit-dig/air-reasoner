@@ -25,10 +25,13 @@ def main():
     outfile = sys.stdout
     sys.stdout = file('/dev/null', 'w')
     form = cgi.FieldStorage()
-    logURIs = form.getlist('log')
-    ruleURIs = form.getlist('rules')
-    from tmswap.amord import testPolicy
-    returnString = testPolicy(logURIs, ruleURIs)
+    logURIs = form.getlist('logFile')
+    ruleURIs = form.getlist('rulesFile')
+    log = form.getfirst('log')
+    rules = form.getfirst('policy')
+    from tmswap import amord
+    testPolicy = amord.testPolicy
+    returnString = testPolicy(logURIs, ruleURIs, log, rules)
     returnString = returnString.encode('utf_8')
 #    print ctype
     send_header(outfile, "Content-type", ctype)

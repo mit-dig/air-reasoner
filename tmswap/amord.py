@@ -730,6 +730,29 @@ def loadFactFormula(formulaTMS, uri, closureMode=""):
     formulaTMS.getThing(f).assume()
     return f
 
+def parseN3(store, f):
+    import notation3
+    p = notation3.SinkParser(store, f)
+
+    p.startDoc()
+    p.feed(string)
+    f = p.endDoc()
+
+    f = f.close()
+    return f
+
+
+
+def loadFactN3(formulaTMS, string, closureMode=""):
+    if loadFactFormula.pClosureMode:
+        closureMode += "p"
+    store = formulaTMS.workingContext.store
+    f = store.newFormula()
+    f.setClosureMode(closureMode)    
+    f = parseN3(store, f)
+    formulaTMS.getThing(f).assume()
+    return f    
+
 loadFactFormula.pClosureMode = False
 
     
@@ -740,7 +763,7 @@ baseRulesURI = 'http://dig.csail.mit.edu/TAMI/2007/amord/base-rules.ttl'
 #baseFactsURI =
 #baseRulesURI = 'data:text/rdf+n3;charset=utf-8,' # quite empty
 
-def testPolicy(logURIs, policyURIs):
+def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None):
     import time
     store = llyn.RDFStore()
     formulaTMS = setupTMS(store)
@@ -748,15 +771,20 @@ def testPolicy(logURIs, policyURIs):
 
 ## We are done with cwm setup
     startTime = time.time()
-
+    
     logFormulae = []
+    if logFormula is not None:
+        logFormulae.append(loadFactN3(formulaTMS, logFormula, ""))
     for logURI in logURIs:
         logFormulae.append(loadFactFormula(formulaTMS, logURI, "")) # should it be "p"?
     baseFactsFormula = loadFactFormula(formulaTMS, baseFactsURI)
 
     eventLoop = EventLoop()
 
+
     policyFormulae = []
+    if ruleFormula is not None:
+        policyFormulae.append(parseN3(store, ruleFormula))
     for policyURI in policyURIs:
         policyFormulae.append(store.load(policyURI))
     baseRulesFormula = store.load(baseRulesURI)
@@ -829,7 +857,7 @@ def testPolicy(logURIs, policyURIs):
 #    print '\n'.join(strings)
 #    import diag
 #    diag.chatty_flag = 1000
-#    return f.n3String() 
+    return f.n3String() 
     return workingContext.n3String()
 
 
@@ -839,7 +867,19 @@ knownScenarios = {
     's0Local' : ( ['../../s0/log.n3'],
                   [  '../../s0/mit-policy.n3'] ),
     's9var2Local' : (['../../s9/variation2/log.n3'],
-                     ['../../s9/variation2/policy.n3'])
+                     ['../../s9/variation2/policy.n3']),
+    's4' : (['http://dig.csail.mit.edu/TAMI/2006/s4/background.ttl',
+'http://dig.csail.mit.edu/TAMI/2006/s4/categories.ttl',
+'http://dig.csail.mit.edu/TAMI/2006/s4/data-schema.ttl',
+'http://dig.csail.mit.edu/TAMI/2006/s4/fbi-bru.ttl',
+'http://dig.csail.mit.edu/TAMI/2006/s4/fbi-crs.ttl',
+'http://dig.csail.mit.edu/TAMI/2006/s4/fbi-tsrs.ttl',
+'http://dig.csail.mit.edu/TAMI/2006/s4/purposes.ttl',
+'http://dig.csail.mit.edu/TAMI/2006/s4/s4.ttl',
+'http://dig.csail.mit.edu/TAMI/2006/s4/tsa-sfdb.ttl',
+'http://dig.csail.mit.edu/TAMI/2006/s4/usms-win.ttl'
+],
+            ['http://dig.csail.mit.edu/TAMI/2006/s4/privacy-act.ttl'])
 
 }
 
