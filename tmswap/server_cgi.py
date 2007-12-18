@@ -4,11 +4,13 @@
 An attempt to get a cgi interface to amord.py
 
 """
+DEBUG = False
 
 ctype = 'text/rdf+n3'
 
 import cgi
-import cgitb; cgitb.enable()  # Comment me out later
+if DEBUG:
+    import cgitb; cgitb.enable()  # Comment me out later
 from StringIO import StringIO
 
 def send_header(outfile, keyword, value):
@@ -36,10 +38,15 @@ def main():
     print ('ran testPolicy(%s, %s, %r, %r)\n' % (logURIs, ruleURIs, log, rules))
     print (str(form.keys()) + '\n')
     send_header(outfile, "Content-type", ctype)
-    send_header(outfile, "Content-Length", str(len(returnString) + len(sys.stdout.getvalue())))
+    if DEBUG:
+        length = str(len(returnString) + len(sys.stdout.getvalue()))
+    else:
+        length =  str(len(returnString))
+    send_header(outfile, "Content-Length", length)
 #    print ctype
     end_headers(outfile)
-    outfile.write(sys.stdout.getvalue())
+    if DEBUG:
+        outfile.write(sys.stdout.getvalue())
     outfile.write(returnString)
     sys.stdout = outfile
 
