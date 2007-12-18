@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """server cgi
 
 An attempt to get a cgi interface to amord.py
