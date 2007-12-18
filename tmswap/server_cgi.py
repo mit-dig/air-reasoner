@@ -9,7 +9,7 @@ ctype = 'text/rdf+n3'
 
 import cgi
 import cgitb; cgitb.enable()  # Comment me out later
-
+from StringIO import StringIO
 
 def send_header(outfile, keyword, value):
     """Send a MIME header."""
@@ -23,7 +23,7 @@ def end_headers(outfile):
 def main():
     import sys
     outfile = sys.stdout
-    sys.stdout = file('/dev/null', 'w')
+    sys.stdout = StringIO()
     form = cgi.FieldStorage()
     logURIs = form.getlist('logFile')
     ruleURIs = form.getlist('rulesFile')
@@ -33,10 +33,13 @@ def main():
     testPolicy = amord.testPolicy
     returnString = testPolicy(logURIs, ruleURIs, log, rules)
     returnString = returnString.encode('utf_8')
-#    print ctype
+    print ('ran testPolicy(%s, %s, %r, %r)\n' % (logURIs, ruleURIs, log, rules))
+    print (str(form.keys()) + '\n')
     send_header(outfile, "Content-type", ctype)
-    send_header(outfile, "Content-Length", str(len(returnString)))
+    send_header(outfile, "Content-Length", str(len(returnString) + len(sys.stdout.getvalue())))
+#    print ctype
     end_headers(outfile)
+    outfile.write(sys.stdout.getvalue())
     outfile.write(returnString)
     sys.stdout = outfile
 
