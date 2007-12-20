@@ -175,10 +175,18 @@ def canonicalizeVariables(statement, variables):
 class Assertion(object):
     """An assertion can be asserted. It tracks what its support will be when asserted
 """
-    def __init__(self, pattern, support=None, rule=None):
+    def __init__(self, pattern, support=None, rule=None, validToRename=None):
         self.pattern = pattern
         self.support = support
         self.rule = rule
+        
+        if isinstance(pattern, Formula):
+            if validToRename is None:
+                self.needsRenaming = frozenset(pattern.existentials())
+            else:
+                self.needsRenaming = frozenset(pattern.existentials()).intersection(validToRename)
+        else:
+            self.needsRenaming = frozenset()
 
     def substitution(self, bindings):
         if self.support is None:
@@ -192,7 +200,10 @@ class Assertion(object):
                     supportList.append(x.substitution(bindings))
             support = frozenset(supportList)
 
-        return Assertion(self.pattern.substitution(bindings), support, self.rule)
+        newBlankNodesBindings = dict([(x, pattern.newBlankNode()) for x in self.needsRenaming]) # if invalid, will not be run
+        bindings.update(newBlankNodesBindings)
+
+        return Assertion(self.pattern.substitution(bindings), support, self.rule, validToRename=newBlankNodesBindings.values())
 
     def __repr__(self):
         return 'Assertion(%s,%s,%s)' % (self.pattern, self.support, self.rule)
@@ -763,9 +774,9 @@ baseRulesURI = 'http://dig.csail.mit.edu/TAMI/2007/amord/base-rules.ttl'
 #baseFactsURI =
 #baseRulesURI = 'data:text/rdf+n3;charset=utf-8,' # quite empty
 
+store = llyn.RDFStore()
 def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None):
     import time
-    store = llyn.RDFStore()
     formulaTMS = setupTMS(store)
     workingContext = formulaTMS.workingContext
 
