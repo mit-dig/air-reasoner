@@ -805,9 +805,6 @@ def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None):
     rdf = workingContext.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
     owl = workingContext.newSymbol('http://www.w3.org/2002/07/owl')
     p = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
-    u = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/s0/university')
-    s9 = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-policy')
-    s9Log = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-log')
 
 
 #    AIRFormula = store.load(p.uriref() + '.ttl')
