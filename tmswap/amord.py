@@ -20,6 +20,13 @@ progress = diag.progress
 import tms
 import rete
 
+from prooftrace import (supportTrace,
+                        removeFormulae,
+                        removeBaseRules,
+                        simpleTraceOutput,
+                        rdfTraceOutput)
+                        
+
 GOAL = 1
 
 debugLevel = 0
@@ -233,12 +240,12 @@ These are then passed to the scheduler
 class RuleFire(object):
     """A thunk, passed to the scheduler when a rule fires
 """
-    def __init__(self, rule, triples, env, penalty):
+    def __init__(self, rule, triples, env, penalty, alt=False):
         self.rule = rule
-        self.args = (triples, env, penalty)
+        self.args = (triples, env, penalty, alt)
 
     def __call__(self):
-        triples, env, penalty = self.args
+        triples, env, penalty, alt = self.args
         self = self.rule
         if debugLevel > 12:
             progress('%s succeeded, with triples %s and env %s' % (self.label, triples, env))
@@ -535,193 +542,6 @@ is a FIFO of thunks to be called.
         return len(self.events) + len(self.alternateEvents)
 
 
-def supportTrace(tmsNodes):
-    pending = set()
-    reasons = {}
-    premises = set()
-    def nf(self):
-#            print 'running nf(%s), %s, %s' % (self, self.__class__, self.justifications)
-        if self in reasons:
-            return True
-        if self in pending:
-            return False
-        if self.assumed():
-            premises.add(self)
-            reasons[self] = '[premise]'
-        pending.add(self)
-        for just in self.justifications:
-            if just.evaluate(nf):
-                reasons[self] = just
-                return True
-        return False
-    for tmsNode in tmsNodes:
-        a = nf(tmsNode)
-    return reasons, premises
-
-def removeFormulae(reasons, premises):
-    newReasons = {}
-    premises = premises.copy()
-    for node, reason in reasons.items():
-        if node in premises:
-            newReasons[node] = reason
-        else:
-            nodes = reasons[node].expression.nodes()
-            if len(nodes) == 1:
-                parent = list(nodes)[0]
-                if isinstance(parent.datum, Formula):
-                    newReasons[node] = reasons[parent]
-                    if parent in premises:
-                        premises.add(node)
-                else:
-                    newReasons[node] = reason
-            else:
-                newReasons[node] = reason
-    return newReasons, premises
-
-def removeBaseRules(reasons, premises):
-    newExpressions = dict((node, reasons[node].expression)
-                          for node in reasons
-                          if node not in premises)
-    baseNodes = frozenset(node for node in reasons
-                          if node not in premises and reasons[node].rule in Rule.baseRules)
-    
-    changed = True
-    doneNewExpressions = {}
-
-    def expressionSubstitutionFunc(expression, bindings):
-        nodes = []
-        for node in expression.args:
-            if isinstance(node, tms.BooleanExpression):
-                nodes.append(expressionSubstitution(node, bindings))
-            else:
-                nodes.append(bindings.get(node, node))
-        if isinstance(expression, tms.NotExpression):
-            return tms.NotExpression(nodes[0])
-        return expression.__class__(nodes)
-        
-
-    mem = {}
-    def expressionSubstitution(expression, bindings):
-        bindingsVal = frozenset(bindings.items())
-        try:
-            return mem[(expression, bindingsVal)]
-        except KeyError:
-            mem[(expression, bindingsVal)] = expressionSubstitutionFunc(expression, bindings)
-            return mem[(expression, bindingsVal)]
-    
-    while newExpressions:
-        for node in list(newExpressions.keys()):
-            expression = newExpressions[node]
-            nodes = expression.nodes()
-            problemNodes = nodes.intersection(baseNodes)
-            if problemNodes:
-                replacementExpressions = {}
-                for probNode in problemNodes:
-                    if probNode in doneNewExpressions:
-                        replacementExpressions[probNode] = doneNewExpressions[probNode]
-                    else:
-                        replacementExpressions[probNode] = newExpressions[probNode]
-                newExpressions[node] = expressionSubstitution(expression, replacementExpressions)
-            else:
-                doneNewExpressions[node] = expression
-                del newExpressions[node]
-    return doneNewExpressions
-
-def simpleTraceOutput(tmsNodes, reasons, premises):
-    done = set()
-    strings = []
-    def nf2(self):
-        if self in done:
-            return True
-        done.add(self)
-        if self in premises:
-            retVal = True
-            strings.append('%s [premise]' % self)
-        else:
-            retVal = reasons[self].evaluate(nf2)
-            strings.append('%s <= %s(%s)' % (self, reasons[self].rule.uriref(), ', '.join([str(x) for x in reasons[self].expression.nodes()])))
-        return retVal
-    for tmsNode in tmsNodes:
-        nf2(tmsNode)
-    return strings
-
-
-def rdfTraceOutput(store, tmsNodes, reasons, premises):
-    formula = store.newFormula()
-    t = formula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/tms')
-    done = set()
-    termsFor = {}
-    expressions = removeBaseRules(reasons, premises)
-##    expressions = dict((node, reasons[node].expression)
-##                       for node in reasons
-##                       if node not in premises)
-    for justification in reasons.values():
-        termsFor[justification] = formula.newBlankNode()
-
-    def booleanExpressionToRDF(expr):
-        if expr in termsFor:
-            return termsFor[expr]
-        node = formula.newBlankNode()
-        termsFor[expr] = node
-        formula.add(node, store.type, {tms.NotExpression: t['Not-justification'],
-                                       tms.AndExpression: t['And-justification'],
-                                       tms.OrExpression: t['Or-justification']}[expr.__class__])
-        if isinstance(expr, tms.AndExpression):
-            #We have a shorthand!
-            newFormula = formula.newFormula()
-            for arg in expr.args:
-                node2 = booleanExpressionToRDF(arg)
-                if isinstance(node2, Formula):
-                    newFormula.loadFormulaWithSubstitution(node2)
-                else:
-                    formula.add(node, t['sub-expr'], node2)
-            formula.add(node, t['sub-expr'], newFormula.close())
-        else:
-            for arg in expr.args:
-                formula.add(node, t['sub-expr'], booleanExpressionToRDF(arg))
-        return node
-
-    premiseFormula = formula.newFormula()
-    
-    def nf2(self):
-        if self in done:
-            return True
-        done.add(self)
-        datum = self.datum
-        if isinstance(datum, Rule):
-            #datum is a rule!
-            termsFor[self] = datum.sourceNode
-        else:
-            newFormula = store.newFormula()
-            newFormula.add(*self.datum[:3])
-            newFormula = newFormula.close()
-            termsFor[self] = newFormula
-        if self in premises:
-            retVal = True
-            if isinstance(termsFor[self], Formula):
-                premiseFormula.loadFormulaWithSubstitution(termsFor[self])
-            else:
-                formula.add(termsFor[self], t['justification'], t['premise'])
-        else:
-            retVal = expressions[self].evaluate(nf2)
-            antecedents = expressions[self].nodes()
-            rule = reasons[self].rule
-            antecedentExpr = booleanExpressionToRDF(expressions[self])
-            selfTerm = termsFor[self]
-            justTerm = termsFor[reasons[self]]
-            formula.add(selfTerm, t['justification'], justTerm)
-            formula.add(justTerm, t['rule-name'], rule)
-            assert formula.contains(subj=justTerm, pred=t['rule-name'], obj=rule)
-            formula.add(justTerm, t['antecedent-expr'], antecedentExpr)
-#            print 'adding (%s, %s, %s), (%s, %s, %s)' % (selfTerm, t['rule-name'], rule, selfTerm, t['antecedent-expr'], antecedentExpr)
-        return retVal
-    
-    for tmsNode in tmsNodes:
-        nf2(tmsNode)
-        formula.add(*tmsNode.datum[:3])
-
-    formula.add(premiseFormula.close(), t['justification'], t['premise'])
-    return formula.close()
             
 
 def setupTMS(store):
@@ -805,6 +625,9 @@ def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None):
     rdf = workingContext.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
     owl = workingContext.newSymbol('http://www.w3.org/2002/07/owl')
     p = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
+    u = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/s0/university')
+    s9 = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-policy')
+    s9Log = workingContext.newSymbol('http://dig.csail.mit.edu/TAMI/2007/s9/run/s9-log')
 
 
 #    AIRFormula = store.load(p.uriref() + '.ttl')
@@ -861,7 +684,7 @@ def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None):
     reasons, premises = supportTrace(tmsNodes)
     reasons, premises = removeFormulae(reasons, premises)
     strings = simpleTraceOutput(tmsNodes, reasons, premises)
-    f = rdfTraceOutput(store, tmsNodes, reasons, premises)
+    f = rdfTraceOutput(store, tmsNodes, reasons, premises, Rule)
 #    print '\n'.join(strings)
 #    import diag
 #    diag.chatty_flag = 1000
