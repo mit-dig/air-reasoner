@@ -90,7 +90,7 @@ This is currently only used for goals
 
     def event(self, node, justification):
         if isinstance(justification, tms.Premise):
-            self.premises.add(justification)
+            self.premises.add(node)
         if justification is False:
             if isinstance(node.datum, Rule):
                 pass # not worth the work
@@ -240,13 +240,16 @@ These are then passed to the scheduler
 class RuleFire(object):
     """A thunk, passed to the scheduler when a rule fires
 """
-    def __init__(self, rule, triples, env, penalty, alt=False):
+    def __init__(self, rule, triples, env, penalty, result, alt=False):
         self.rule = rule
-        self.args = (triples, env, penalty, alt)
+        self.args = (triples, env, penalty, result, alt)
 
     def __call__(self):
-        triples, env, penalty, alt = self.args
+        triples, env, penalty, result, alt = self.args
         self = self.rule
+        if alt and self.success: # We fired after all
+            raise RuntimeError('we do not have any alts yet')
+            return
         if debugLevel > 12:
             progress('%s succeeded, with triples %s and env %s' % (self.label, triples, env))
         triplesTMS = []
@@ -272,7 +275,7 @@ class RuleFire(object):
         elif goals:
             if not self.goal:
                 raise RuntimeError('how did I get here?\nI matched %s, which are goals, but I don\'t want goals' % goals)
-#                print 'we goal succeeded! %s, %s' % (triples, self.result)
+#                print 'we goal succeeded! %s, %s' % (triples, result)
             envDict = env.asDict()
             for triple, _ in goals:
                 assert not triple.variables.intersection(env.keys())
@@ -280,7 +283,7 @@ class RuleFire(object):
                 if newVars:
                     raise NotImplementedError("I don't know how to add variables")
             
-            for r in self.result:
+            for r in result:
                 r12 = r.substitution(env.asDict())
                 r2 = r12.pattern
                 support = r12.support
@@ -297,17 +300,16 @@ class RuleFire(object):
                 assert r2TMS.supported                
 #                raise NotImplementedError(goals) #todo: handle goals
         elif unSupported:
-            raise RuntimeError(triple, self)
-            for triple in unSupported:
-                assert isinstance(triple, rete.BogusTriple), triple
-                boundTriple = triple.substitution(env.asDict())
-                (s, p, o), newVars = canonicalizeVariables(boundTriple, self.vars)
-                self.tms.justifyAuxTriple(GOAL, s, p, o, newVars, self.sourceNode, [self.tms.getThing(self)])
+            raise RuntimeError(triple, self) # We should never get unsupported triples
         else:
             if self.goal:
                 return
-#                print 'we succeeded! %s, %s' % (triples, self.result)
-            for r in self.result:
+#                print 'we succeeded! %s, %s' % (triples, result)
+            if alt:
+                altSupport = list(self.tms.premises)
+            else:
+                altSupport = []
+            for r in result:
                 r12 = r.substitution(env.asDict())
                 r2 = r12.pattern
                 support = r12.support
@@ -316,9 +318,9 @@ class RuleFire(object):
 #            print '   ...... so about to assert %s' % r2
                 r2TMS = self.tms.getThing(r2)
                 if support is None:
-                    r2TMS.justify(self.sourceNode, triplesTMS + [self.tms.getThing(self)])
+                    r2TMS.justify(self.sourceNode, triplesTMS + [self.tms.getThing(self)] + altSupport)
                 else:
-                    supportTMS = reduce(frozenset.union, support, frozenset())
+                    supportTMS = reduce(frozenset.union, support, frozenset()).union(altSupport)
                     r2TMS.justify(ruleId, supportTMS)
                 assert self.tms.getThing(self).supported
                 assert r2TMS.supported
@@ -333,7 +335,7 @@ much how the rule was represented in the rdf network
     baseRules = set()
     
     def __init__(self, eventLoop, tms, vars, label,
-                 pattern, result, sourceNode, goal=False, matchName=None, base=False):
+                 pattern, result, alt, sourceNode, goal=False, matchName=None, base=False):
         self.generatedLabel = False
         if label is None or label=='None':
             self.generatedLabel = True
@@ -349,6 +351,7 @@ much how the rule was represented in the rdf network
         self.pattern = pattern
         self.patternToCompare = frozenset([x.spo() for x in pattern])
         self.result = result
+        self.alt = alt
         self.goal = goal
         self.matchName = matchName
         self.sourceNode = sourceNode
@@ -362,7 +365,8 @@ much how the rule was represented in the rdf network
         label=%s
         pattern=%s
         result=%s
-        matchName=%s''' % (tms, self.vars, label, pattern, result, matchName)
+        alt=%s
+        matchName=%s''' % (tms, self.vars, label, pattern, result, alt, matchName)
 
 
     def __eq__(self, other):
@@ -408,17 +412,22 @@ much how the rule was represented in the rdf network
 
     def onSuccess(self, (triples, environment, penalty)):
         self.success = True
-        self.eventLoop.add(RuleFire(self, triples, environment, penalty))
+        self.eventLoop.add(RuleFire(self, triples, environment, penalty, self.result))
+
+    def onFailure(self):
+        assert not self.success
+        self.eventLoop.addAlternate(RuleFule(self, [], {}, 0, self.alt, alt=True))
 
     def substitution(self, env):
         pattern = self.pattern.substitution(env)
         result = [x.substitution(env) for x in self.result]
+        alt = [x.substitution(env) for x in self.alt]
         if self.generatedLabel:
             label = None
         else:
             label = self.label
         return self.__class__(self.eventLoop, self.tms, self.vars,
-                              label, pattern, result, self.sourceNode,
+                              label, pattern, result, alt, self.sourceNode,
                               self.goal, self.matchName, base=self.isBase)
 
     @classmethod
@@ -429,31 +438,44 @@ much how the rule was represented in the rdf network
         p = F.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
 
         vars = vars.union(F.each(subj=node, pred=p['variable']))
-        
+
+        realNode = node
+        nodes = [realNode]
+        altNode = F.the(subj=realNode, pred=p['alt'])
+        if altNode:
+            nodes.append(altNode)
+
         label = F.the(subj=node, pred=p['label'])
         pattern = F.the(subj=node, pred=p['pattern'])
         base = base or (F.any(subj=node, pred=F.store.type, obj=p['Hidden-rule']) is not None)
-        subrules = [Assertion(cls.compileFromTriples(eventLoop, tms, F, x, vars=vars, base=base))
-                    for x in F.each(subj=node, pred=p['rule'])]
-        goal_subrules = [Assertion(cls.compileFromTriples(eventLoop, tms, F, x, goal=True, vars=vars, base=base))
-                         for x in F.each(subj=node, pred=p['goal-rule'])]
-        simple_assertions = F.each(subj=node, pred=p['assert'])
-        complex_assertions = F.each(subj=node, pred=p['assertion'])
-        assertions = []
-        for assertion in simple_assertions:
-            assertions.append(Assertion(assertion))
-        for assertion in complex_assertions:
-            statement = F.the(subj=assertion, pred=p['statement'])
-            justNode = F.the(subj=assertion, pred=p['justification'])
-            antecedents = frozenset(F.each(subj=justNode, pred=p['antecedent']))
-            rule_id = F.the(subj=justNode, pred=p['rule-id'])
-            assertions.append(Assertion(statement, antecedents, rule_id))
+
+        resultList  = []
+        for node in nodes:
+            subrules = [Assertion(cls.compileFromTriples(eventLoop, tms, F, x, vars=vars, base=base))
+                        for x in F.each(subj=node, pred=p['rule'])]
+            goal_subrules = [Assertion(cls.compileFromTriples(eventLoop, tms, F, x, goal=True, vars=vars, base=base))
+                             for x in F.each(subj=node, pred=p['goal-rule'])]
+            simple_assertions = F.each(subj=node, pred=p['assert'])
+            complex_assertions = F.each(subj=node, pred=p['assertion'])
+            assertions = []
+            for assertion in simple_assertions:
+                assertions.append(Assertion(assertion))
+            for assertion in complex_assertions:
+                statement = F.the(subj=assertion, pred=p['statement'])
+                justNode = F.the(subj=assertion, pred=p['justification'])
+                antecedents = frozenset(F.each(subj=justNode, pred=p['antecedent']))
+                rule_id = F.the(subj=justNode, pred=p['rule-id'])
+                assertions.append(Assertion(statement, antecedents, rule_id))
+            resultList.append(subrules + assertions + goal_subrules)
+        resultList.append([]) # In case there is no alt
+        node = realNode
         matchedGraph = F.the(subj=node, pred=p['matched-graph'])
         
         self = cls(eventLoop, tms,
                    vars, unicode(label),
                    pattern,
-                   subrules + assertions + goal_subrules,
+                   resultList[0],
+                   alt=resultList[1],
                    goal=goal, matchName=matchedGraph, sourceNode=node, base=base)
         return self
 
@@ -468,6 +490,7 @@ much how the rule was represented in the rdf network
                    vars, unicode(label),
                    pattern,
                    assertions,
+                   alt=[],
                    goal=False,
                    matchName=None,
                    sourceNode=pattern,
