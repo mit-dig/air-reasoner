@@ -90,7 +90,10 @@ This is currently only used for goals
 
     def event(self, node, justification):
         if isinstance(justification, tms.Premise):
-            self.premises.add(node)
+            if isinstance(node.datum, tuple) and len(node.datum) == 2:
+                pass # Better than the alternative?
+            else:
+                self.premises.add(node)
         if justification is False:
             if isinstance(node.datum, Rule):
                 pass # not worth the work
@@ -115,7 +118,9 @@ This is currently only used for goals
             self.workingContext.loadFormulaWithSubstitution(node.datum)
         if isinstance(node.datum, tuple):
 #            print '\t ... now supporting %s because of %s' % (node, justification)
-            if len(node.datum) == 4:
+            if len(node.datum) == 2:
+                pass # signal data
+            elif len(node.datum) == 4:
                 triple = node.datum[:3]
                 variables = node.datum[3]
                 if variables is None:
@@ -248,10 +253,13 @@ class RuleFire(object):
         triples, env, penalty, result, alt = self.args
         self = self.rule
         if alt and self.success: # We fired after all
-            raise RuntimeError('we do not have any alts yet')
+#            raise RuntimeError('we do not have any alts yet')
             return
         if debugLevel > 12:
-            progress('%s succeeded, with triples %s and env %s' % (self.label, triples, env))
+            if alt:
+                progress('%s failed, and alt is being called' % (self.label,))
+            else:
+                progress('%s succeeded, with triples %s and env %s' % (self.label, triples, env))
         triplesTMS = []
         goals = []
         unSupported = []
@@ -306,7 +314,9 @@ class RuleFire(object):
                 return
 #                print 'we succeeded! %s, %s' % (triples, result)
             if alt:
-                altSupport = list(self.tms.premises)
+                closedWorld = self.tms.getThing(('closedWorld', self.tms.workingContext.newList(list(self.tms.premises))))
+                closedWorld.assume()
+                altSupport = [closedWorld]
             else:
                 altSupport = []
             for r in result:
@@ -402,7 +412,7 @@ much how the rule was represented in the rdf network
                     self.eventLoop.add(AuxTripleJustifier(self.tms, GOAL, s, p, o, newVars, self.sourceNode, [self.tms.getThing(self)]))
         index = workingContext._index
         bottomBeta = rete.compilePattern(index, patterns, self.vars, buildGoals=False, goalPatterns=self.goal)
-        trueBottom =  rete.ProductionNode(bottomBeta, self.onSuccess)
+        trueBottom =  rete.ProductionNode(bottomBeta, self.onSuccess, self.onFailure)
         return trueBottom
 
     def addTriple(self, triple):
@@ -416,7 +426,8 @@ much how the rule was represented in the rdf network
 
     def onFailure(self):
         assert not self.success
-        self.eventLoop.addAlternate(RuleFule(self, [], {}, 0, self.alt, alt=True))
+        if self.alt:
+            self.eventLoop.addAlternate(RuleFire(self, [], Env(), 0, self.alt, alt=True))
 
     def substitution(self, env):
         pattern = self.pattern.substitution(env)
@@ -706,9 +717,9 @@ def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None):
     tmsNodes = [formulaTMS.getTriple(triple.subject(), triple.predicate(), triple.object(), None) for triple in triples]
     reasons, premises = supportTrace(tmsNodes)
     reasons, premises = removeFormulae(reasons, premises)
-    strings = simpleTraceOutput(tmsNodes, reasons, premises)
-    f = rdfTraceOutput(store, tmsNodes, reasons, premises, Rule)
+#    strings = simpleTraceOutput(tmsNodes, reasons, premises)
 #    print '\n'.join(strings)
+    f = rdfTraceOutput(store, tmsNodes, reasons, premises, Rule)
 #    import diag
 #    diag.chatty_flag = 1000
     return f.n3String() 

@@ -491,8 +491,8 @@ with a method to call when the match succeeds
         self.task = task
         self.alternative = alternative
         self.updateFromAbove()
-##        if not self.items:
-##            self.alternative()
+        if not self.items:
+            self.alternative()
         return self
 
     def leftActivate(self, token):

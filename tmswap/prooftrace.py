@@ -123,6 +123,7 @@ def simpleTraceOutput(tmsNodes, reasons, premises):
 def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
     formula = store.newFormula()
     t = formula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/tms')
+    air = formula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
     done = set()
     termsFor = {}
     expressions = removeBaseRules(reasons, premises, Rule.baseRules)
@@ -165,17 +166,35 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
         if isinstance(datum, Rule):
             #datum is a rule!
             termsFor[self] = datum.sourceNode
-        else:
-            newFormula = store.newFormula()
-            newFormula.add(*self.datum[:3])
-            newFormula = newFormula.close()
-            termsFor[self] = newFormula
+        elif isinstance(datum, tuple):
+            if len(datum) == 2:
+                if datum[0] == 'closedWorld':
+                    ####print datum, [x for x in datum[1]]
+                    newNode = formula.newBlankNode()
+                    for x in datum[1]:
+                        nf2(x)
+                    formula.add(newNode, air['closed-world-assumption'], formula.newList([termsFor[x] for x in datum[1]]))
+                    termsFor[self] = newNode
+                else:
+                    raise RuntimeError(self)
+            elif len(datum) == 4:
+                newFormula = store.newFormula()
+                newFormula.add(*self.datum[:3])
+                newFormula = newFormula.close()
+                termsFor[self] = newFormula
+            else:
+                raise RuntimeError(self)
+        elif isinstance(datum, Formula): # We failed to remove it!
+            termsFor[self] = datum # represents itself
         if self in premises:
             retVal = True
             if isinstance(termsFor[self], Formula):
                 premiseFormula.loadFormulaWithSubstitution(termsFor[self])
             else:
                 formula.add(termsFor[self], t['justification'], t['premise'])
+        elif self.assumed():
+            retVal = True
+            formula.add(termsFor[self], t['justification'], t['premise'])
         else:
             retVal = expressions[self].evaluate(nf2)
             antecedents = expressions[self].nodes()
