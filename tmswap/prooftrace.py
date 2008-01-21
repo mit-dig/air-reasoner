@@ -7,7 +7,7 @@ Given a tms, generate proof traces
 
 import tms
 from formula import Formula, StoredStatement
-from term import List, Env
+from term import List, Env, Symbol
 
 def supportTrace(tmsNodes):
     pending = set()
@@ -158,7 +158,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
 
     premiseFormula = formula.newFormula()
     
-    def nf2(self):
+    def nf2(self, recurse=True):
         if self in done:
             return True
         done.add(self)
@@ -172,7 +172,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                     ####print datum, [x for x in datum[1]]
                     newNode = formula.newBlankNode()
                     for x in datum[1]:
-                        nf2(x)
+                        nf2(x, False)
                     formula.add(newNode, air['closed-world-assumption'], formula.newList([termsFor[x] for x in datum[1]]))
                     termsFor[self] = newNode
                 else:
@@ -184,29 +184,32 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                 termsFor[self] = newFormula
             else:
                 raise RuntimeError(self)
-        elif isinstance(datum, Formula): # We failed to remove it!
+        elif isinstance(datum, (Formula, Symbol)): # We failed to remove it!
             termsFor[self] = datum # represents itself
-        if self in premises:
-            retVal = True
-            if isinstance(termsFor[self], Formula):
-                premiseFormula.loadFormulaWithSubstitution(termsFor[self])
-            else:
+        if recurse:
+            if self in premises:
+                retVal = True
+                if isinstance(termsFor[self], Formula):
+                    premiseFormula.loadFormulaWithSubstitution(termsFor[self])
+                else:
+                    formula.add(termsFor[self], t['justification'], t['premise'])
+            elif self.assumed():
+                retVal = True
                 formula.add(termsFor[self], t['justification'], t['premise'])
-        elif self.assumed():
-            retVal = True
-            formula.add(termsFor[self], t['justification'], t['premise'])
+            else:
+                retVal = expressions[self].evaluate(nf2)
+                antecedents = expressions[self].nodes()
+                rule = reasons[self].rule
+                antecedentExpr = booleanExpressionToRDF(expressions[self])
+                selfTerm = termsFor[self]
+                justTerm = termsFor[reasons[self]]
+                formula.add(selfTerm, t['justification'], justTerm)
+                formula.add(justTerm, t['rule-name'], rule)
+                assert formula.contains(subj=justTerm, pred=t['rule-name'], obj=rule)
+                formula.add(justTerm, t['antecedent-expr'], antecedentExpr)
+    #            print 'adding (%s, %s, %s), (%s, %s, %s)' % (selfTerm, t['rule-name'], rule, selfTerm, t['antecedent-expr'], antecedentExpr)
         else:
-            retVal = expressions[self].evaluate(nf2)
-            antecedents = expressions[self].nodes()
-            rule = reasons[self].rule
-            antecedentExpr = booleanExpressionToRDF(expressions[self])
-            selfTerm = termsFor[self]
-            justTerm = termsFor[reasons[self]]
-            formula.add(selfTerm, t['justification'], justTerm)
-            formula.add(justTerm, t['rule-name'], rule)
-            assert formula.contains(subj=justTerm, pred=t['rule-name'], obj=rule)
-            formula.add(justTerm, t['antecedent-expr'], antecedentExpr)
-#            print 'adding (%s, %s, %s), (%s, %s, %s)' % (selfTerm, t['rule-name'], rule, selfTerm, t['antecedent-expr'], antecedentExpr)
+            retVal = False # it does not matter
         return retVal
     
     for tmsNode in tmsNodes:

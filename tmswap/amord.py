@@ -12,7 +12,7 @@ from itertools import chain
 
 import llyn
 from formula import Formula, StoredStatement
-from term import List, Env
+from term import List, Env, Symbol
 
 import diag
 progress = diag.progress
@@ -42,7 +42,9 @@ The job of activating rules also goes on this
         self.nodes = WVD()
         self.workingContext = workingContext
         workingContext.tms = self
-        self.formulaContents = workingContext.newSymbol('http://dig.csail.mit.edu/2007/cwmrete/tmswap/amord#FormulaContents')
+        self.NS = workingContext.newSymbol('http://dig.csail.mit.edu/2007/cwmrete/tmswap/amord')
+        self.formulaContents = self.NS['FormulaContents']
+        self.parseSemantics = workingContext.store.semantics
         self.premises = set()
         self.falseAssumptions = set()
         self.contexts = {}
@@ -112,6 +114,11 @@ This is currently only used for goals
             node.datum.compileToRete()
             if debugLevel >= 4:
                 progress('\t\t ... built rule')
+        if isinstance(node.datum, Symbol):
+            if debugLevel >= 2:
+                progress('Now supporting %s because of %s' % (node.datum, justification))
+            f = _loadF(self, node.datum.uriref())
+            self.getThing(f).justify(self.parseSemantics, [node])
         if isinstance(node.datum, Formula):
             if debugLevel >= 2:
                 progress('Now supporting %s because of %s' % (node.datum, justification))
@@ -585,14 +592,24 @@ def setupTMS(store):
     return formulaTMS
     
 
-def loadFactFormula(formulaTMS, uri, closureMode=""):
+def loadFactFormula(formulaTMS, uri, closureMode=""): #what to do about closureMode?
+##    We're not ready for this yet!
+##    store = formulaTMS.workingContext.store
+##    s = store.newSymbol(uri)
+##    assert isinstance(s, Symbol)
+##    formulaTMS.getThing(s).assume()
+##    return s
+    f = _loadF(formulaTMS, uri, closureMode)
+    formulaTMS.getThing(f).assume()
+    return f
+
+def _loadF(formulaTMS, uri, closureMode=""):
     if loadFactFormula.pClosureMode:
         closureMode += "p"
     store = formulaTMS.workingContext.store
     f = store.newFormula()
     f.setClosureMode(closureMode)
     f = store.load(uri, openFormula=f)
-    formulaTMS.getThing(f).assume()
     return f
 
 def parseN3(store, f):
@@ -717,8 +734,8 @@ def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None):
     tmsNodes = [formulaTMS.getTriple(triple.subject(), triple.predicate(), triple.object(), None) for triple in triples]
     reasons, premises = supportTrace(tmsNodes)
     reasons, premises = removeFormulae(reasons, premises)
-#    strings = simpleTraceOutput(tmsNodes, reasons, premises)
-#    print '\n'.join(strings)
+    strings = simpleTraceOutput(tmsNodes, reasons, premises)
+    print '\n'.join(strings)
     f = rdfTraceOutput(store, tmsNodes, reasons, premises, Rule)
 #    import diag
 #    diag.chatty_flag = 1000
