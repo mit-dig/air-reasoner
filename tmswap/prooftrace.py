@@ -57,7 +57,8 @@ def removeBaseRules(reasons, premises, baseRules):
                           for node in reasons
                           if node not in premises)
     baseNodes = frozenset(node for node in reasons
-                          if node not in premises and reasons[node].rule in baseRules)
+                          if node not in premises and ((reasons[node].rule in baseRules)
+                              or (hasattr(reasons[node].rule, 'name') and reasons[node].rule.name in baseRules)))
     
     changed = True
     doneNewExpressions = {}
@@ -203,6 +204,11 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                 antecedentExpr = booleanExpressionToRDF(expressions[self])
                 selfTerm = termsFor[self]
                 justTerm = termsFor[reasons[self]]
+                if hasattr(rule, 'descriptions'):
+                    desc = rule.descriptions
+                    rule = rule.name
+                    for d in desc:
+                        formula.add(selfTerm, t['description'], d)
                 formula.add(selfTerm, t['justification'], justTerm)
                 formula.add(justTerm, t['rule-name'], rule)
                 assert formula.contains(subj=justTerm, pred=t['rule-name'], obj=rule)

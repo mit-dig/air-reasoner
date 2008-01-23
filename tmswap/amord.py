@@ -12,7 +12,7 @@ from itertools import chain
 
 import llyn
 from formula import Formula, StoredStatement
-from term import List, Env, Symbol
+from term import List, Env, Symbol, Term
 
 import diag
 progress = diag.progress
@@ -248,6 +248,19 @@ These are then passed to the scheduler
     def __call__(self):
         self.tms.justifyAuxTriple(*self.args)
 
+class RuleName(object):
+    def __init__(self, name, descriptions):
+        assert isinstance(name, Term)
+        assert all(isinstance(x, Term) for x in descriptions)
+        self.name = name
+        self.descriptions = descriptions
+
+    def __repr__(self):
+        return 'R(%s)' % (self.name,)
+
+    def uriref(self): # silly
+        return self.name.uriref() + '+'.join(''.join(str(y) for y in x) for x in self.descriptions)
+
 
 class RuleFire(object):
     """A thunk, passed to the scheduler when a rule fires
@@ -324,8 +337,10 @@ class RuleFire(object):
                 closedWorld = self.tms.getThing(('closedWorld', self.tms.workingContext.newList(list(self.tms.premises))))
                 closedWorld.assume()
                 altSupport = [closedWorld]
+                desc = self.altDescriptions
             else:
                 altSupport = []
+                desc = [x.substitution(env.asDict()) for x in self.descriptions]
             for r in result:
                 r12 = r.substitution(env.asDict())
                 r2 = r12.pattern
@@ -335,10 +350,10 @@ class RuleFire(object):
 #            print '   ...... so about to assert %s' % r2
                 r2TMS = self.tms.getThing(r2)
                 if support is None:
-                    r2TMS.justify(self.sourceNode, triplesTMS + [self.tms.getThing(self)] + altSupport)
+                    r2TMS.justify(RuleName(self.sourceNode, desc), triplesTMS + [self.tms.getThing(self)] + altSupport)
                 else:
                     supportTMS = reduce(frozenset.union, support, frozenset()).union(altSupport)
-                    r2TMS.justify(ruleId, supportTMS)
+                    r2TMS.justify(RuleName(ruleId, desc), supportTMS)
                 assert self.tms.getThing(self).supported
                 assert r2TMS.supported
 
@@ -352,7 +367,8 @@ much how the rule was represented in the rdf network
     baseRules = set()
     
     def __init__(self, eventLoop, tms, vars, label,
-                 pattern, result, alt, sourceNode, goal=False, matchName=None, base=False):
+                 pattern, result, descriptions, alt, altDescriptions, sourceNode,
+                 goal=False, matchName=None, base=False):
         self.generatedLabel = False
         if label is None or label=='None':
             self.generatedLabel = True
@@ -368,7 +384,10 @@ much how the rule was represented in the rdf network
         self.pattern = pattern
         self.patternToCompare = frozenset([x.spo() for x in pattern])
         self.result = result
+        self.descriptions = descriptions
         self.alt = alt
+        assert isinstance(altDescriptions, list), altDescriptions
+        self.altDescriptions = altDescriptions
         self.goal = goal
         self.matchName = matchName
         self.sourceNode = sourceNode
@@ -440,12 +459,14 @@ much how the rule was represented in the rdf network
         pattern = self.pattern.substitution(env)
         result = [x.substitution(env) for x in self.result]
         alt = [x.substitution(env) for x in self.alt]
+        descriptions = [x.substitution(env) for x in self.descriptions]
+        altDescriptions = [x.substitution(env) for x in self.altDescriptions]
         if self.generatedLabel:
             label = None
         else:
             label = self.label
         return self.__class__(self.eventLoop, self.tms, self.vars,
-                              label, pattern, result, alt, self.sourceNode,
+                              label, pattern, result, descriptions, alt, altDescriptions, self.sourceNode,
                               self.goal, self.matchName, base=self.isBase)
 
     @classmethod
@@ -462,10 +483,14 @@ much how the rule was represented in the rdf network
         altNode = F.the(subj=realNode, pred=p['alt'])
         if altNode:
             nodes.append(altNode)
+            altDescriptions = list(F.each(subj=altNode, pred=p['description']))
+        else:
+            altDescriptions = []
 
         label = F.the(subj=node, pred=p['label'])
         pattern = F.the(subj=node, pred=p['pattern'])
         base = base or (F.any(subj=node, pred=F.store.type, obj=p['Hidden-rule']) is not None)
+        descriptions = list(F.each(subj=node, pred=p['description']))
 
         resultList  = []
         for node in nodes:
@@ -493,7 +518,8 @@ much how the rule was represented in the rdf network
                    vars, unicode(label),
                    pattern,
                    resultList[0],
-                   alt=resultList[1],
+                   descriptions=descriptions,
+                   alt=resultList[1], altDescriptions=altDescriptions,
                    goal=goal, matchName=matchedGraph, sourceNode=node, base=base)
         return self
 
@@ -507,8 +533,8 @@ much how the rule was represented in the rdf network
         self = cls(eventLoop, tms,
                    vars, unicode(label),
                    pattern,
-                   assertions,
-                   alt=[],
+                   assertions, [],
+                   alt=[], altDescriptions=[],
                    goal=False,
                    matchName=None,
                    sourceNode=pattern,
