@@ -25,6 +25,8 @@ from prooftrace import (supportTrace,
                         removeBaseRules,
                         simpleTraceOutput,
                         rdfTraceOutput)
+
+from py25 import all, any
                         
 
 GOAL = 1
@@ -787,7 +789,9 @@ knownScenarios = {
 'http://dig.csail.mit.edu/TAMI/2006/s4/tsa-sfdb.ttl',
 'http://dig.csail.mit.edu/TAMI/2006/s4/usms-win.ttl'
 ],
-            ['http://dig.csail.mit.edu/TAMI/2006/s4/privacy-act.ttl'])
+            ['http://dig.csail.mit.edu/TAMI/2006/s4/privacy-act.ttl']),
+    'arl' : (['http://dig.csail.mit.edu/2008/ARL/log.n3'],
+             ['http://dig.csail.mit.edu/2008/ARL/unresol-policy.n3'])
 
 }
 
