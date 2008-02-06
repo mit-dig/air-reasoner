@@ -490,8 +490,13 @@ much how the rule was represented in the rdf network
             altDescriptions = []
 
         label = F.the(subj=node, pred=p['label'])
-        pattern = F.the(subj=node, pred=p['pattern'])
-        assert pattern is not None, node
+        try:
+            pattern = F.the(subj=node, pred=p['pattern'])
+        except AssertionError:
+            raise ValueError('%s has too many patterns, being all of %s'
+                             % (node, F.each(subj=node, pred=p['pattern'])))
+        if pattern is None:
+            raise ValueError('%s must have a pattern. You did not give it one' % (node,))
         base = base or (F.any(subj=node, pred=F.store.type, obj=p['Hidden-rule']) is not None)
         descriptions = list(F.each(subj=node, pred=p['description']))
 
@@ -796,8 +801,11 @@ knownScenarios = {
 
 }
 
-def runScenario(s):
-    if s not in knownScenarios:
+def runScenario(s, others=[]):
+    if s == 'test':
+        rules = others[0:1]
+        facts = others[1:2]
+    elif s not in knownScenarios:
         facts = ['http://dig.csail.mit.edu/TAMI/2007/%s/log.n3' % s]
         rules = ['http://dig.csail.mit.edu/TAMI/2007/%s/policy.n3' % s]
  #       raise ValueError("I don't know about scenario %s" % s)
@@ -838,7 +846,7 @@ def main():
     (options, args) = parser.parse_args()
     if not args:
         args = ['s0']
-    call = lambda : runScenario(args[0])
+    call = lambda : runScenario(args[0], args[1:])
     if options.lookupOntologies:
         loadFactFormula.pClosureMode = True
     if options.fullUnify:

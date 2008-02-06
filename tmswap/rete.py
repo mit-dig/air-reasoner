@@ -274,6 +274,9 @@ class Token(object):
         parent.children.add(self)
         current.WME.tokens.add(self)
 
+    def moveDown(self, node):
+        return Token(node, self.parent, self.current, self.env, self.penalty)
+
     def delete(self):
         self.parent.children.remove(self)
         while self.children:
@@ -305,6 +308,9 @@ class NullTokenClass(object):
         self.children = set()
         self.env = Env()
         self.penalty = 0
+        return self
+
+    def moveDown(self, node):
         return self
 
     def flatten(self):
@@ -496,7 +502,7 @@ with a method to call when the match succeeds
         return self
 
     def leftActivate(self, token):
-        token = Token(self, token.parent, token.current, token.env)
+        token = token.moveDown(self)
         self.items.add(token)
         self.task(token.flatten())
 
