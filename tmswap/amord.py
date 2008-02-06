@@ -491,6 +491,7 @@ much how the rule was represented in the rdf network
 
         label = F.the(subj=node, pred=p['label'])
         pattern = F.the(subj=node, pred=p['pattern'])
+        assert pattern is not None, node
         base = base or (F.any(subj=node, pred=F.store.type, obj=p['Hidden-rule']) is not None)
         descriptions = list(F.each(subj=node, pred=p['description']))
 
