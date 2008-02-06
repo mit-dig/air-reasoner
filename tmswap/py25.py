@@ -7,7 +7,7 @@ that were created for python 2.5
 
 
 try:
-    all
+    all = all
 except NameError:
     def all(iterable):
         for element in iterable:
@@ -16,7 +16,7 @@ except NameError:
         return True
 
 try:
-    any
+    any = any
 except NameError:
     def any(iterable):
         for element in iterable:
