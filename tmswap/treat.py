@@ -77,7 +77,7 @@ class Matcher(object):
                 self.done((just, env3, 0))
 
             else:
-                match(rest, env3, just)
+                self.match(rest, env3, just)
             
     def done(self, tok):
         for child in self.children:

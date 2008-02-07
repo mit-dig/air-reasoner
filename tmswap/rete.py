@@ -158,11 +158,12 @@ class AlphaFilter(AlphaMemory):
     """An alphaFilter connects an alpha node to a join node. It has the full pattern, and
 generates variable bindings
 """
-    def __init__(self, pattern, vars, index, parents):
+    def __init__(self, pattern, vars, index, parents, builtinMap):
         self.index = index
         self.penalty = 10
         self.parents = parents
         self.pattern = pattern
+        self.builtinMap = builtinMap
         freeVariables = vars
         def findExistentials(x):
             if hasattr(x, 'spo'):
@@ -249,7 +250,7 @@ generates variable bindings
                                                          pattern.object()))
 
         parents = []
-        secondaryAlpha = cls(pattern, vars, index, parents)
+        secondaryAlpha = cls(pattern, vars, index, parents, builtinMap)
         p, s, o = masterPatternTuple
         V = VAR_PLACEHOLDER
         pts = [(p, s, o)]
