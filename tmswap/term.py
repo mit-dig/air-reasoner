@@ -147,8 +147,8 @@ you can hash it (if you want to)
     def flatten(self, other):
         """Pull all of the bindings of other into a copy of self
         """
-        from backward import progress
-        progress(lambda : 'Env.flatten(%s,%s)' % (self, other))
+#        from backward import progress
+#        progress(lambda : 'Env.flatten(%s,%s)' % (self, other))
         retVal = dict(other)
         for key, (val, source) in self.items():
             if key in other:
@@ -160,7 +160,7 @@ you can hash it (if you want to)
                 retVal[key] = (val, source)
         retVal = self.__class__(retVal)
         retVal.id = self.id
-        progress(lambda : '... returns %s' % retVal)
+#        progress(lambda : '... returns %s' % retVal)
         return retVal
 
     def substitution(self, node, *otherEnvs):

@@ -19,6 +19,9 @@ progress = diag.progress
 
 import tms
 import rete
+import treat
+
+MM = rete
 
 from prooftrace import (supportTrace,
                         removeFormulae,
@@ -439,8 +442,8 @@ much how the rule was represented in the rdf network
                     (s, p, o), newVars = canonicalizeVariables(triple, self.vars)
                     self.eventLoop.add(AuxTripleJustifier(self.tms, GOAL, s, p, o, newVars, self.sourceNode, [self.tms.getThing(self)]))
         index = workingContext._index
-        bottomBeta = rete.compilePattern(index, patterns, self.vars, buildGoals=False, goalPatterns=self.goal)
-        trueBottom =  rete.ProductionNode(bottomBeta, self.onSuccess, self.onFailure)
+        bottomBeta = MM.compilePattern(index, patterns, self.vars, buildGoals=False, goalPatterns=self.goal)
+        trueBottom =  MM.ProductionNode(bottomBeta, self.onSuccess, self.onFailure)
         return trueBottom
 
     def addTriple(self, triple):

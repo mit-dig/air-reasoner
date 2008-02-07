@@ -24,6 +24,27 @@ except NameError:
                 return True
         return False
 
+try:
+    min([1], key=(lambda x: x))
+    min = min
+except TypeError:
+    oldmin = min
+    def min(*args, **keywords):
+        func = None
+        for key, val in keywords.items():
+            if key != 'key':
+                raise TypeError("min() got an unexpected keyword argument")
+            func = val
+        if func is None:
+            return min(*args)
+        if len(args) == 0:
+            raise TypeError("min expected 1 arguments, got 0")
+        if len(args) == 1:
+            args = args[0]
+        if len(args) == 0:
+            raise TypeError("min() arg is an empty sequence")
+        return min(func(x) for x in args)
+            
 
 from collections import deque
 try:

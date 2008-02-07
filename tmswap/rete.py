@@ -18,6 +18,8 @@ import itertools
 from term import unify, Env
 from formula import Formula, StoredStatement, WME
 
+import operator
+
 from py25 import dequeRemove
 VAR_PLACEHOLDER = object()
 
@@ -156,8 +158,10 @@ class AlphaFilter(AlphaMemory):
     """An alphaFilter connects an alpha node to a join node. It has the full pattern, and
 generates variable bindings
 """
-    def __init__(self, pattern, vars):
+    def __init__(self, pattern, vars, index, parents):
+        self.index = index
         self.penalty = 10
+        self.parents = parents
         self.pattern = pattern
         freeVariables = vars
         def findExistentials(x):
@@ -177,7 +181,22 @@ generates variable bindings
                 return frozenset()
         existentialVariables = findExistentials(pattern)
         self.vars = pattern.occurringIn(freeVariables | existentialVariables)
+        self.initialized = False
         AlphaMemory.__init__(self)
+
+    def initialize(self):
+        if self.initialized:
+            return
+        self.initialized = True
+        for primaryAlpha in self.parents:
+            primaryAlpha.successors.appendleft(self)
+            for triple in primaryAlpha:
+                self.rightActivate(triple)
+
+    def __len__(self):
+        if self.initialized:
+            return AlphaMemory.__len__(self)
+        return reduce(operator.add, [len(x) for x in self.parents], 0)
 
     @property
     def provides(self):
@@ -215,6 +234,12 @@ generates variable bindings
 
     @classmethod
     def build(cls, index, pattern, vars, builtinMap):
+        secondaryAlpha = cls.construct(index, pattern, vars, builtinMap)
+        secondaryAlpha.initialize()
+        return secondaryAlpha
+
+    @classmethod
+    def construct(cls, index, pattern, vars, builtinMap):
         def replaceWithNil(x):
             if isinstance(x, Formula) or x.occurringIn(vars):
                 return None
@@ -222,8 +247,9 @@ generates variable bindings
         masterPatternTuple = tuple(replaceWithNil(x) for x in (pattern.predicate(),
                                                          pattern.subject(),
                                                          pattern.object()))
-        
-        secondaryAlpha = cls(pattern, vars)
+
+        parents = []
+        secondaryAlpha = cls(pattern, vars, index, parents)
         p, s, o = masterPatternTuple
         V = VAR_PLACEHOLDER
         pts = [(p, s, o)]
@@ -239,13 +265,12 @@ generates variable bindings
                 pts = newpts
         for patternTuple in pts:
             primaryAlpha = index.setdefault(patternTuple, AlphaMemory())
+            parents.append(primaryAlpha)
             for secondaryAlpha2 in primaryAlpha.successors:
                 if secondaryAlpha2.pattern == pattern:
                     return secondaryAlpha2
-            primaryAlpha.successors.appendleft(secondaryAlpha)
-            for triple in primaryAlpha:
-                secondaryAlpha.rightActivate(triple)
         return secondaryAlpha
+        
 
     def triplesMatching(self, successor, env, includeMissing=False): # This is fast enough
         retVal = self   # No reason to do additional work here
