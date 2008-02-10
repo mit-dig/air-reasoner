@@ -14,6 +14,8 @@ import llyn
 from formula import Formula, StoredStatement
 from term import List, Env, Symbol, Term
 
+import uripath
+
 import diag
 progress = diag.progress
 
@@ -21,7 +23,9 @@ import tms
 import rete
 import treat
 
-MM = rete
+MM = rete # or it could be treat
+
+OFFLINE = [False]
 
 from prooftrace import (supportTrace,
                         removeFormulae,
@@ -35,6 +39,7 @@ from py25 import all, any
 GOAL = 1
 
 debugLevel = 0
+
 
 
 class FormulaTMS(object):
@@ -113,20 +118,20 @@ This is currently only used for goals
         if isinstance(node.datum, Rule):
             if debugLevel >= 3:
                 if node.datum.goal and debugLevel >= 4:
-                    progress('\tNow supporting goal rule %s because of %s' % (node.datum, justification))
+                    progress('\tNow supporting goal rule %s because of %s' % (node, justification))
                 else:
-                    progress('\tNow supporting rule %s because of %s' % (node.datum, justification))
+                    progress('\tNow supporting rule %s because of %s' % (node, justification))
             node.datum.compileToRete()
             if debugLevel >= 4:
                 progress('\t\t ... built rule')
         if isinstance(node.datum, Symbol):
             if debugLevel >= 2:
-                progress('Now supporting %s because of %s' % (node.datum, justification))
+                progress('Now supporting %s because of %s' % (node, justification))
             f = _loadF(self, node.datum.uriref())
             self.getThing(f).justify(self.parseSemantics, [node])
         if isinstance(node.datum, Formula):
             if debugLevel >= 2:
-                progress('Now supporting %s because of %s' % (node.datum, justification))
+                progress('Now supporting %s because of %s' % (node, justification))
             self.workingContext.loadFormulaWithSubstitution(node.datum)
         if isinstance(node.datum, tuple):
 #            print '\t ... now supporting %s because of %s' % (node, justification)
@@ -684,6 +689,14 @@ baseRulesURI = 'http://dig.csail.mit.edu/TAMI/2007/amord/base-rules.ttl'
 
 store = llyn.RDFStore()
 def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None):
+    global baseFactsURI, baseRulesURI
+    if OFFLINE[0]:
+        baseFactsURI = uripath.join(uripath.base(),
+                                      baseFactsURI.replace('http://dig.csail.mit.edu/TAMI',
+                                                           '../../..'))
+        baseRulesURI = uripath.join(uripath.base(),
+                                      baseRulesURI.replace('http://dig.csail.mit.edu/TAMI',
+                                                           '../../..'))
     import time
     formulaTMS = setupTMS(store)
     workingContext = formulaTMS.workingContext
@@ -696,6 +709,7 @@ def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None):
         logFormulae.append(loadFactN3(formulaTMS, logFormula, ""))
     for logURI in logURIs:
         logFormulae.append(loadFactFormula(formulaTMS, logURI, "")) # should it be "p"?
+
     baseFactsFormula = loadFactFormula(formulaTMS, baseFactsURI)
 
     eventLoop = EventLoop()
@@ -805,6 +819,8 @@ knownScenarios = {
 }
 
 def runScenario(s, others=[]):
+    if s[-5:] == 'Local':
+        OFFLINE[0] = True
     if s == 'test':
         rules = others[0:1]
         facts = others[1:2]

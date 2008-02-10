@@ -275,6 +275,7 @@ generates variable bindings
 
     def triplesMatching(self, successor, env, includeMissing=False): # This is fast enough
         retVal = self   # No reason to do additional work here
+        assert self.initialized
         if includeMissing:
             return retVal + [TripleWithBinding(BogusTriple(self.pattern), Env())]
         return retVal

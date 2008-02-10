@@ -36,14 +36,19 @@ except TypeError:
                 raise TypeError("min() got an unexpected keyword argument")
             func = val
         if func is None:
-            return min(*args)
+            return oldmin(*args)
         if len(args) == 0:
             raise TypeError("min expected 1 arguments, got 0")
         if len(args) == 1:
             args = args[0]
         if len(args) == 0:
             raise TypeError("min() arg is an empty sequence")
-        return min(func(x) for x in args)
+        m = args[0]
+        v = func(m)
+        for x in args:
+            if func(x) < v:
+                m, v = x, func(x)
+        return m
             
 
 from collections import deque

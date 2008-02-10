@@ -28,7 +28,7 @@ def Union(*args):
     return reduce(or_, args, frozenset())
 
 class BindingFilter(AlphaFilter):
-    def substitution(self, bindings):
+    def substitution(self, bindings, vars):
         if not bindings:
             return self
         pattern = self.pattern.substitution(bindings)
@@ -43,12 +43,29 @@ def compilePattern(index, patterns, vars,
                                          pattern,
                                          vars,
                                          builtinMap=builtinMap))
-    return Matcher(filters)
+    return Matcher(filters, vars)
+
+def mergeEnv(env, env2):  # Not good enough! need to unify somehow....
+    newEnv = env
+                
+
+
+    
+    for var, (val, source) in env2.items():
+        if var in env:
+            if env[var] == val:
+                pass
+            else:
+                raise RuntimeError("An env merge should always succeed, but I could not merge %s and %s" % (env, env2))
+        else:
+            newEnv = newEnv.bind(var, (val, source))
+    return newEnv
+
 
 
 class Matcher(object):
-    def __init__(self, filters):
-        self.vars = Union(*[x.vars for x in filters])
+    def __init__(self, filters, vars):
+        self.vars = Union(vars, *[x.vars for x in filters])
         self.children = set()
         self.filters = filters
         for f in filters:
@@ -64,7 +81,7 @@ class Matcher(object):
             self.done((triples, env, 0))
             return
         bindings = env.asDict()
-        alphas = [x.substitution(bindings) for x in alphas]
+        alphas = [x.substitution(bindings, self.vars) for x in alphas]
         top = min(alphas, key=len)
         rest = [x for x in alphas if x is not top]
         top.initialize()
@@ -72,7 +89,8 @@ class Matcher(object):
             triple = triple_holder.triple
             env2 = triple_holder.env  
             just = triples + [triple]
-            env3 = env.flatten(env2)
+            env3 = mergeEnv(env, env2)
+#            env3 = env.flatten(env2)
             if not rest:
                 self.done((just, env3, 0))
 
