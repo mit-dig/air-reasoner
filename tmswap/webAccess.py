@@ -96,7 +96,7 @@ def webget(addr, referer=None, types=[]):
     if referer: #consistently misspelt
         req.add_header('Referer', referer)
 
-    req.add_header('User-Agent', 'cwm/1.2 (TAMI reasoner/1)')
+    req.add_header('User-Agent', 'cwm/1.2 (AIR reasoner/1)')
 
     stream =  urllib2.urlopen(req)
 
