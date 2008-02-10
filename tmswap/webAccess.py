@@ -96,6 +96,8 @@ def webget(addr, referer=None, types=[]):
     if referer: #consistently misspelt
         req.add_header('Referer', referer)
 
+    req.add_header('User-Agent', 'cwm/1.2 (TAMI reasoner/1)')
+
     stream =  urllib2.urlopen(req)
 
     if print_all_file_names:
@@ -218,9 +220,13 @@ def load(store, uri=None, openFormula=None, asIfFrom=None, contentType=None,
         else:
             p = notation3.SinkParser(store, F,  thisDoc=asIfFrom,flags=flags, why=why)
 
-        p.startDoc()
-        p.feed(buffer)
-        p.endDoc()
+        try:
+            p.startDoc()
+            p.feed(buffer)
+            p.endDoc()
+        except:
+            progress("Failed to parse %s" % uri or buffer)
+            raise
         
     if not openFormula:
         F = F.close()
