@@ -833,39 +833,47 @@ def runScenario(s, others=[]):
     return testPolicy(facts, rules)
 
 def main():
+    global MM
     from optparse import OptionParser
     usage = "usage: %prog [options] scenarioName"
     parser = OptionParser(usage)
     parser.add_option('--profile', dest="profile", action="store_true", default=False,
                       help="""Instead of displaying output, display profile information.
-                      This requires the hotshot module, and is a bit slow
-                      """)
+ This requires the hotshot module, and is a bit slow
+""")
     parser.add_option('--psyco', '-j', dest='psyco', action="store_true", default=False,
                       help="""Try to use psyco to speed up the program.
-                      Don't try to do this while profiling --- it won't work.
-                      If you do not have psyco, it will throw an ImportError
+Don't try to do this while profiling --- it won't work.
+If you do not have psyco, it will throw an ImportError
 
-                      There are no guarentees this will speed things up instead of
-                      slowing them down. In fact, it seems to slow them down quite
-                      a bit right now
-                      """)
+There are no guarentees this will speed things up instead of
+slowing them down. In fact, it seems to slow them down quite
+a bit right now
+""")
     parser.add_option('--full-unify', dest='fullUnify', action="store_true", default=False,
                       help="""Run full unification (as opposed to simple implication)
-                      of goals. This may compute (correct) answers it would otherwise miss
-                      It is much more likely to simply kill your performance at this time
-                      """)
+of goals. This may compute (correct) answers it would otherwise miss
+It is much more likely to simply kill your performance at this time
+""")
     parser.add_option('--lookup-ontologies', '-L', dest="lookupOntologies", action="store_true", default=False,
                       help="""Set the cwm closure flag of "p" on all facts loaded.
-                      This will load the ontologies for all properties, until that
-                      converges. This may compute (correct) answers it would otherwise miss
-                      It is much more likely to simply kill your performance at this time.
-                      It may even cause the computation to fail, if a URI 404's or is not RDF.
-                      """)
+This will load the ontologies for all properties, until that
+converges. This may compute (correct) answers it would otherwise miss
+It is much more likely to simply kill your performance at this time.
+It may even cause the computation to fail, if a URI 404's or is not RDF.
+""")
+    parser.add_option('--reasoner', '-r', dest="reasoner", action="store", default="rete",
+                      help="""Which reasoner to chose. Current options are
+'rete' and 'treat' (without the quotes). The default is 'rete',
+which seems faster right now. 'treat' is likely more extensible
+for the future, but may still be buggy.
+""")
 
     (options, args) = parser.parse_args()
     if not args:
         args = ['s0']
     call = lambda : runScenario(args[0], args[1:])
+    MM = eval(options.reasoner)
     if options.lookupOntologies:
         loadFactFormula.pClosureMode = True
     if options.fullUnify:
