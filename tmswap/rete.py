@@ -185,12 +185,13 @@ generates variable bindings
         self.initialized = False
         AlphaMemory.__init__(self)
 
-    def initialize(self):
+    def initialize(self, addToParents=True):
         if self.initialized:
             return
         self.initialized = True
         for primaryAlpha in self.parents:
-            primaryAlpha.successors.appendleft(self)
+            if addToParents:
+                primaryAlpha.successors.appendleft(self)
             for triple in primaryAlpha:
                 self.rightActivate(triple)
 

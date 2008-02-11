@@ -84,7 +84,7 @@ class Matcher(object):
         alphas = [x.substitution(bindings, self.vars) for x in alphas]
         top = min(alphas, key=len)
         rest = [x for x in alphas if x is not top]
-        top.initialize()
+        top.initialize(addToParents=False)
         for triple_holder in top.triplesMatching(self, env):
             triple = triple_holder.triple
             env2 = triple_holder.env  
