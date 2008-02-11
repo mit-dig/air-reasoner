@@ -58,6 +58,11 @@ The job of activating rules also goes on this
         self.premises = set()
         self.falseAssumptions = set()
         self.contexts = {}
+
+        self.assumedPolicies = []
+        self.assumedURIs = []
+        self.assumedStrings = []
+        self.assumedClosedWorlds = []
         
 
     def getAuxTriple(self, auxid, subject, predicate, object, variables):
@@ -344,8 +349,14 @@ class RuleFire(object):
                 return
 #                print 'we succeeded! %s, %s' % (triples, result)
             if alt:
-                closedWorld = self.tms.getThing(('closedWorld', self.tms.workingContext.newList(list(self.tms.premises))))
+#                closedWorld = self.tms.getThing(('closedWorld', self.tms.workingContext.newList(list(self.tms.premises))))
+                closedWorld = self.tms.getThing(('closedWorld',
+                                                 self.tms.workingContext.newList(self.tms.assumedPolicies +
+                                                     self.tms.assumedURIs +
+                                                     self.tms.assumedStrings +
+                                                     self.tms.assumedClosedWorlds)))
                 closedWorld.assume()
+                self.tms.assumedClosedWorlds.append(closedWorld)
                 altSupport = [closedWorld]
                 desc = self.altDescriptions
             else:
@@ -585,7 +596,10 @@ much how the rule was represented in the rdf network
                                                        base=base)
                         for x in pf.each(subj=y, pred=p['goal-rule'])]
                     for y in policies], [])
-        return rules, goal_rules, cwm_rules               
+        return policies, rules, goal_rules, cwm_rules               
+
+
+
 
 
 uriGenCount = [0]
@@ -643,6 +657,7 @@ def loadFactFormula(formulaTMS, uri, closureMode=""): #what to do about closureM
 ##    return s
     f = _loadF(formulaTMS, uri, closureMode)
     formulaTMS.getThing(f).assume()
+    formulaTMS.assumedURIs.append(formulaTMS.workingContext.newSymbol(uri))
     return f
 
 def _loadF(formulaTMS, uri, closureMode=""):
@@ -675,11 +690,12 @@ def loadFactN3(formulaTMS, string, closureMode=""):
     f.setClosureMode(closureMode)    
     f = parseN3(store, f)
     formulaTMS.getThing(f).assume()
+    formulaTMS.assumedStrings.append(formulaTMS.workingContext.newLiteral(string, dt=n3NS))
     return f    
 
 loadFactFormula.pClosureMode = False
 
-    
+
 
 baseFactsURI = 'http://dig.csail.mit.edu/TAMI/2007/amord/base-assumptions.ttl'
 baseRulesURI = 'http://dig.csail.mit.edu/TAMI/2007/amord/base-rules.ttl'
@@ -688,6 +704,9 @@ baseRulesURI = 'http://dig.csail.mit.edu/TAMI/2007/amord/base-rules.ttl'
 #baseRulesURI = 'data:text/rdf+n3;charset=utf-8,' # quite empty
 
 store = llyn.RDFStore()
+
+n3NS = store.newSymbol('http://www.w3.org/2000/10/swap/grammar/n3#n3')
+
 def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None):
     global baseFactsURI, baseRulesURI
     if OFFLINE[0]:
@@ -750,7 +769,8 @@ def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None):
             base=True
         else:
             base=False
-        rules, goal_rules, cwm_rules = Rule.compileFormula(eventLoop, formulaTMS, pf, base=base)
+        policies, rules, goal_rules, cwm_rules = Rule.compileFormula(eventLoop, formulaTMS, pf, base=base)
+        formulaTMS.assumedPolicies.extend(policies)
         allRules += rules
         allRules += cwm_rules
         allGoalRules += goal_rules
@@ -801,9 +821,9 @@ knownScenarios = {
                   [  '../../s0/mit-policy.n3'] ),
     's9var2Local' : (['../../s9/variation2/log.n3'],
                      ['../../s9/variation2/policy.n3']),
-    'arl1' : (['../../../../2008/ARL/log.n3'],
+    'arl1Local' : (['../../../../2008/ARL/log.n3'],
                      ['../../../../2008/ARL/udhr-policy.n3']),    
-     'arl2' : (['../../../../2008/ARL/log.n3'],
+     'arl2Local' : (['../../../../2008/ARL/log.n3'],
                      ['../../../../2008/ARL/unresol-policy.n3']),    
     's4' : (['http://dig.csail.mit.edu/TAMI/2006/s4/background.ttl',
 'http://dig.csail.mit.edu/TAMI/2006/s4/categories.ttl',
@@ -817,7 +837,9 @@ knownScenarios = {
 'http://dig.csail.mit.edu/TAMI/2006/s4/usms-win.ttl'
 ],
             ['http://dig.csail.mit.edu/TAMI/2006/s4/privacy-act.ttl']),
-    'arl' : (['http://dig.csail.mit.edu/2008/ARL/log.n3'],
+    'arl1' : (['http://dig.csail.mit.edu/2008/ARL/log.n3'],
+                     ['http://dig.csail.mit.edu/2008/ARL/udhr-policy.n3']), 
+    'arl2' : (['http://dig.csail.mit.edu/2008/ARL/log.n3'],
              ['http://dig.csail.mit.edu/2008/ARL/unresol-policy.n3'])
 
 }

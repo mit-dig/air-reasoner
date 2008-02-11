@@ -7,7 +7,7 @@ Given a tms, generate proof traces
 
 import tms
 from formula import Formula, StoredStatement
-from term import List, Env, Symbol
+from term import List, Env, Symbol, Fragment, Literal
 
 def supportTrace(tmsNodes):
     pending = set()
@@ -163,7 +163,12 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
         if self in done:
             return True
         done.add(self)
-        datum = self.datum
+        if hasattr(self, 'datum'):
+            datum = self.datum
+        elif isinstance(self, (Formula, Symbol, Fragment, Literal)):
+            datum = self
+        else:
+            raise TypeError(self)
         if isinstance(datum, Rule):
             #datum is a rule!
             termsFor[self] = datum.sourceNode
@@ -175,6 +180,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                     for x in datum[1]:
                         nf2(x, False)
                     formula.add(newNode, air['closed-world-assumption'], formula.newList([termsFor[x] for x in datum[1]]))
+##                    formula.add(newNode, air['closed-world-assumption'], formula.newList([x for x in datum[1]]))
                     termsFor[self] = newNode
                 else:
                     raise RuntimeError(self)
@@ -185,8 +191,10 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                 termsFor[self] = newFormula
             else:
                 raise RuntimeError(self)
-        elif isinstance(datum, (Formula, Symbol)): # We failed to remove it!
+        elif isinstance(datum, (Formula, Symbol, Fragment, Literal)): # We failed to remove it!
             termsFor[self] = datum # represents itself
+        else:
+            raise TypeError(datum)
         if recurse:
             if self in premises:
                 retVal = True
