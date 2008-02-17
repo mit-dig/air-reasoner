@@ -171,7 +171,12 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
             raise TypeError(self)
         if isinstance(datum, Rule):
             #datum is a rule!
-            termsFor[self] = datum.sourceNode
+            if datum.generated:
+                newNode = formula.newBlankNode()
+                formula.add(newNode, air['instanceOf'], datum.sourceNode)
+                termsFor[self] = newNode
+            else:
+                termsFor[self] = datum.sourceNode
         elif isinstance(datum, tuple):
             if len(datum) == 2:
                 if datum[0] == 'closedWorld':

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """Amord.py
 
 an attempt at an amord implementation built on cwm
@@ -389,7 +390,7 @@ much how the rule was represented in the rdf network
     
     def __init__(self, eventLoop, tms, vars, label,
                  pattern, result, descriptions, alt, altDescriptions, sourceNode,
-                 goal=False, matchName=None, base=False):
+                 goal=False, matchName=None, base=False, generated=False):
         self.generatedLabel = False
         if label is None or label=='None':
             self.generatedLabel = True
@@ -412,6 +413,7 @@ much how the rule was represented in the rdf network
         self.goal = goal
         self.matchName = matchName
         self.sourceNode = sourceNode
+        self.generated = generated
         self.isBase = base
         if base:
             self.baseRules.add(sourceNode)
@@ -477,6 +479,8 @@ much how the rule was represented in the rdf network
             self.eventLoop.addAlternate(RuleFire(self, [], Env(), 0, self.alt, alt=True))
 
     def substitution(self, env):
+        if not env:
+            return self
         pattern = self.pattern.substitution(env)
         result = [x.substitution(env) for x in self.result]
         alt = [x.substitution(env) for x in self.alt]
@@ -488,7 +492,7 @@ much how the rule was represented in the rdf network
             label = self.label
         return self.__class__(self.eventLoop, self.tms, self.vars,
                               label, pattern, result, descriptions, alt, altDescriptions, self.sourceNode,
-                              self.goal, self.matchName, base=self.isBase)
+                              self.goal, self.matchName, base=self.isBase, generated=True)
 
     @classmethod
     def compileFromTriples(cls, eventLoop, tms, F, node, goal=False, vars=frozenset(), base=False):

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """server cgi
 
-An attempt to get a cgi interface to amord.py
+An attempt to get a cgi interface to policyrunner.py
 
 """
 DEBUG = False
@@ -45,8 +45,8 @@ def wsgi_app(environ, start_response):
     ruleURIs = form.getlist('rulesFile')
     log = form.getfirst('log')
     rules = form.getfirst('policy')
-    from tmswap import amord
-    testPolicy = amord.testPolicy
+    from tmswap import policyrunner
+    testPolicy = policyrunner.testPolicy
     returnString = testPolicy(logURIs, ruleURIs, log, rules)
     returnString = returnString.encode('utf_8')
     print ('ran testPolicy(%s, %s, %r, %r)\n' % (logURIs, ruleURIs, log, rules))
@@ -83,8 +83,8 @@ def main():
     ruleURIs = form.getlist('rulesFile')
     log = form.getfirst('log')
     rules = form.getfirst('policy')
-    from tmswap import amord
-    testPolicy = amord.testPolicy
+    from tmswap import policyrunner
+    testPolicy = policyrunner.testPolicy
     returnString = testPolicy(logURIs, ruleURIs, log, rules)
     returnString = returnString.encode('utf_8')
     print ('ran testPolicy(%s, %s, %r, %r)\n' % (logURIs, ruleURIs, log, rules))
