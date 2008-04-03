@@ -712,6 +712,10 @@ store = llyn.RDFStore()
 n3NS = store.newSymbol('http://www.w3.org/2000/10/swap/grammar/n3#n3')
 
 def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None):
+    trace, result = runPolicy(logURIs, policyURIs, logFormula=logFormula, ruleFormula=ruleFormula)
+    return trace.n3String()
+
+def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None):
     global baseFactsURI, baseRulesURI
     if OFFLINE[0]:
         baseFactsURI = uripath.join(uripath.base(),
@@ -814,8 +818,7 @@ def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None):
     f = rdfTraceOutput(store, tmsNodes, reasons, premises, Rule)
 #    import diag
 #    diag.chatty_flag = 1000
-    return f.n3String() 
-    return workingContext.n3String()
+    return f, workingContext 
 
 
 knownScenarios = {
