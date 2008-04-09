@@ -4,7 +4,7 @@
 An attempt to get a cgi interface to policyrunner.py
 
 """
-DEBUG = False
+DEBUG = TRUE
 
 ctype = 'text/rdf+n3'
 
@@ -104,4 +104,4 @@ def main():
 
 
 if __name__ == '__main__': # What else would it be?
-    main_wsgi()
+    main()
