@@ -3,6 +3,11 @@
 a TREAT implementation, to see if it performs better / is
  more flexible than rete.py
 
+This is based on TREAT: A New and Efficient Match Algorithm
+for AI Production Systems by Daniel P. Miranker
+
+ISBN 0273087932
+
 the interface should be the same!
 
 """
@@ -32,17 +37,17 @@ class BindingFilter(AlphaFilter):
         if not bindings:
             return self
         pattern = self.pattern.substitution(bindings)
-        return self.construct(self.index, pattern, self.vars, self.builtinMap)
+        return self.construct(self.index, pattern, self.vars, self.supportBuiltin)
 
 def compilePattern(index, patterns, vars,
-                   buildGoals=False, goalPatterns=False, builtinMap={}):
+                   buildGoals=False, goalPatterns=False, supportBuiltin=None):
     """This builds the TREAT"""
     filters = []
     for pattern in patterns:
         filters.append(BindingFilter.build(index,
                                          pattern,
                                          vars,
-                                         builtinMap=builtinMap))
+                                         supportBuiltin=supportBuiltin))
     return Matcher(filters, vars)
 
 def mergeEnv(env, env2):  # Not good enough! need to unify somehow....

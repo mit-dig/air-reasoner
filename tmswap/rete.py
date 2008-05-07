@@ -15,7 +15,7 @@ WKD = weakref.WeakKeyDictionary
 from collections import deque
 import itertools
 
-from term import unify, Env
+from term import unify, Env, BuiltIn
 from formula import Formula, StoredStatement, WME
 
 import operator
@@ -25,12 +25,12 @@ VAR_PLACEHOLDER = object()
 
 fullUnify = False
 
-def compilePattern(index, patterns, vars, buildGoals=False, goalPatterns=False, builtinMap={}):
+def compilePattern(index, patterns, vars, buildGoals=False, goalPatterns=False, supportBuiltin=None):
     """This builds the RETE network"""
     current = EmptyRoot
     patterns.sort()
     for pattern in sortPatterns(patterns):
-        alpha = AlphaFilter.build(index, pattern, vars, builtinMap=builtinMap)
+        alpha = AlphaFilter.build(index, pattern, vars, supportBuiltin=supportBuiltin)
         current = JoinNode(current, alpha, buildGoals)
         current = BetaMemory(current)
     return current
@@ -158,12 +158,12 @@ class AlphaFilter(AlphaMemory):
     """An alphaFilter connects an alpha node to a join node. It has the full pattern, and
 generates variable bindings
 """
-    def __init__(self, pattern, vars, index, parents, builtinMap):
+    def __init__(self, pattern, vars, index, parents, supportBuiltin):
         self.index = index
         self.penalty = 10
         self.parents = parents
         self.pattern = pattern
-        self.builtinMap = builtinMap
+        self.supportBuiltin = supportBuiltin
         freeVariables = vars
         def findExistentials(x):
             if hasattr(x, 'spo'):
@@ -235,8 +235,8 @@ generates variable bindings
                 self.add(TripleWithBinding(s, env))
 
     @classmethod
-    def build(cls, index, pattern, vars, builtinMap):
-        secondaryAlpha = cls.construct(index, pattern, vars, builtinMap)
+    def build(cls, index, pattern, vars, supportBuiltin):
+        secondaryAlpha = cls.construct(index, pattern, vars, supportBuiltin)
         secondaryAlpha.initialize()
         return secondaryAlpha
 
@@ -277,9 +277,25 @@ generates variable bindings
     def triplesMatching(self, successor, env, includeMissing=False): # This is fast enough
         retVal = self   # No reason to do additional work here
         assert self.initialized
+        builtInMade = []
+        if isinstance(self.pattern.predicate(), BuiltIn):
+            if self.pattern.predicate() is self.pattern.context().store.includes:
+                newIndex = self.pattern.subject()._index
+                node = compilePatterns(newIndex, self.pattern.object.statements, self.vars)
+                def onSuccess(self, (triples, environment, penalty)):
+                    newAssumption = self.pattern.substitution(environment)
+                    #somebodyPleaseAssertFromBuiltin(self.pattern.predicate(), newAssumption)
+
+                
+
+                    
+                    builtInMade.append(TripleWithBinding(newAssumption, environment))
+                prod = ProductionNode(node, onSuccess)
+                
+                    
         if includeMissing:
-            return retVal + [TripleWithBinding(BogusTriple(self.pattern), Env())]
-        return retVal
+            return retVal + [TripleWithBinding(BogusTriple(self.pattern), Env())] + builtInMade
+        return retVal + builtInMade
 
 
 class Token(object):

@@ -34,8 +34,10 @@ from prooftrace import (supportTrace,
                         simpleTraceOutput,
                         rdfTraceOutput)
 
-from py25 import all, any
+from py25 import all, any, defaultdict
                         
+
+workcount = defaultdict(int)
 
 GOAL = 1
 
@@ -48,6 +50,7 @@ class FormulaTMS(object):
 It keeps a Formula of all facts currently believed.
 The job of activating rules also goes on this
 """
+    tracking = True
     def __init__(self, workingContext):
         self.tms = tms.TMS('FormulaTMS', self.event)
         self.nodes = WVD()
@@ -123,10 +126,15 @@ This is currently only used for goals
                     self.getContext(GOAL).removeStatement(self.getAuxStatement(node.datum))
         if isinstance(node.datum, Rule):
             if debugLevel >= 3:
-                if node.datum.goal and debugLevel >= 4:
+                if node.datum.goal:
                     progress('\tNow supporting goal rule %s because of %s' % (node, justification))
                 else:
                     progress('\tNow supporting rule %s because of %s' % (node, justification))
+            if self.tracking:
+                if node.datum.goal:
+                    workcount['goal-rule'] += 1
+                else:
+                    workcount['rule'] += 1
             node.datum.compileToRete()
             if debugLevel >= 4:
                 progress('\t\t ... built rule')
@@ -144,6 +152,8 @@ This is currently only used for goals
             if len(node.datum) == 2:
                 pass # signal data
             elif len(node.datum) == 4:
+                if self.tracking:
+                    workcount['fact'] += 1
                 triple = node.datum[:3]
                 variables = node.datum[3]
                 if variables is None:
@@ -169,6 +179,8 @@ This is currently only used for goals
                     s2.variables = v
                     result = self.getContext(GOAL). _addStatement(s1)
             else:
+                if self.tracking:
+                    workcount['goal'] += 1
                 if debugLevel > 7:
                     progress('\t ... now supporting goal %s because of %s' % (node, justification))
                 c, s, p, o, v = node.datum
@@ -792,9 +804,11 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None):
 
     eventStartTime = time.time()
     Formula._isReasoning = True
+    FormulaTMS.tracking = False
     while eventLoop:
         eventLoop.next()
-    Formula._isReasoning = False        
+    Formula._isReasoning = False
+    print workcount
 
 # See how long it took (minus output)
     now = time.time()
