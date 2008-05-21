@@ -685,7 +685,7 @@ def _loadF(formulaTMS, uri, closureMode=""):
     f = store.load(uri, openFormula=f)
     return f
 
-def parseN3(store, f):
+def parseN3(store, f, string):
     import notation3
     p = notation3.SinkParser(store, f)
 
@@ -704,7 +704,7 @@ def loadFactN3(formulaTMS, string, closureMode=""):
     store = formulaTMS.workingContext.store
     f = store.newFormula()
     f.setClosureMode(closureMode)    
-    f = parseN3(store, f)
+    f = parseN3(store, f, string)
     formulaTMS.getThing(f).assume()
     formulaTMS.assumedStrings.append(formulaTMS.workingContext.newLiteral(string, dt=n3NS))
     return f    
@@ -756,7 +756,7 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None):
 
     policyFormulae = []
     if ruleFormula is not None:
-        policyFormulae.append(parseN3(store, ruleFormula))
+        policyFormulae.append(parseN3(store, store.newFormula(), ruleFormula))
     for policyURI in policyURIs:
         policyFormulae.append(store.load(policyURI))
     baseRulesFormula = store.load(baseRulesURI)
@@ -858,6 +858,8 @@ knownScenarios = {
 'http://dig.csail.mit.edu/TAMI/2006/s4/usms-win.ttl'
 ],
             ['http://dig.csail.mit.edu/TAMI/2006/s4/privacy-act.ttl']),
+    'ucsd' : (['http://dig.csail.mit.edu/2008/Talks/0513-UCSD/simple/policy-explicit.n3'],
+            ['http://dig.csail.mit.edu/2008/Talks/0513-UCSD/simple/data1.n3']),
     'arl1' : (['http://dig.csail.mit.edu/2008/ARL/log.n3'],
                      ['http://dig.csail.mit.edu/2008/ARL/udhr-policy.n3']), 
     'arl2' : (['http://dig.csail.mit.edu/2008/ARL/log.n3'],
