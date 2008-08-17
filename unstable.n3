@@ -1,0 +1,52 @@
+
+# $Date: 2008-01-24 10:50:05 -0500 (Thu, 24 Jan 2008) $
+# $Revision: 10910 $
+# $Author: oshani $
+
+# MIT Prox Card Policy: http://web.mit.edu/mitcard/privacy.html
+# We use a simplified policy: prox card data can only be used for
+# criminal investigation.
+
+#### Namespaces ####
+
+# The default namespace is this document.
+@prefix : <#> .
+
+# "prox:" is an alias for ":" to improve printed output.
+@prefix prox: <#> .
+
+# AIR (AMORD in RDF) is the policy language.
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+
+# Purposes are drawn from a predefined set.
+@prefix pur: <http://dig.csail.mit.edu/TAMI/2006/s4/purposes#> .
+
+# The "mit:" namespace defines background terms specific to MIT.
+@prefix mit: <http://dig.csail.mit.edu/TAMI/2007/s0/university#> .
+
+@prefix owl: <http://www.w3.org/2002/07/owl#>.
+
+#### Policy ####
+
+:MITProxCardPolicy a air:Policy;
+    air:variable :S, :P, :O;
+    air:rule [
+	air:label "Rule 1";
+	air:pattern {
+	    :this :is :rule1
+	};
+        air:alt [
+	    air:description ("It would seem that rule 1 failed to fire");
+            air:assert { :rule2 :is :cool . :rule1 air:non-compliant-with owl:Thing }
+	    ];
+    ],
+    [
+	air:label "Rule 2";
+	air:pattern {
+	   :rule2 :is :cool
+	};
+        air:alt [
+	    air:description ("It would seem that rule 2 failed to fire");
+            air:assert { :this :is :rule1  . :rule2 air:non-compliant-with owl:Thing}
+	    ];
+    ] .
