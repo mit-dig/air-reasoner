@@ -1,0 +1,25 @@
+Here's a list of the coding standards I prefer to keep.  I've tried to bring
+most of the old code up to these standards in the process of going through and
+understanding the codebase, but there may be some exceptions to this rule.
+
+My new code tries its best to stick to this standard though.
+
+- Expressions should always have spaces separating operators from variables and
+  functions.  This helps readability.  Should be balanced no matter what.
+  - EXCEPTION: Doesn't apply to simple ops in array indices (e.g. word[:j+1]
+  - EXCEPTION: Doesn't apply if we can keep the line under 80 characters by
+               dropping a handful (1-3).
+- Try to refer to functions specified in externally-specified modules with the
+  module, or if the functions aren't used much, also for Python modules.
+  Otherwise, import the functions specifically (e.g. 'import re' vs.
+  'from string import find')
+- Keep all imports to the top of the file (or function if it's something used
+  in only one function...)
+  - EXCEPTION: imports needed for tests or the main function.
+- Do normal imports, followed by package-based modules, followed by local
+  modules.
+- Do module imports before function imports ('import re' before
+  'from string import find')
+- I prefer alphabetical imports, but that's not very important at all.
+- Documentation should respect the 80-line limit. Code doesn't need to, but
+  should try.

@@ -22,15 +22,16 @@ REFERENCES
 
 __version__ = "$Id: uripath.py,v 1.21 2007/06/26 02:36:16 syosi Exp $"
 
-from string import find, rfind, index
+import os
+import re
+from string import find, rfind, index, count
 
 
 def splitFrag(uriref):
-    """split a URI reference between the fragment and the rest.
+    """Splits a URI into a tuple (base, fragment), tossing the '#' used as a
+    delimiter.  If no fragment is present, fragment is None.
 
-    Punctuation is thrown away.
-
-    e.g.
+    Examples:
     
     >>> splitFrag("abc#def")
     ('abc', 'def')
@@ -45,11 +46,11 @@ def splitFrag(uriref):
     else: return uriref, None
 
 def splitFragP(uriref, punct=0):
-    """split a URI reference before the fragment
-
-    Punctuation is kept.
+    """Splits a URI into a tuple (base, fragment), prefixing the '#' used as a
+    delimiter to the variable fragment.  If no fragment is present, fragment
+    is ''.
     
-    e.g.
+    Examples:
 
     >>> splitFragP("abc#def")
     ('abc', '#def')
@@ -65,18 +66,21 @@ def splitFragP(uriref, punct=0):
 
 
 def join(here, there):
-    """join an absolute URI and URI reference
-    (non-ascii characters are supported/doctested;
-    haven't checked the details of the IRI spec though)
+    """Joins an absolute URI and URI reference.
+    
+    Non-ASCII characters are supported/doctested; haven't checked the details
+    of the IRI spec though.
+    
+    here is assumed to be absolute, without a fragment.
+    there is a URI reference.
 
-    here is assumed to be absolute.
-    there is URI reference.
-
+    Raise ValueError if there uses relative path syntax but here has no
+    hierarchical path.
+    
+    Examples:
+    
     >>> join('http://example/x/y/z', '../abc')
     'http://example/x/abc'
-
-    Raise ValueError if there uses relative path
-    syntax but here has no hierarchical path.
 
     >>> join('mid:foo@example', '../foo')
     Traceback (most recent call last):
@@ -89,16 +93,17 @@ def join(here, there):
     >>> join('mid:foo@example', '#foo')
     'mid:foo@example#foo'
     
-    We grok IRIs
+    We grok IRIs, such as:
 
     >>> len(u'Andr\\xe9')
     5
     
     >>> join('http://example.org/', u'#Andr\\xe9')
     u'http://example.org/#Andr\\xe9'
+    
     """
 
-    assert(find(here, "#") < 0), "Base may not contain hash: '%s'"% here # caller must splitFrag (why?)
+    assert(find(here, "#") < 0), "Base may not contain hash: '%s'" % here # caller must splitFrag (why?)
 
     slashl = find(there, '/')
     colonl = find(there, ':')
@@ -115,12 +120,13 @@ def join(here, there):
     
     # join('mid:foo@example', '../foo') bzzt
     if here[bcolonl+1:bcolonl+2] <> '/':
-        raise ValueError ("Base <%s> has no slash after colon - with relative '%s'." %(here, there))
+        raise ValueError ("Base <%s> has no slash after colon - with relative '%s'." %
+                          (here, there))
 
     if here[bcolonl+1:bcolonl+3] == '//':
         bpath = find(here, '/', bcolonl+3)
     else:
-        bpath = bcolonl+1
+        bpath = bcolonl + 1
 
     # join('http://xyz', 'foo')
     if bpath < 0:
@@ -154,14 +160,13 @@ def join(here, there):
     return here[:slashr+1] + path + frag
 
 
-    
-import re
-import string
 commonHost = re.compile(r'^[-_a-zA-Z0-9.]+:(//[^/]*)?/[^/]*$')
 
 
 def refTo(base, uri):
-    """figure out a relative URI reference from base to uri
+    """Return the relative URI to uri from base.
+    
+    Examples:
 
     >>> refTo('http://example/x/y/z', 'http://example/x/abc')
     '../abc'
@@ -185,8 +190,8 @@ def refTo(base, uri):
     >>> x='http://ex/x/y';y='http://ex/x/q%3ar';join(x, refTo(x, y)) == y
     1
     
-    This one checks that it uses a root-realtive one where that is
-    all they share.  Now uses root-relative where no path is shared.
+    This one checks that it uses a root-relative one where that is all they
+    share.  Now uses root-relative where no path is shared.
     This is a matter of taste but tends to give more resilience IMHO
     -- and shorter paths
 
@@ -206,44 +211,46 @@ def refTo(base, uri):
     
     # Find how many path segments in common
     i=0
-    while i<len(uri) and i<len(base):
+    while i < len(uri) and i < len(base):
         if uri[i] == base[i]: i = i + 1
         else: break
     # print "# relative", base, uri, "   same up to ", i
     # i point to end of shortest one or first difference
 
+    # Do they have ONLY a shared host? Then we can use the root '/blah' form.
     m = commonHost.match(base[:i])
     if m:
-        k=uri.find("//")
-        if k<0: k=-2 # no host
-        l=uri.find("/", k+2)
+        k = uri.find("//")
+        if k < 0: k = -2 # no host
+        l = uri.find("/", k + 2)
         if uri[l+1:l+2] != "/" and base[l+1:l+2] != "/" and uri[:l]==base[:l]:
             return uri[l:]
 
-    if uri[i:i+1] =="#" and len(base) == i: return uri[i:] # fragment of base
+    if uri[i:i+1] == "#" and len(base) == i: return uri[i:] # fragment of base
 
-    while i>0 and uri[i-1] != '/' : i=i-1  # scan for slash
+    while i > 0 and uri[i-1] != '/' : i=i-1  # scan for slash
 
     if i < 3: return uri  # No way.
-    if string.find(base, "//", i-2)>0 \
-       or string.find(uri, "//", i-2)>0: return uri # An unshared "//"
-    if string.find(base, ":", i)>0: return uri  # An unshared ":"
-    n = string.count(base, "/", i)
-    if n == 0 and i<len(uri) and uri[i] == '#':
+    if find(base, "//", i - 2) > 0 \
+       or find(uri, "//", i - 2) > 0: return uri # An unshared "//"
+    if find(base, ":", i) > 0: return uri  # An unshared ":"
+    
+    # Find the number of directories we need to head up (relatively)
+    n = count(base, "/", i)
+    if n == 0 and i < len(uri) and uri[i] == '#':
         return "./" + uri[i:]
     elif n == 0 and i == len(uri):
         return "./"
     else:
         return ("../" * n) + uri[i:]
 
-import os
 def base():
-        """The base URI for this process - the Web equiv of cwd
+        """Return the base URI for this process - the Web equiv of cwd
         
-        Relative or abolute unix-standard filenames parsed relative to
-        this yeild the URI of the file.
-        If we had a reliable way of getting a computer name,
-        we should put it in the hostname just to prevent ambiguity
+        Relative or absolute unix-standard filenames parsed relative to this
+        yield the URI of the file.  If we had a reliable way of getting a
+        computer name, we should put it in the hostname just to prevent
+        ambiguity.
 
         """
 #       return "file://" + hostname + os.getcwd() + "/"
@@ -251,31 +258,33 @@ def base():
 
 
 def _fixslash(str):
-    """ Fix windowslike filename to unixlike - (#ifdef WINDOWS)"""
+    """ Fix Windows-like filenames to unix-like - (#ifdef WINDOWS)"""
     s = str
     for i in range(len(s)):
         if s[i] == "\\": s = s[:i] + "/" + s[i+1:]
     if s[0] != "/" and s[1] == ":": s = s[2:]  # @@@ Hack when drive letter present
     return s
 
-URI_unreserved = "ABCDEFGHIJJLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
-    # unreserved  = ALPHA / DIGIT / "-" / "." / "_" / "~"
-    
+# Haha, no one spotted the doubling of upper-case J in the following? -- Ian
+URI_unreserved = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
+# unreserved  = ALPHA / DIGIT / "-" / "." / "_" / "~"
+
 def canonical(str_in):
-    """Convert equivalent URIs (or parts) to the same string
+    """Convert equivalent URIs (or parts) to the same string.
     
-    There are many differenet levels of URI canonicalization
-    which are possible.  See http://www.ietf.org/rfc/rfc3986.txt
+    There are many differenet levels of URI canonicalization which are
+    possible.  See http://www.ietf.org/rfc/rfc3986.txt
     Done:
-    - Converfting unicode IRI to utf-8
+    - Converting unicode IRI to utf-8
     - Escaping all non-ASCII
     - De-escaping, if escaped, ALPHA (%41-%5A and %61-%7A), DIGIT (%30-%39),
       hyphen (%2D), period (%2E), underscore (%5F), or tilde (%7E) (Sect 2.4) 
     - Making all escapes uppercase hexadecimal
     Not done:
     - Making URI scheme lowercase
-    - changing /./ or  /foo/../ to / with care not to change host part
+    - Changing /./ or  /foo/../ to / with care not to change host part
     
+    Examples:
     
     >>> canonical("foo bar")
     'foo%20bar'
@@ -302,7 +311,7 @@ def canonical(str_in):
     '%2F'
 
     """
-    if type(str_in) == type(u''):
+    if isinstance(str_in, unicode):
         s8 = str_in.encode('utf-8')
     else:
         s8 = str_in
@@ -322,8 +331,8 @@ def canonical(str_in):
             s += ch
         i = i +1
     return s
-    
-    
+
+
 import unittest
 
 class Tests(unittest.TestCase):
