@@ -1,5 +1,4 @@
-"""
-A hack to import sets and frozensets, internally if possible
+"""A hack to import sets and frozensets, internally if possible.
 
 """
 
@@ -49,7 +48,8 @@ except NameError:
 
             if type(other) in (list, tuple, xrange):
                 # Optimized: we know that __iter__() and next() can't
-                # raise TypeError, so we can move 'try:' out of the loop.
+                # raise TypeError, so we can move 'try:' out of the
+                # loop.
                 it = iter(other)
                 while True:
                     try:
@@ -77,7 +77,8 @@ except NameError:
         def symmetric_difference(self, other):
             """Return the symmetric difference of two sets as a new set.
 
-            (I.e. all elements that are in exactly one of the sets.)
+            (i.e. all elements that are in exactly one of the sets.)
+            
             """
             data = {}
             value = True
@@ -95,7 +96,8 @@ except NameError:
         def difference(self, other):
             """Return the difference of two sets as a new Set.
 
-            (I.e. all elements that are in this set and not in the other.)
+            (i.e. all elements that are in this set and not in the other.)
+            
             """
             
             data = {}

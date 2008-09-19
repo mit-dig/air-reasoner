@@ -1,11 +1,11 @@
 #!/bin/env python
 """
-Uniform Resource Identifier (URI) path manipulation,
-above the access layer
+Uniform Resource Identifier (URI) path manipulation, above the access
+layer
 
-The name of this module and the functions are somewhat
-arbitrary; they hark to other parts of the python
-library; e.g. uripath.join() is somewhat like os.path.join().
+The name of this module and the functions are somewhat arbitrary; they
+hark to other parts of the python library; e.g. uripath.join() is
+somewhat like os.path.join().
 
 REFERENCES
 
@@ -20,7 +20,7 @@ REFERENCES
 
 """
 
-__version__ = "$Id: uripath.py,v 1.21 2007/06/26 02:36:16 syosi Exp $"
+__version__ = "$Id: uripath.py,v 1.22 2008/09/17 15:01:44 pipian Exp $"
 
 import os
 import re
@@ -28,8 +28,8 @@ from string import find, rfind, index, count
 
 
 def splitFrag(uriref):
-    """Splits a URI into a tuple (base, fragment), tossing the '#' used as a
-    delimiter.  If no fragment is present, fragment is None.
+    """Splits a URI into a tuple (base, fragment), tossing the '#' used as
+    a delimiter.  If no fragment is present, fragment is None.
 
     Examples:
     
@@ -46,9 +46,9 @@ def splitFrag(uriref):
     else: return uriref, None
 
 def splitFragP(uriref, punct=0):
-    """Splits a URI into a tuple (base, fragment), prefixing the '#' used as a
-    delimiter to the variable fragment.  If no fragment is present, fragment
-    is ''.
+    """Splits a URI into a tuple (base, fragment), prefixing the '#' used
+    as a delimiter to the variable fragment.  If no fragment is
+    present, fragment is ''.
     
     Examples:
 
@@ -68,14 +68,14 @@ def splitFragP(uriref, punct=0):
 def join(here, there):
     """Joins an absolute URI and URI reference.
     
-    Non-ASCII characters are supported/doctested; haven't checked the details
-    of the IRI spec though.
+    Non-ASCII characters are supported/doctested; haven't checked the
+    details of the IRI spec though.
     
     here is assumed to be absolute, without a fragment.
     there is a URI reference.
 
-    Raise ValueError if there uses relative path syntax but here has no
-    hierarchical path.
+    Raise ValueError if there uses relative path syntax but here has
+    no hierarchical path.
     
     Examples:
     
@@ -190,15 +190,15 @@ def refTo(base, uri):
     >>> x='http://ex/x/y';y='http://ex/x/q%3ar';join(x, refTo(x, y)) == y
     1
     
-    This one checks that it uses a root-relative one where that is all they
-    share.  Now uses root-relative where no path is shared.
-    This is a matter of taste but tends to give more resilience IMHO
+    This one checks that it uses a root-relative one where that is all
+    they share.  Now uses root-relative where no path is shared.  This
+    is a matter of taste but tends to give more resilience IMHO
     -- and shorter paths
 
-    Note that base may be None, meaning no base.  In some situations, there
-    just ain't a base. Slife. In these cases, relTo returns the absolute value.
-    The axiom abs(,rel(b,x))=x still holds.
-    This saves people having to set the base to "bogus:".
+    Note that base may be None, meaning no base.  In some situations,
+    there just ain't a base. Slife. In these cases, relTo returns the
+    absolute value.  The axiom abs(,rel(b,x))=x still holds.  This
+    saves people having to set the base to "bogus:".
 
     >>> refTo('http://ex/x/y/z', 'http://ex/r')
     '/r'
@@ -247,10 +247,10 @@ def refTo(base, uri):
 def base():
         """Return the base URI for this process - the Web equiv of cwd
         
-        Relative or absolute unix-standard filenames parsed relative to this
-        yield the URI of the file.  If we had a reliable way of getting a
-        computer name, we should put it in the hostname just to prevent
-        ambiguity.
+        Relative or absolute unix-standard filenames parsed relative
+        to this yield the URI of the file.  If we had a reliable way
+        of getting a computer name, we should put it in the hostname
+        just to prevent ambiguity.
 
         """
 #       return "file://" + hostname + os.getcwd() + "/"
@@ -277,8 +277,9 @@ def canonical(str_in):
     Done:
     - Converting unicode IRI to utf-8
     - Escaping all non-ASCII
-    - De-escaping, if escaped, ALPHA (%41-%5A and %61-%7A), DIGIT (%30-%39),
-      hyphen (%2D), period (%2E), underscore (%5F), or tilde (%7E) (Sect 2.4) 
+    - De-escaping, if escaped, ALPHA (%41-%5A and %61-%7A), DIGIT
+      (%30-%39), hyphen (%2D), period (%2E), underscore (%5F), or
+      tilde (%7E) (Sect 2.4)
     - Making all escapes uppercase hexadecimal
     Not done:
     - Making URI scheme lowercase
@@ -465,9 +466,12 @@ def _test():
 
 if __name__ == '__main__':
     _test()
-
+ 
 
 # $Log: uripath.py,v $
+# Revision 1.22  2008/09/17 19:01:44  pipian
+# fixed minor bug in URI_unreserved
+#
 # Revision 1.21  2007/06/26 02:36:16  syosi
 # fix tabs
 #

@@ -1,11 +1,14 @@
 """Utility functions for ordered seqeunces
 
-When you are dealing with sequences which you know are ordered,
-then set operations are linear instead of square in the length of the
-sequences. This makes an ordered sequence a practical representation of a set.
+When you are dealing with sequences which you know are ordered, then
+set operations are linear instead of square in the length of the
+sequences. This makes an ordered sequence a practical representation
+of a set.
 
-@@ Now python has sets, these should be used where the ordering is not otherwise
-necessary.  @@ check 
+@@ Now python has sets, these should be used where the ordering is not
+otherwise necessary.
+@@ check
+
 $Id: OrderedSequence.py,v 1.2 2007/06/26 02:36:15 syosi Exp $
 """
 
@@ -19,9 +22,9 @@ def merge(a,b):
     n = len(b)
     result = []
     while 1:
-        if i==m:   # No more of a, return rest of b
+        if i == m:   # No more of a, return rest of b
             return result + b[j:]
-        if j==n:
+        if j == n:
             return result + a[i:]
         if a[i] < b[j]:
             result.append(a[i])
@@ -35,9 +38,9 @@ def merge(a,b):
             j = j + 1
         
 def intersection(a,b):
-    """Find intersection of sorted sequences
+    """Find intersection of sorted sequences.
 
-    The fact that the sequences are sorted makes this faster"""
+    The fact that the sequences are sorted makes this faster."""
     i = 0
     j = 0
     m = len(a)
@@ -45,7 +48,7 @@ def intersection(a,b):
 #    progress(" &&& Intersection of %s and %s" %(a,b))
     result = []
     while 1:
-        if i==m or j==n:   # No more of one, return what we have
+        if i == m or j == n:   # No more of one, return what we have
             return result
         if a[i] < b[j]:
             i = i + 1
@@ -67,9 +70,9 @@ def minus(a,b):
     result = []
 #    progress(" &&& minus of %s and %s" %(a,b))
     while 1:
-        if j==n:   # No more of b, return rest of a
+        if j == n:   # No more of b, return rest of a
             return result + a[i:]
-        if i==m:   # No more of a, some of b - error
+        if i == m:   # No more of a, some of b - error
             raise ValueError("Cannot remove items" + `b[j:]`)
             return result + b[j:]
         if a[i] < b[j]:

@@ -1,10 +1,10 @@
 #!/usr/bin/python
 """RDFSink -- RDF parser/serializer/store interface
 
-This is a simple API for a push-stream of RDF data. It doesn't use a particular
-classof obejcts, but just uses Python pairs. It is kinda crude but it does
-allow for example data to be squirted efficiently between modules which use
-different Python classes for RDF.
+This is a simple API for a push-stream of RDF data. It doesn't use a
+particular classof obejcts, but just uses Python pairs. It is kinda
+crude but it does allow for example data to be squirted efficiently
+between modules which use different Python classes for RDF.
 
 HISTORY
 
@@ -17,10 +17,11 @@ REFERENCES
 
 """
 
-__version__ = "$Id: RDFSink.py,v 1.36 2007/06/26 02:36:15 syosi Exp $"
+__version__ = "$Id: RDFSink.py,v 1.37 2008/09/19 14:58:22 pipian Exp $"
 
-# The statement is stored as a quad - affectionately known as a triple ;-)
-# offsets when a statement is stored as a Python tuple (c, p, s, o)
+# The statement is stored as a quad - affectionately known as a triple
+# ;-) offsets when a statement is stored as a Python tuple
+# (c, p, s, o)
 CONTEXT = 0
 PRED = 1  
 SUBJ = 2
@@ -29,8 +30,8 @@ OBJ = 3
 PARTS =  PRED, SUBJ, OBJ
 ALL4 = CONTEXT, PRED, SUBJ, OBJ
 
-# A sink takes quads where each item is a pair (type, value)
-# However, the recommended way is for the source to call the factory methods
+# A sink takes quads where each item is a pair (type, value). However,
+# the recommended way is for the source to call the factory methods
 # new* rather than just make up pairs.
 
 SYMBOL = 0          # URI which or may not have a fragment.
@@ -45,10 +46,10 @@ XMLLITERAL = 25     # A DOM tree encases in a dummy document level
 
 # quanitifiers... @@it's misleading to treat these as predicates...
 Logic_NS = "http://www.w3.org/2000/10/swap/log#"
-# For some graphs you can express with NTriples, there is no RDF syntax. The 
-# following allows an anonymous node to be merged with another node.
-# It really is the same node, at the ntriples level, do not confuse with
-# daml:sameAs
+# For some graphs you can express with NTriples, there is no RDF
+# syntax. The following allows an anonymous node to be merged with
+# another node.  It really is the same node, at the ntriples level, do
+# not confuse with daml:sameAs
 NODE_MERGE_URI = Logic_NS + "is"  # Pseudo-property indicating node merging
 forSomeSym = Logic_NS + "forSome"
 forAllSym = Logic_NS + "forAll"
@@ -79,21 +80,19 @@ N3_Empty = (SYMBOL, List_NS + "Empty")
 
 
 # Standard python modules:
-import time
 from os import getpid, environ
 from time import time
 from warnings import warn
 
 # SWAP modules:
-import uripath
 from diag import verbosity, progress
 from uripath import base, join
 
 runNamespaceValue = None
 
 def runNamespace():
-    """Return a URI suitable as a namespace for run-local objects. Will defer
-    to the environment variable CWM_RUN_NS.
+    """Return a URI suitable as a namespace for run-local objects. Will
+    defer to the environment variable CWM_RUN_NS.
     
     """
     # @@@ include hostname (privacy?) (hash it?)
@@ -102,8 +101,8 @@ def runNamespace():
         try:
             runNamespaceValue = environ["CWM_RUN_NS"]
         except KeyError:
-            runNamespaceValue = uripath.join(
-                uripath.base(), ".run-" + `time()` + "p"+ `getpid()` +"#")
+            runNamespaceValue = join(
+                base(), ".run-" + `time()` + "p"+ `getpid()` +"#")
         runNamespaceValue = join(base(), runNamespaceValue) # absolutize
     return runNamespaceValue
 
@@ -117,7 +116,7 @@ def uniqueURI():
     return runNamespace() + "u_" + `nextu`
     
 class URISyntaxError(ValueError):
-    """A parameter is passed to a routine that requires a URI reference
+    """A parameter is passed to a routine that requires a URI reference.
     
     """
     pass
@@ -127,28 +126,29 @@ class RDFSink:
     """interface to connect modules in RDF processing.
     OBSOLETE
 
-    This is a superclass for other RDF processors which accept RDF events
-    or indeed Swell events. It is superceded, effectively, by the class
-    Formula, as a sink of data and a source of new symbols.
+    This is a superclass for other RDF processors which accept RDF
+    events or indeed Swell events. It is superceded, effectively, by
+    the class Formula, as a sink of data and a source of new symbols.
     
     Keeps track of prefixes.
     
-    This interface has the advantage that it does not have any dependencies
-    on object types, it is really one-way (easily serialized as no return
-    values). It has the disadvantages that
+    This interface has the advantage that it does not have any
+    dependencies on object types, it is really one-way (easily
+    serialized as no return values). It has the disadvantages that
         - It uses the pseudoproperties log:forSome and log:forAll to
           make variables, which is a bit of a kludge.
-        - It may involve on the receiver side the same thing being interned
-          many times, which wastes time searching hash tables.
-    The superclass handles common functions such as craeting new arbitray
-    identifiers.
+        - It may involve on the receiver side the same thing being
+          interned many times, which wastes time searching hash
+          tables.
+    The superclass handles common functions such as creating new
+    arbitrary identifiers.
     
     """
 
     def __init__(self, genPrefix=None):
         """If you give it a URI prefix to use for generated IDs it will use
-        one; otherwise, it will use the name of an imaginary temporary file in
-        the current directory.
+        one; otherwise, it will use the name of an imaginary temporary
+        file in the current directory.
         
         """
         self.prefixes = { }     # Convention only - human friendly to
@@ -170,8 +170,8 @@ class RDFSink:
     def startDoc(self):
         """Start a document.
         
-        Call this once at the beginning of parsing so that the receiver can
-        initialize things...
+        Call this once at the beginning of parsing so that the
+        receiver can initialize things...
         
         """
         pass
@@ -179,9 +179,10 @@ class RDFSink:
     def endDoc(self, rootFormulaPair):
         """End a document.
         
-        Call this once only at the end of parsing so that the receiver can wrap
-        things up, optimize, intern, index and so on.  The pair given is the
-        (type, value) identifier of the root formula of the thing parsed.
+        Call this once only at the end of parsing so that the receiver
+        can wrap things up, optimize, intern, index and so on.  The
+        pair given is the (type, value) identifier of the root formula
+        of the thing parsed.
         
         """
         pass
@@ -189,10 +190,10 @@ class RDFSink:
     def reopen(self):
         """Un-End a document.
         
-        If you have added stuff to a document, thought you were done, and then
-        want to add more, call this to get back into the state that
-        makeStatement is again acceptable. Remember to end the document again
-        when done.
+        If you have added stuff to a document, thought you were done,
+        and then want to add more, call this to get back into the
+        state that makeStatement is again acceptable. Remember to end
+        the document again when done.
         
         """
         pass
@@ -201,8 +202,8 @@ class RDFSink:
         """Add a statement to a stream/store.
 
         raises URISyntaxError on bad URIs
-        tuple is a quad (context, predicate, subject, object) of things
-        generated by calls to newLiteral, etc.
+        tuple is a quad (context, predicate, subject, object) of
+        things generated by calls to newLiteral, etc.
         why is reason for the statement.
 
         """
@@ -243,10 +244,11 @@ class RDFSink:
     def bind(self, prefix, uri):
         """Pass on a binding hint for later use in output.
 
-        This really is just a hint. The parser calls bind to pass on the prefix
-        which it came across, as this is a useful hint for a human readable
-        prefix for output of the same namespace. Otherwise, output processors
-        will have to invent or avoid using namespaces, which will look ugly.
+        This really is just a hint. The parser calls bind to pass on
+        the prefix which it came across, as this is a useful hint for
+        a human readable prefix for output of the same
+        namespace. Otherwise, output processors will have to invent or
+        avoid using namespaces, which will look ugly.
         
         """
 
@@ -268,11 +270,11 @@ class RDFSink:
     def setDefaultNamespace(self, uri):
         """Pass on a binding hint for later use in output.
 
-        This really is just a hint. The parser calls this to pass on the
-        default namespace which it came across, as this is a useful hint for a
-        human readable prefix for output of the same namespace. Otherwise,
-        output processors will have to invent or avoid using namespaces, which
-        will look ugly.
+        This really is just a hint. The parser calls this to pass on
+        the default namespace which it came across, as this is a
+        useful hint for a human readable prefix for output of the same
+        namespace. Otherwise, output processors will have to invent or
+        avoid using namespaces, which will look ugly.
         
         """
 
@@ -281,8 +283,8 @@ class RDFSink:
     def makeComment(self, str):
         """This passes on a comment line which of course has no semantics.
         
-        This is only useful in direct piping of parsers to output, to preserve
-        comments in the original file.
+        This is only useful in direct piping of parsers to output, to
+        preserve comments in the original file.
         
         """
         pass
@@ -345,9 +347,9 @@ class RDFSink:
         
     def checkNewId(self, uri):
         """The store can override this to raise an exception if the id is not
-        in fact new. This is useful because it is useful to generate IDs with
-        useful diagnostic ways but this lays them open to possibly clashing in
-        pathological cases.
+        in fact new. This is useful because it is useful to generate
+        IDs with useful diagnostic ways but this lays them open to
+        possibly clashing in pathological cases.
         
         """
         return
@@ -376,12 +378,13 @@ class RDFSink:
         
 
 class RDFStructuredOutput(RDFSink):
-    # The foillowing are only used for structured "pretty" output of structure
-    # N3. They roughly correspond to certain syntax forms in N3, but the whole
-    # area is just a kludge for pretty output and not worth going into unless
-    # you need to.
+    # The following are only used for structured "pretty" output of
+    # structure N3. They roughly correspond to certain syntax forms in
+    # N3, but the whole area is just a kludge for pretty output and
+    # not worth going into unless you need to.
     
-    # These simple versions may be inherited, by the reifier for example
+    # These simple versions may be inherited, by the reifier for
+    # example
 
     def startAnonymous(self,  triple, isList=0):
         return self.makeStatement(triple)
@@ -410,11 +413,12 @@ class RDFStructuredOutput(RDFSink):
 
 from diag import printState
 class TracingRDFSink:
-    """An implementation of the RDFSink interface which helps me understand it,
-    especially how it gets used by parsers vs. by an RDF store.    [ -sandro ]
+    """An implementation of the RDFSink interface which helps me
+    understand it, especially how it gets used by parsers vs. by an
+    RDF store.  [ -sandro ]
 
-    Set .backing to be some other RDFSink if you want to get proper results
-    while tracing.
+    Set .backing to be some other RDFSink if you want to get proper
+    results while tracing.
 
     Try:
 

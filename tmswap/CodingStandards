@@ -21,5 +21,6 @@ My new code tries its best to stick to this standard though.
 - Do module imports before function imports ('import re' before
   'from string import find')
 - I prefer alphabetical imports, but that's not very important at all.
-- Documentation should respect the 80-line limit. Code doesn't need to, but
-  should try.
+- Documentation should respect the 72-character limit. Code doesn't need to,
+  but should try.
+- Aim for Python 2.4 and 2.5 compatibility.

@@ -20,7 +20,7 @@ You also get the Namespace() class which allows you to generate
 symbols easily.
 
 History:
-    Spilt off from  thing.py 2003-08-19
+    Split off from  thing.py 2003-08-19
 
 $Log: myStore.py,v $
 Revision 1.13  2007/06/26 02:36:15  syosi
@@ -68,23 +68,28 @@ Revision 1.3  2004/01/28 23:03:00  connolly
 - wrapped some comments at 79 chars
   per http://www.python.org/doc/essays/styleguide.html
 
-
 """
 
 import uripath
 
-# Allow a strore provdier to register:
+# Allow a storage provider to register:
 
 store = None
 storeClass = None
 
 def setStoreClass(c):
-    """Set the process-global class to be used to generate a new store if needed"""
+    """Set the process-global class to be used to generate a new store if
+    needed
+    
+    """
     global storeClass
     storeClass = c
 
 def setStore(s):
-    """Set the process-global default store to be used when an explicit store is not"""
+    """Set the process-global default store to be used when an explicit
+    store is not
+    
+    """
     global store
     store = s
 
@@ -95,25 +100,26 @@ def _checkStore(s=None):
     if store != None: return store
     if storeClass == None:
         import llyn   # default 
-    assert storeClass!= None, "Some storage module must register with myStore.py before you can use it"
+    assert storeClass != None, "Some storage module must register with myStore.py before you can use it"
     store = storeClass() # Make new one
     return store
 
 
 def symbol(uri):
-    """Create or reuse an interned version of the given symbol
-    in the default store. and return it for future use
+    """Create or reuse an interned version of the given symbol in the
+    default store, and return it for future use.
 
     >>> x = symbol(u'http://example.org/#Andr\\xe9')
     >>> y = symbol(u'http://example.org/#Andr\\xe9')
     >>> x is y
     1
+    
     """
     return _checkStore().newSymbol(uri)
     
 def literal(str, dt=None, lang=None):
-    """Create or reuse, in the default store, an interned version of
-    the given literal string and return it for future use
+    """Create or reuse, in the default store, an interned version of the
+    given literal string and return it for future use.
 
     >>> x = literal("#Andr\\xe9")
     >>> y = literal("#Andr\\xe9")
@@ -121,7 +127,6 @@ def literal(str, dt=None, lang=None):
     1
 
     """
-    
     return _checkStore().newLiteral(str, dt, lang)
 
 
@@ -129,8 +134,10 @@ def intern(v):
     return _checkStore().intern(v)
 
 def formula():
-    """Create or reuse, in the default store, a new empty formula (triple people think: triple store)
-    and return it for future use"""
+    """Create or reuse, in the default store, a new empty formula (triple
+    people think: triple store) and return it for future use
+    
+    """
     return _checkStore().newFormula()
 
 #def bNode(str, context):
@@ -140,27 +147,33 @@ def formula():
 
 def existential(str, context, uri):
     """Create or reuse, in the default store, a new named variable
-    existentially qualified within the given
-    formula as context, and return it for future use"""
+    existentially qualified within the given formula as context, and
+    return it for future use.
+    
+    """
     return _checkStore().newExistential(context, uri)
 
 def universal(str, context, uri):
-    """Create or reuse, in the default store, a named variable
-    universally qualified within the given
-    formula as context, and return it for future use"""
+    """Create or reuse, in the default store, a named variable universally
+    qualified within the given formula as context, and return it for
+    future use.
+    
+    """
     return _checkStore().newUniversal(context, uri)
 
 def load(uri=None, openFormula=None, contentType=None, remember=1, flags=""):
     """Get and parse document.  Guesses format if necessary.
 
-    uri:      if None, load from standard input.
-    remember: if 1, store as metadata the relationship between this URI and this formula.
+    uri: if None, load from standard input.
+    remember: if 1, store as metadata the relationship between this URI
+    and this formula.
     
     Returns:  top-level formula of the parsed document.
     Raises:   IOError, SyntaxError, DocumentError
     """
-    return _checkStore().load(uri, openFormula=openFormula, contentType=contentType,
-                        remember=remember, flags=flags)
+    return _checkStore().load(uri, openFormula=openFormula,
+                              contentType=contentType, remember=remember,
+                              flags=flags)
 
 def loadMany(uris, openFormula=None, referer=None):
     """Load a number of resources into the same formula
@@ -196,7 +209,8 @@ class Namespace(object):
         """get the lname Symbol in this namespace.
 
         lname -- an XML name (limited to URI characters)
-        I hope this is only called *after* the ones defines above have been checked
+        I hope this is only called *after* the ones defines above have
+        been checked
         """
         if lname.startswith("__"): # python internal
             raise AttributeError, lname
