@@ -15,7 +15,7 @@ WKD = weakref.WeakKeyDictionary
 from collections import deque
 import itertools
 
-from term import unify, Env, BuiltIn
+from term import unify, Env, BuiltIn, Function, ReverseFunction
 from formula import Formula, StoredStatement, WME
 
 import operator
@@ -25,14 +25,22 @@ VAR_PLACEHOLDER = object()
 
 fullUnify = False
 
-def compilePattern(index, patterns, vars, buildGoals=False, goalPatterns=False, supportBuiltin=None):
-    """This builds the RETE network"""
+def compilePattern(index, patterns, vars, buildGoals=False, goalPatterns=False,
+                   supportBuiltin=None):
+    """Compile the RETE network for a given set of patterns and return the
+    'goal' node."""
+    # Start with an empty root node...
     current = EmptyRoot
-    patterns.sort()
-    for pattern in sortPatterns(patterns):
-        alpha = AlphaFilter.build(index, pattern, vars, supportBuiltin=supportBuiltin)
+    for pattern in sortPatterns(patterns, vars):
+        # And for each pattern in order, build the alpha filter, join
+        # node, and beta memory.
+        alpha = AlphaFilter.build(index, pattern, vars,
+                                  supportBuiltin=supportBuiltin)
         current = JoinNode(current, alpha, buildGoals)
         current = BetaMemory(current)
+
+    # The last pattern matched is, of course, the one that triggers
+    # any success for the RETE match (and the only one that matters).
     return current
     
 #### Dealing with builtins
@@ -40,25 +48,73 @@ def compilePattern(index, patterns, vars, buildGoals=False, goalPatterns=False, 
 ## A naive topological sort may not work
 ## Triples will rely on variables only --- but we are sorting triples, not variables
 
-class CyclicError(ValueError): pass
+class CyclicError(ValueError):
+    """Thrown when a cyclic dependency is found."""
+    pass
 
-def sortPatterns(patterns):
-    """return a better order for the patterns, based on a topological - like sort"""
-    return patterns # This is not used right now
+def sortPatterns(patterns, vars):
+    """Sort the given patterns topologically, such that built-ins are
+    satisfied as late as possible."""
+
+    # We don't care about general patterns, really (all triples that
+    # will match should already be present).  We just care that the
+    # built-ins are at the end, as those triples aren't actually
+    # present, and hence, we need to make sure that all arguments are
+    # matched PRIOR to the builtins running.
+    
+    # There's a particular corner case: if something is both a
+    # Function and a ReverseFunction, by default, it will never be
+    # satisfied.  This isn't a problem though, if we remember this:
+    # 
+    # The function will be forced into one of those two roles when
+    # there are no variables left that can be bound more easily
+    # (e.g. with built-ins that are exclusively functions or reverse
+    # functions), and at least ONE side is fully bound and the other
+    # has at most one variable left unbound.  At that point, we can
+    # determine what role the built-in needs to be in to fully satisfy
+    # the Rete, and we process it as that role and continue to sort
+    # the remaining patterns until nothing's left.
+    #
+    # TODO: Still a corner case...  What if there's a cycle? A
+    # MultipleFunction?
+
+    vars = set(vars)
     requires = {}
     provides = {}
+    unresolvables = set()
+    patterns.sort()
     for pattern in patterns:
-        for var in pattern.requires:
-            requires.setdefault(var, set()).add(pattern)
-        for var in pattern.provides:
+        # Each pattern should be keeping track of its requires and its
+        # provides.  Special case, however, if a pattern is of unknown
+        # type (Function or ReverseFunction)...  We don't know
+        # requires or provides at this time, and it's currently
+        # unresolvable.
+        if pattern.predicate() != pattern.predicate().store.sameAs:
+            for var in pattern.requires(vars):
+                requires.setdefault(var, set()).add(pattern)
+        for var in pattern.provides(vars):
             provides.setdefault(var, set()).add(pattern)
-
+        if pattern.isUnresolvable(vars):
+            unresolvables.add(pattern)
+#    print requires
+#    print provides
+#    print unresolvables
 
     def getTopologically():
+        """Sort patterns topologically by requires, provides, and
+        indeterminates."""
+        
+        # Nodes in the graph are our patterns.
         nodes = patterns
         inDegrees = {}
         for node in nodes:
-            inDegrees[node] = len(node.requires)
+            inDegrees[node] = len(node.requires(vars))
+            
+            # Not sure what's going on with owl:sameAs.  It's a
+            # BuiltIn and rule?  Gotta ignore CyclicErrors raised as a
+            # result of it.
+            if node.predicate() == node.predicate().store.sameAs:
+                inDegrees[node] = 0
         zeros = deque()
         for node in nodes:
             if inDegrees[node] == 0:
@@ -67,7 +123,7 @@ def sortPatterns(patterns):
         while zeros:
             top = zeros.pop()
             yield top
-            for var in top.provides:
+            for var in top.provides(vars, provided):
                 if var in provided:
                     continue
                 else:
@@ -76,12 +132,32 @@ def sortPatterns(patterns):
                         if inDegrees[node] == 0:
                             zeros.appendleft(node)
                     provided.add(var)
+            if not zeros:
+                # Well, we're out of things we can resolve directly.
+                # Let's see if we can force a previously unresolvable
+                # pattern to resolve now (i.e. if we now know if
+                # whether it should behave as a Function or a
+                # ReverseFunction based on now-provided variables.)
+                
+                popnodes = set()
+                for node in unresolvables:
+                    if not node.isUnresolvable(vars, provided):
+                        # It's resolvable, which implies that we have,
+                        # in fact, met the inDegrees=0 requirement,
+                        # even though it's not evident.
+                        inDegrees[node] = 0
+                        for var in requires.keys():
+                            if node in requires[var]:
+                                requires[var].remove(node)
+                        zeros.appendleft(node)
+                        popnodes.add(node)
+                for node in popnodes:
+                    unresolvables.remove(node)
+                        
         if max(inDegrees.values()) != 0:
-            raise CyclicError
+            raise CyclicError, "You've got a cyclic dependency in your rule, buddy!"
 
     return list(getTopologically())
-
-    
 
 ### end builtins
 
@@ -241,7 +317,7 @@ generates variable bindings
         return secondaryAlpha
 
     @classmethod
-    def construct(cls, index, pattern, vars, builtinMap):
+    def construct(cls, index, pattern, vars, supportBuiltin):
         def replaceWithNil(x):
             if isinstance(x, Formula) or x.occurringIn(vars):
                 return None
@@ -251,7 +327,7 @@ generates variable bindings
                                                          pattern.object()))
 
         parents = []
-        secondaryAlpha = cls(pattern, vars, index, parents, builtinMap)
+        secondaryAlpha = cls(pattern, vars, index, parents, supportBuiltin)
         p, s, o = masterPatternTuple
         V = VAR_PLACEHOLDER
         pts = [(p, s, o)]
@@ -278,7 +354,7 @@ generates variable bindings
         retVal = self   # No reason to do additional work here
         assert self.initialized
         builtInMade = []
-        if isinstance(self.pattern.predicate(), BuiltIn):
+        if isinstance(self.pattern.predicate(), BuiltIn) and self.pattern.predicate() != self.pattern.predicate().store.sameAs:
             if self.pattern.predicate() is self.pattern.context().store.includes:
                 newIndex = self.pattern.subject()._index
                 node = compilePatterns(newIndex, self.pattern.object.statements, self.vars)
@@ -291,8 +367,32 @@ generates variable bindings
                     
                     builtInMade.append(TripleWithBinding(newAssumption, environment))
                 prod = ProductionNode(node, onSuccess)
-                
-                    
+            # Alright, if we are ACTING as a function, we need to bind
+            # the object.
+            elif self.pattern.predicateActsAs(self.pattern.freeVariables(),
+                                              set(env.keys())) == Function:
+                matchedPat = self.pattern.substitution(env)
+                for binds, environment in unify(self.pattern.object(), self.pattern.predicate().evalObj(matchedPat.subject(), None, None, None, None), vars = self.vars):
+                    builtInMade.append(TripleWithBinding(matchedPat.substitution(binds), environment.flatten(binds)))
+                    self.supportBuiltin(builtInMade[-1].triple)
+            elif self.pattern.predicateActsAs(self.pattern.freeVariables(),
+                                              set(env.keys())) == ReverseFunction:
+                # If we're acting as a ReverseFunction, bind the
+                # result of the reverse function to the subject.
+                matchedPat = self.pattern.substitution(env)
+                for binds, environment in unify(self.pattern.subject(), self.pattern.predicate().evalSubj(matchedPat.object(), None, None, None, None), vars = self.vars):
+                    builtInMade.append(TripleWithBinding(matchedPat.substitution(binds), environment.flatten(binds)))
+                    self.supportBuiltin(builtInMade[-1].triple)
+            elif self.pattern.predicateActsAs(self.pattern.freeVariables(),
+                                              set(env.keys())) == BuiltIn:
+                # If we're acting as a ReverseFunction, bind the
+                # result of the reverse function to the subject.
+                matchedPat = self.pattern.substitution(env)
+                if matchedPat.predicate().eval(matchedPat.subject(),
+                                               matchedPat.object(),
+                                               None, None, None, None):
+                    builtInMade.append(TripleWithBinding(matchedPat, env))
+                    self.supportBuiltin(builtInMade[-1].triple)
         if includeMissing:
             return retVal + [TripleWithBinding(BogusTriple(self.pattern), Env())] + builtInMade
         return retVal + builtInMade

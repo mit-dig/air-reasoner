@@ -1493,35 +1493,35 @@ class RDFStore(RDFSink) :
         self.li = self.intern(N3_li)
         self.List = self.intern(N3_List)
 
-##        import cwm_string  # String builtins
-##        import cwm_os      # OS builtins
-##        import cwm_time    # time and date builtins
-##        import cwm_math    # Mathematics
-##        import cwm_trigo   # Trignometry
-##        import cwm_times    # time and date builtins
-##        import cwm_maths   # Mathematics, perl/string style
-##        import cwm_list    # List handling operations
-##        import cwm_set     # Set operations
-##        import cwm_sparql  # builtins for sparql
-##        import cwm_xml     # XML Document Object Model operations
-##        cwm_string.register(self)
-##        cwm_math.register(self)
-##        cwm_trigo.register(self)
-##        cwm_maths.register(self)
-##        cwm_os.register(self)
-##        cwm_time.register(self)
-##        cwm_times.register(self)
-##        cwm_list.register(self)
-##        cwm_set.register(self)
-##        cwm_sparql.register(self)
-##        cwm_xml.register(self)
-##        import cwm_crypto  # Cryptography
-##        if crypto:
-##            if cwm_crypto.USE_PKC == 0:
-##                raise RuntimeError("Try installing pycrypto, and make sure it is in you PYTHONPATH")
-##        else:
-##            cwm_crypto.USE_PKC = 0       
-##        cwm_crypto.register(self)  # would like to anyway to catch bug if used but not available
+        import cwm_string  # String builtins
+        import cwm_os      # OS builtins
+        import cwm_time    # time and date builtins
+        import cwm_math    # Mathematics
+        import cwm_trigo   # Trignometry
+        import cwm_times    # time and date builtins
+        import cwm_maths   # Mathematics, perl/string style
+        import cwm_list    # List handling operations
+        import cwm_set     # Set operations
+        import cwm_sparql  # builtins for sparql
+        import cwm_xml     # XML Document Object Model operations
+        cwm_string.register(self)
+        cwm_math.register(self)
+        cwm_trigo.register(self)
+        cwm_maths.register(self)
+        cwm_os.register(self)
+        cwm_time.register(self)
+        cwm_times.register(self)
+        cwm_list.register(self)
+        cwm_set.register(self)
+        cwm_sparql.register(self)
+        cwm_xml.register(self)
+        import cwm_crypto  # Cryptography
+        if crypto:
+            if cwm_crypto.USE_PKC == 0:
+                raise RuntimeError("Try installing pycrypto, and make sure it is in you PYTHONPATH")
+        else:
+            cwm_crypto.USE_PKC = 0       
+        cwm_crypto.register(self)  # would like to anyway to catch bug if used but not available
 
     def newLiteral(self, str, dt=None, lang=None):
         "Interned version: generate new literal object as stored in this store"

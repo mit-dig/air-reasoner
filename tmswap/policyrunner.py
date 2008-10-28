@@ -13,7 +13,7 @@ from itertools import chain
 
 import llyn
 from formula import Formula, StoredStatement
-from term import List, Env, Symbol, Term
+from term import List, Env, Symbol, Term, BuiltIn
 
 import uripath
 
@@ -152,6 +152,10 @@ This is currently only used for goals
             if len(node.datum) == 2:
                 pass # signal data
             elif len(node.datum) == 4:
+                if isinstance(node.datum[1], BuiltIn) and node.datum[1] is not node.datum[1].store.sameAs:
+                     # Hackety hack...  Dun like it, but it avoids
+                     # inserting a (wrong) built-in fact...
+                     return
                 if self.tracking:
                     workcount['fact'] += 1
                 triple = node.datum[:3]
@@ -472,7 +476,7 @@ much how the rule was represented in the rdf network
                     (s, p, o), newVars = canonicalizeVariables(triple, self.vars)
                     self.eventLoop.add(AuxTripleJustifier(self.tms, GOAL, s, p, o, newVars, self.sourceNode, [self.tms.getThing(self)]))
         index = workingContext._index
-        bottomBeta = MM.compilePattern(index, patterns, self.vars, buildGoals=False, goalPatterns=self.goal)
+        bottomBeta = MM.compilePattern(index, patterns, self.vars, buildGoals=False, goalPatterns=self.goal, supportBuiltin=self.addTriple)
         trueBottom =  MM.ProductionNode(bottomBeta, self.onSuccess, self.onFailure)
         return trueBottom
 
@@ -513,7 +517,8 @@ much how the rule was represented in the rdf network
         rdf = F.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
         p = F.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
 
-        vars = vars.union(F.each(subj=node, pred=p['variable']))
+#        vars = vars.union(F.each(subj=node, pred=p['variable']))
+        vars = vars.union(F.universals())
 
         realNode = node
         nodes = [realNode]
@@ -590,7 +595,8 @@ much how the rule was represented in the rdf network
         rdf = pf.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
         p = pf.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
         policies = pf.each(pred=rdf['type'], obj=p['Policy'])
-        globalVars = frozenset(pf.each(pred=rdf['type'], obj=p['Variable']))
+#        globalVars = frozenset(pf.each(pred=rdf['type'], obj=p['Variable']))
+        globalVars = frozenset(pf.universals())
         cwm_rules = [cls.compileCwmRule(eventLoop,
                                         formulaTMS,
                                         pf,
@@ -600,7 +606,8 @@ much how the rule was represented in the rdf network
                                         formulaTMS,
                                         pf,
                                         x,
-                                        vars=globalVars.union(pf.each(subj=y, pred=p['variable'])),
+#                                        vars=globalVars.union(pf.each(subj=y, pred=p['variable'])),
+                                        vars=globalVars.union(pf.universals()),
                                         base=base)
                         for x in pf.each(subj=y, pred=p['rule'])]
                     for y in policies], [])
@@ -608,7 +615,8 @@ much how the rule was represented in the rdf network
                                                        formulaTMS,
                                                        pf,
                                                        x,
-                                                       vars=globalVars.union(pf.each(subj=y, pred=p['variable'])),
+#                                                       vars=globalVars.union(pf.each(subj=y, pred=p['variable'])),
+                                                       vars=globalVars.union(pf.universals()),
                                                        base=base)
                         for x in pf.each(subj=y, pred=p['goal-rule'])]
                     for y in policies], [])
@@ -736,6 +744,8 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None):
         baseRulesURI = uripath.join(uripath.base(),
                                       baseRulesURI.replace('http://dig.csail.mit.edu/TAMI',
                                                            '../../..'))
+        logURIs = map(lambda x: uripath.join(uripath.base(), x), logURIs)
+        policyURIs = map(lambda x: uripath.join(uripath.base(), x), policyURIs)
     import time
     formulaTMS = setupTMS(store)
     workingContext = formulaTMS.workingContext

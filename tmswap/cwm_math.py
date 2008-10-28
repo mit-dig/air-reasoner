@@ -88,7 +88,6 @@ class BI_sum(LightBuiltIn, Function):
         for x in subj_py: t += numeric(x)
         return t
 
-
 class BI_sumOf(LightBuiltIn, ReverseFunction):
     def evaluateSubject(self, obj_py): 
         t = 0

@@ -36,7 +36,7 @@ from diag import progress, verbosity, tracking
 from term import matchSet, \
     AnonymousNode , AnonymousExistential, AnonymousUniversal, \
     Term, CompoundTerm, List, \
-    unifySequence, unify, Existential
+    unifySequence, unify, Existential, Function, ReverseFunction, BuiltIn, MultipleFunction, MultipleReverseFunction
 
 from RDFSink import Logic_NS
 from RDFSink import CONTEXT, PRED, SUBJ, OBJ
@@ -781,23 +781,33 @@ class WME(object):
         self.tokens = set()
 
 class StoredStatement(object):
-    """A statememnt as an element of a formula
-    """
+    """An RDF statement that is an element of a Formula."""
     def __init__(self, q):
         self.quad = q
         self.WME = WME()
-
-    requires = frozenset()
+        
+        self.provided = None
+        
+    # TODO: Fix requires, freevariables in case of function(?)
+#    requires = frozenset()
     variables = frozenset()
-    
-
+        
     def substitution(self, bindings, why=None):
+        """Perform a substitution on this StoredStatement with the given
+        bindings and return a new StoredStatement.
+        
+        """
         return self.__class__([self.quad[0]] + [x.substitution(bindings, why=why) for x in self.quad if x is not self.quad[0]])
 
-    def __getitem__(self, i):   # So that we can index the stored thing directly
+    def __getitem__(self, i):  # So that we can index the stored thing directly
+        """Get the corresponding item in our quad."""
         return self.quad[i]
 
     def __repr__(self):
+        """Return a string representation of this StoredStatement in the form
+        '{`s` `p` `o`}'.
+        
+        """
         subjString = `self[SUBJ]`
         predString = `self[PRED]`
         objString = `self[OBJ]`
@@ -853,22 +863,23 @@ class StoredStatement(object):
 
 
     def context(self):
-        """Return the context of the statement"""
+        """Return the context of the statement."""
         return self.quad[CONTEXT]
     
     def predicate(self):
-        """Return the predicate of the statement"""
+        """Return the predicate of the statement."""
         return self.quad[PRED]
     
     def subject(self):
-        """Return the subject of the statement"""
+        """Return the subject of the statement."""
         return self.quad[SUBJ]
     
     def object(self):
-        """Return the object of the statement"""
+        """Return the object of the statement."""
         return self.quad[OBJ]
 
     def spo(self):
+        """Return a tuple of the form (s, p, o) of the statement."""
         return (self.quad[SUBJ], self.quad[PRED], self.quad[OBJ])
 
     def __len__(self):
@@ -878,7 +889,10 @@ class StoredStatement(object):
         return [self]
 
     def occurringIn(self, vars):
-        "Which variables in the list occur in this?"
+        """Return a set of all variables specified in vars that occur in the
+        statement.
+        
+        """
         set = Set()
         if verbosity() > 98: progress("----occuringIn: ", `self`)
         for p in PRED, SUBJ, OBJ:
@@ -896,14 +910,122 @@ class StoredStatement(object):
         notVariables = frozenset([x for x in self.context().freeVariables()
                                   if isinstance(x, Existential)])
         return allFree.difference(notVariables)
+    
+    def predicateActsAs(self, vars=set(), provided=set()):
+        """Return the type of term the predicate is acting as in this
+        statement, given a set of bound variables.  Useful for
+        determining, in particular, the type of BuiltIn the predicate
+        is if it is both a Function and ReverseFunction.
+        
+        """
+        pred = self.predicate()
+        unprovided = vars.difference(provided)
+        
+        # Are we behaving as a Function or a ReverseFunction?  That's
+        # determined by where the unprovided variables are.
+        if isinstance(pred, Function) and isinstance(pred, ReverseFunction) and not isinstance(pred, MultipleFunction) and not isinstance(pred, MultipleReverseFunction):
+            # Behave as a Function if the subject is fully speced.
+            if unprovided and not self.subject().occurringIn(unprovided) and self.object().occurringIn(unprovided):
+                return Function
+            # Behave as a ReverseFunction if the object is fully speced.
+            elif unprovided and not self.object().occurringIn(unprovided) and self.subject().occurringIn(unprovided):
+                return ReverseFunction
+            # Behave as a BuiltIn if both are fully speced.
+            elif not self.occurringIn(unprovided):
+                return BuiltIn
+            # Otherwise, we're unresolvable.
+            else:
+                return None
+        # Functions need to have their subject fully speced.
+        elif isinstance(pred, Function) and not isinstance(pred, MultipleFunction):
+            return Function
+        # ReverseFunctions need to have their object fully speced.
+        elif isinstance(pred, ReverseFunction) and not isinstance(pred, MultipleReverseFunction):
+            return ReverseFunction
+        # BuiltIns need both fully speced.
+        elif isinstance(pred, BuiltIn):
+            return BuiltIn
+        # And of course if we aren't a BuiltIn, behave normally.
+        else:
+            return StoredStatement
+    
+    def provides(self, vars=set(), provided=set()):
+        """Return a set of variables this statement will provide values
+        for.
+        
+        """
+        unprovided = vars.difference(provided)
+        actsAs = self.predicateActsAs(vars, provided)
+        
+        # A Function provides only things in the object.
+        # A ReverseFunction only those in the subject.
+        if actsAs == Function:
+            return self.object().occurringIn(unprovided)
+        elif actsAs == ReverseFunction:
+            return self.subject().occurringIn(unprovided)
+        # A BuiltIn provides nothing.
+        elif actsAs == BuiltIn or actsAs == None:
+            return frozenset()
+        # And a StoredStatement everything.
+        elif actsAs == StoredStatement:
+            return self.occurringIn(unprovided)
 
-    provides = property(freeVariables)
+    def requires(self, vars=set(), provided=set()):
+        """Return a set of variables this statement will require values
+        for.
+        
+        """
+        unprovided = vars.difference(provided)
+        actsAs = self.predicateActsAs(vars, provided)
+        
+        # A Function requires only things in the object.
+        # A ReverseFunction only those in the subject.
+        # A BuiltIn requires everything.
+        if actsAs == Function:
+            return self.subject().occurringIn(unprovided)
+        elif actsAs == ReverseFunction:
+            return self.object().occurringIn(unprovided)
+        elif actsAs == BuiltIn or actsAs == None:
+            return self.occurringIn(unprovided)
+        # And a StoredStatement nothing.
+        elif actsAs == StoredStatement:
+            return frozenset()
 
+#    requires = property(_requires)
+    
+    def isUnresolvable(self, vars=set(), provided=set()):
+        """Return whether status as a Function or ReverseFunction is currently
+        unresolvable.
+        
+        """
+        unprovided = vars.difference(provided)
+        
+        # Are we behaving as a Function or a ReverseFunction?  That's
+        # determined by where the unprovided variables are.
+        if isinstance(self.predicate(), Function) and isinstance(self.predicate(), ReverseFunction) and not isinstance(self.predicate(), MultipleFunction) and not isinstance(self.predicate(), MultipleReverseFunction):
+            # Behave as a Function if the subject is fully speced.
+            if unprovided and not self.subject().occurringIn(unprovided) and self.object().occurringIn(unprovided):
+                return False
+            # Behave as a ReverseFunction if the object is fully speced.
+            elif unprovided and not self.object().occurringIn(unprovided) and self.subject().occurringIn(unprovided):
+                return False
+            # Behave as a BuiltIn if both are fully speced.
+            elif not self.occurringIn(unprovided):
+                return False
+            # Otherwise, we're unresolvable.
+            else:
+                return True
+        return False
+    
+#    isUnresolvable = property(_isUnresolvable)
+    
     def existentials(self):
-        return self.occuringIn(self.quad[CONTEXT].existentials())
+        """Return all existentials in this statement."""
+        return self.occurringIn(self.quad[CONTEXT].existentials())
 
     def universals(self):
-        return self.occuringIn(self.quad[CONTEXT].universals())
+        """Return all universals in this statement."""
+        return self.occurringIn(self.quad[CONTEXT].universals())
 
 ##    def unify(self, other, vars=Set([]), existentials=Set([]),  bindings={}):
 ##      """See Term.unify()
