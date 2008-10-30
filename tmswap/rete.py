@@ -154,7 +154,7 @@ def sortPatterns(patterns, vars):
                 for node in popnodes:
                     unresolvables.remove(node)
                         
-        if max(inDegrees.values()) != 0:
+        if len(inDegrees) != 0 and max(inDegrees.values()) != 0:
             raise CyclicError, "You've got a cyclic dependency in your rule, buddy!"
 
     return list(getTopologically())
@@ -356,17 +356,20 @@ generates variable bindings
         builtInMade = []
         if isinstance(self.pattern.predicate(), BuiltIn) and self.pattern.predicate() != self.pattern.predicate().store.sameAs:
             if self.pattern.predicate() is self.pattern.context().store.includes:
+                # log:includes references the (Indexed)Formula in the
+                # subject and checks it for a pattern match.
                 newIndex = self.pattern.subject()._index
-                node = compilePatterns(newIndex, self.pattern.object.statements, self.vars)
-                def onSuccess(self, (triples, environment, penalty)):
-                    newAssumption = self.pattern.substitution(environment)
+                node = compilePattern(newIndex, self.pattern.object().statements, self.vars)
+                def onSuccess((triples, environment, penalty)):
+                    newAssumption = self.pattern.substitution(environment.asDict())
                     #somebodyPleaseAssertFromBuiltin(self.pattern.predicate(), newAssumption)
-
-                
-
                     
                     builtInMade.append(TripleWithBinding(newAssumption, environment))
-                prod = ProductionNode(node, onSuccess)
+                    self.supportBuiltin(builtInMade[-1].triple)
+                def onFailure():
+                    # Do nothing.
+                    pass
+                prod = ProductionNode(node, onSuccess, onFailure)
             # Alright, if we are ACTING as a function, we need to bind
             # the object.
             elif self.pattern.predicateActsAs(self.pattern.freeVariables(),

@@ -356,9 +356,13 @@ class IndexedFormula(Formula):
             return 0  # Return no change in size of store
             
         assert not isinstance(pred, Formula) or pred.canonical is pred, "pred Should be closed"+`pred`
+#        assert (not isinstance(subj, Formula)
+#                or subj is self
+#                or subj.canonical is subj), "subj Should be closed or self"+`subj`
+        # If it's closed, subj.canonical != None, not subj.canonical == subj
         assert (not isinstance(subj, Formula)
                 or subj is self
-                or subj.canonical is subj), "subj Should be closed or self"+`subj`
+                or subj.canonical != None), "subj Should be closed or self"+`subj`
         assert not isinstance(obj, Formula) or obj.canonical is obj, "obj Should be closed"+`obj`+`obj.canonical`
         store.size = store.size+1 # rather nominal but should be monotonic
 

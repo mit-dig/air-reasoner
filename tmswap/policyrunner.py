@@ -201,6 +201,13 @@ This is currently only used for goals
         
 
 def canonicalizeVariables(statement, variables):
+    """Canonicalize all variables in statement to be URIs of the form
+    http://example.com/vars/#variable(digits).  Returns a tuple
+    corresponding to the subject, predicate, and object following
+    canonicalization, and a frozenset including the URIs of all
+    variables that were canonicalized.
+    
+    """
     subj, pred, obj = statement.spo()
     store = statement.context().store
     varMapping = {}
@@ -217,9 +224,25 @@ def canonicalizeVariables(statement, variables):
         if isinstance(node, List):
             return node.store.newList([canNode(x) for x in node])
         if isinstance(node, Formula):
-            if node.occurringIn(variables):
-                raise ValueError(node)
-            return node
+            # Commenting this out for log:includes.  What side-effects
+            # does this have?
+#            if node.occurringIn(variables):
+#                raise ValueError(node)
+#            return node
+            
+            # log:includes uses external scope to canonicalize
+            # variables...?
+            f = None
+            for statement in node.statements:
+                subj, pred, obj = statement.spo()
+                if subj is not canNode(subj) or pred is not canNode(pred) or obj is not canNode(obj):
+                    f = node.store.newFormula()
+            if f:
+                for statement in node.statements:
+                    subj, pred, obj = statement.spo()
+                    f.add(canNode(subj), canNode(pred), canNode(obj))
+                f.close()
+                return f
         return node
     return (canNode(subj), canNode(pred), canNode(obj)), frozenset(varMapping.values())
 
