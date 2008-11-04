@@ -358,7 +358,7 @@ generates variable bindings
             if self.pattern.predicate() is self.pattern.context().store.includes:
                 # log:includes references the (Indexed)Formula in the
                 # subject and checks it for a pattern match.
-                newIndex = self.pattern.subject()._index
+                newIndex = self.pattern.substitution(env).subject()._index
                 node = compilePattern(newIndex, self.pattern.object().statements, self.vars)
                 def onSuccess((triples, environment, penalty)):
                     newAssumption = self.pattern.substitution(environment.asDict())
