@@ -1636,6 +1636,20 @@ class RDFStore(RDFSink) :
             self.load(u, openFormula=F, remember=0, referer=referer)
         return F.close()
 
+    def mergeFormulae(self, formulae):
+        """Merge several formulas and return a new formula."""
+        merged = self.newFormula()
+        
+        for formula in formulae:
+            # Uncomfortable with this hack.  Implies that both
+            # formulas are in the same store...
+            merged._universalVariables = merged._universalVariables.union(formula._universalVariables)
+            merged._existentialVariables = merged._existentialVariables.union(formula._existentialVariables)
+            for statement in formula.statements:
+                merged.add(statement.subject(), statement.predicate(), statement.object())
+        
+        return merged
+
     def genId(self):
         """Generate a new identifier
         

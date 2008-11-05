@@ -817,7 +817,10 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None):
 
     allRules = []
     allGoalRules = []
-    for pf in policyFormulae + [baseRulesFormula]:
+#    # We need to 'flatten' the policy formulae before we can compile it.
+    policyFormula = store.mergeFormulae(policyFormulae)
+    for pf in [policyFormula] + [baseRulesFormula]:
+#    for pf in policyFormulae + [baseRulesFormula]:
         if pf is baseRulesFormula: ## Realy bad hack!
             base=True
         else:
@@ -875,6 +878,10 @@ knownScenarios = {
                   [  '../../s0/mit-policy.n3'] ),
     's9var2Local' : (['../../s9/variation2/log.n3'],
                      ['../../s9/variation2/policy.n3']),
+    's9var1Local' : (['../../s9/variation1/log.n3'],
+                     ['../../s9/variation1/policy1.n3', '../../s9/variation1/policy2.n3']),
+#                     ['../../s9/variation1/policy.n3']),
+#                     ['../../s9/variation1/demo-policy.n3']),
     'arl1Local' : (['../../../../2008/ARL/log.n3'],
                      ['../../../../2008/ARL/udhr-policy.n3']),    
      'arl2Local' : (['../../../../2008/ARL/log.n3'],
