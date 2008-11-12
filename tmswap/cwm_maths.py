@@ -28,7 +28,7 @@ MATHS_NS_URI = 'http://www.w3.org/2000/10/swap/maths#'
 
 def tidy(x):
     #DWC bugfix: "39.03555" got changed to "393555"
-    if x == None: return None
+    if not isinstance(x, Decimal) and x == None: return None
     s = str(x)
     if s[-2:] == '.0': s=s[:-2]
     return s
@@ -138,11 +138,11 @@ class BI_remainderOf(LightBuiltIn, ReverseFunction):
 
 class BI_negation(LightBuiltIn, Function, ReverseFunction):
 
-    def evalaluateObject(self, subject):
+    def evaluateObject(self, subject):
             t = -Decimal(subject)
             if t is not None: return tidy(t)
 
-    def evalaluateSubject(self, object):
+    def evaluateSubject(self, object):
             t = -Decimal(object)
             if t is not None: return tidy(t)
 

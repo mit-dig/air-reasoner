@@ -78,6 +78,7 @@ class BI_absoluteValue(LightBuiltIn, Function):
     def evaluateObject(self, subj_py):
         return abs(numeric(subj_py))
 
+# TODO: Fix testing against decimals
 class BI_rounded(LightBuiltIn, Function):
     def evaluateObject(self, subj_py):
         return round(float(subj_py))

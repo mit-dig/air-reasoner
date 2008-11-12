@@ -86,6 +86,7 @@ class Decimal:
             ours = other[i]
             i = i + 1
             value = value * base + int(ours, base)
+            char_ord = ord(other[i])
         if other[i] == '.':
             i = i + 1
 #            while other[i] in '0123456789':
