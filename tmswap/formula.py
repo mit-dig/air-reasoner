@@ -923,13 +923,19 @@ class StoredStatement(object):
         
         # Are we behaving as a Function or a ReverseFunction?  That's
         # determined by where the unprovided variables are.
-        if isinstance(pred, Function) and isinstance(pred, ReverseFunction) and not isinstance(pred, MultipleFunction) and not isinstance(pred, MultipleReverseFunction):
+        if isinstance(pred, Function) and isinstance(pred, ReverseFunction):
             # Behave as a Function if the subject is fully speced.
             if unprovided and not self.subject().occurringIn(unprovided) and self.object().occurringIn(unprovided):
-                return Function
+                if isinstance(pred, MultipleFunction):
+                    return MultipleFunction
+                else:
+                    return Function
             # Behave as a ReverseFunction if the object is fully speced.
             elif unprovided and not self.object().occurringIn(unprovided) and self.subject().occurringIn(unprovided):
-                return ReverseFunction
+                if isinstance(pred, MultipleReverseFunction):
+                    return MultipleReverseFunction
+                else:
+                    return ReverseFunction
             # Behave as a BuiltIn if both are fully speced.
             elif not self.occurringIn(unprovided):
                 return BuiltIn
@@ -937,10 +943,14 @@ class StoredStatement(object):
             else:
                 return None
         # Functions need to have their subject fully speced.
-        elif isinstance(pred, Function) and not isinstance(pred, MultipleFunction):
+        elif isinstance(pred, MultipleFunction):
+            return MultipleFunction
+        elif isinstance(pred, Function):
             return Function
         # ReverseFunctions need to have their object fully speced.
-        elif isinstance(pred, ReverseFunction) and not isinstance(pred, MultipleReverseFunction):
+        elif isinstance(pred, MultipleReverseFunction):
+            return MultipleReverseFunction
+        elif isinstance(pred, ReverseFunction):
             return ReverseFunction
         # BuiltIns need both fully speced.
         elif isinstance(pred, BuiltIn):
@@ -959,9 +969,9 @@ class StoredStatement(object):
         
         # A Function provides only things in the object.
         # A ReverseFunction only those in the subject.
-        if actsAs == Function:
+        if actsAs == Function or actsAs == MultipleFunction:
             return self.object().occurringIn(unprovided)
-        elif actsAs == ReverseFunction:
+        elif actsAs == ReverseFunction or actsAs == MultipleReverseFunction:
             return self.subject().occurringIn(unprovided)
         # A BuiltIn provides nothing.
         elif actsAs == BuiltIn or actsAs == None:
@@ -981,9 +991,9 @@ class StoredStatement(object):
         # A Function requires only things in the object.
         # A ReverseFunction only those in the subject.
         # A BuiltIn requires everything.
-        if actsAs == Function:
+        if actsAs == Function or actsAs == MultipleFunction:
             return self.subject().occurringIn(unprovided)
-        elif actsAs == ReverseFunction:
+        elif actsAs == ReverseFunction or actsAs == MultipleReverseFunction:
             return self.object().occurringIn(unprovided)
         elif actsAs == BuiltIn or actsAs == None:
             return self.occurringIn(unprovided)
@@ -1002,7 +1012,7 @@ class StoredStatement(object):
         
         # Are we behaving as a Function or a ReverseFunction?  That's
         # determined by where the unprovided variables are.
-        if isinstance(self.predicate(), Function) and isinstance(self.predicate(), ReverseFunction) and not isinstance(self.predicate(), MultipleFunction) and not isinstance(self.predicate(), MultipleReverseFunction):
+        if isinstance(self.predicate(), Function) and isinstance(self.predicate(), ReverseFunction):
             # Behave as a Function if the subject is fully speced.
             if unprovided and not self.subject().occurringIn(unprovided) and self.object().occurringIn(unprovided):
                 return False

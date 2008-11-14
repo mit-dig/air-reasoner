@@ -70,7 +70,6 @@ class BI_last(LightBuiltIn, Function):
 ##        mapped.internFrag(genID[hash+1:], Map)
 ##        return store.symbol(genID)
 
-
 class BI_in(LightBuiltIn, MultipleReverseFunction):
     """Is the subject in the object?
     Returnes a sequence of values."""
@@ -111,6 +110,7 @@ class BI_append(LightBuiltIn, Function):
             r.extend([a for a in x])
         return self.store.newList(r)
 
+# TODO: How does this work?
 class BI_members(LightBuiltIn, Function):
     """Makes a set from a list
 

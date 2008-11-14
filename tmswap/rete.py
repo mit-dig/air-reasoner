@@ -15,7 +15,7 @@ WKD = weakref.WeakKeyDictionary
 from collections import deque
 import itertools
 
-from term import unify, Env, BuiltIn, Function, ReverseFunction
+from term import unify, Env, BuiltIn, Function, ReverseFunction, MultipleFunction, MultipleReverseFunction
 from formula import Formula, StoredStatement, WME
 
 import operator
@@ -379,6 +379,15 @@ generates variable bindings
                     builtInMade.append(TripleWithBinding(matchedPat.substitution(binds), environment.flatten(binds)))
                     self.supportBuiltin(builtInMade[-1].triple)
             elif self.pattern.predicateActsAs(self.pattern.freeVariables(),
+                                              set(env.keys())) == MultipleFunction:
+                # Each item of the possible objects needs to be
+                # returned as a separate triple matching.
+                matchedPat = self.pattern.substitution(env)
+                for object in self.pattern.predicate().evalObj(matchedPat.subject(), None, None, None, None):
+                    for binds, environment in unify(self.pattern.object(), object, vars = self.vars):
+                        builtInMade.append(TripleWithBinding(matchedPat.substitution(binds), environment.flatten(binds)))
+                        self.supportBuiltin(builtInMade[-1].triple)
+            elif self.pattern.predicateActsAs(self.pattern.freeVariables(),
                                               set(env.keys())) == ReverseFunction:
                 # If we're acting as a ReverseFunction, bind the
                 # result of the reverse function to the subject.
@@ -386,6 +395,15 @@ generates variable bindings
                 for binds, environment in unify(self.pattern.subject(), self.pattern.predicate().evalSubj(matchedPat.object(), None, None, None, None), vars = self.vars):
                     builtInMade.append(TripleWithBinding(matchedPat.substitution(binds), environment.flatten(binds)))
                     self.supportBuiltin(builtInMade[-1].triple)
+            elif self.pattern.predicateActsAs(self.pattern.freeVariables(),
+                                              set(env.keys())) == MultipleReverseFunction:
+                # Each item of the possible subjects needs to be
+                # returned as a separate triple matching.
+                matchedPat = self.pattern.substitution(env)
+                for subject in self.pattern.predicate().evalSubj(matchedPat.object(), None, None, None, None):
+                    for binds, environment in unify(self.pattern.subject(), subject, vars = self.vars):
+                        builtInMade.append(TripleWithBinding(matchedPat.substitution(binds), environment.flatten(binds)))
+                        self.supportBuiltin(builtInMade[-1].triple)
             elif self.pattern.predicateActsAs(self.pattern.freeVariables(),
                                               set(env.keys())) == BuiltIn:
                 # If we're acting as a ReverseFunction, bind the
@@ -564,7 +582,9 @@ to get larger matches.
     def leftActivate(self, token):
         if self.parent.empty:
             self.relinkAlpha()
-            if self.alphaNode.empty:
+            # Only delink this join if it's not for a triple that
+            # isn't a BuiltIn...
+            if not isinstance(self.alphaNode.pattern.predicate(), BuiltIn) and self.alphaNode.empty:
                 self.parent.children.remove(self)
         matchedSomething = False
         for i in self.alphaNode.triplesMatching(self, token.env, self.makesGoals):
