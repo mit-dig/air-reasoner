@@ -217,6 +217,9 @@ def refTo(base, uri):
     # print "# relative", base, uri, "   same up to ", i
     # i point to end of shortest one or first difference
 
+    # Check fragments BEFORE shared host only.
+    if uri[i:i+1] == "#" and len(base) == i: return uri[i:] # fragment of base
+
     # Do they have ONLY a shared host? Then we can use the root '/blah' form.
     m = commonHost.match(base[:i])
     if m:
@@ -225,8 +228,6 @@ def refTo(base, uri):
         l = uri.find("/", k + 2)
         if uri[l+1:l+2] != "/" and base[l+1:l+2] != "/" and uri[:l]==base[:l]:
             return uri[l:]
-
-    if uri[i:i+1] == "#" and len(base) == i: return uri[i:] # fragment of base
 
     while i > 0 and uri[i-1] != '/' : i=i-1  # scan for slash
 
@@ -377,7 +378,9 @@ class Tests(unittest.TestCase):
                  ("http://example/x/y%2Fz", "http://example/x%2Fabc", "/x%2Fabc"),
                  ("http://example/x%2Fy/z", "http://example/x%2Fy/abc", "abc"),
                  # Ryan Lee
-                 ("http://example/x/abc.efg", "http://example/x/", "./")
+                 ("http://example/x/abc.efg", "http://example/x/", "./"),
+                 # Albert Au yeung
+                 ("http://example/x", "http://example/x#y", "#y")
                  )
 
         for inp1, inp2, exp in cases:
