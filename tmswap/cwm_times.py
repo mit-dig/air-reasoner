@@ -102,7 +102,7 @@ class BI_second(LightBuiltIn, Function):
         except:
             return None
 
-tzone = re.compile(r'.*([-+]\d{1,2}:\d{2,2})')
+tzone = re.compile(r'.*([-+]\d{1,2}:\d{2,2}|Z)')
 class BI_timeZone(LightBuiltIn, Function):
     def evaluateObject(self,  subj_py):
         m = tzone.match(subj_py)
@@ -167,9 +167,9 @@ class BI_formatSeconds(LightBuiltIn, Function):
 class BI_parseToSeconds(LightBuiltIn, Function):
     def evaluateObject(self,   subj_py):
         if verbosity() > 80: progress("strTime:parse input:"+`subj_py`)
-        str, format = subj_py
+        value, format = subj_py
         try:
-            return  str(calendar.timegm(time.strptime(str, format)))
+            return  str(calendar.timegm(time.strptime(value, format)))
         except:
             return None
 

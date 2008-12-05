@@ -45,7 +45,7 @@ class BI_in(LightBuiltIn, MultipleReverseFunction):
     def evalSubj(self, obj, queue, bindings, proof, query):
         if not isinstance(obj, NonEmptyList) and not isinstance(obj, N3Set): return None
         rea = None
-        return [x or x in obj]  # [({subj:x}, rea) for x in obj]
+        return [x for x in obj]  # [({subj:x}, rea) for x in obj]
 
 class BI_member(LightBuiltIn, MultipleFunction):
     """Is the subject in the object?

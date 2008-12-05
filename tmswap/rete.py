@@ -375,9 +375,11 @@ generates variable bindings
             elif self.pattern.predicateActsAs(self.pattern.freeVariables(),
                                               set(env.keys())) == Function:
                 matchedPat = self.pattern.substitution(env)
-                for binds, environment in unify(self.pattern.object(), self.pattern.predicate().evalObj(matchedPat.subject(), None, None, None, None), vars = self.vars):
-                    builtInMade.append(TripleWithBinding(matchedPat.substitution(binds), environment.flatten(binds)))
-                    self.supportBuiltin(builtInMade[-1].triple)
+                object = self.pattern.predicate().evalObj(matchedPat.subject(), None, None, None, None)
+                if object is not None:
+                    for binds, environment in unify(self.pattern.object(), object, vars = self.vars):
+                        builtInMade.append(TripleWithBinding(matchedPat.substitution(binds), environment.flatten(binds)))
+                        self.supportBuiltin(builtInMade[-1].triple)
             elif self.pattern.predicateActsAs(self.pattern.freeVariables(),
                                               set(env.keys())) == MultipleFunction:
                 # Each item of the possible objects needs to be
@@ -392,9 +394,11 @@ generates variable bindings
                 # If we're acting as a ReverseFunction, bind the
                 # result of the reverse function to the subject.
                 matchedPat = self.pattern.substitution(env)
-                for binds, environment in unify(self.pattern.subject(), self.pattern.predicate().evalSubj(matchedPat.object(), None, None, None, None), vars = self.vars):
-                    builtInMade.append(TripleWithBinding(matchedPat.substitution(binds), environment.flatten(binds)))
-                    self.supportBuiltin(builtInMade[-1].triple)
+                subject = self.pattern.predicate().evalSubj(matchedPat.object(), None, None, None, None)
+                if subject is not None:
+                    for binds, environment in unify(self.pattern.subject(), subject, vars = self.vars):
+                        builtInMade.append(TripleWithBinding(matchedPat.substitution(binds), environment.flatten(binds)))
+                        self.supportBuiltin(builtInMade[-1].triple)
             elif self.pattern.predicateActsAs(self.pattern.freeVariables(),
                                               set(env.keys())) == MultipleReverseFunction:
                 # Each item of the possible subjects needs to be

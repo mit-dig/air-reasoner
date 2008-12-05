@@ -104,7 +104,7 @@ class BI_second(LightBuiltIn, Function):
         except:
             return None
 
-tzone = re.compile(r'.*([-+]\d{1,2}:\d{2,2})')
+tzone = re.compile(r'.*([-+]\d{1,2}:\d{2,2}|Z)')
 class BI_timeZone(LightBuiltIn, Function):
     def evaluateObject(self,  subj_py):
         m = tzone.match(subj_py)

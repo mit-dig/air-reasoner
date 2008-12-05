@@ -371,7 +371,11 @@ For future reference, use newUniversal
         returns number of statements added (roughly)"""
         total = 0
         subWhy=Because('I said so #1', why)
-        bindings2 = bindings.copy()
+        # May be being passed an Env...  And copy won't work nicely with it.
+        if hasattr(bindings, 'asDict') and callable(bindings.asDict):
+            bindings2 = bindings.asDict()
+        else:
+            bindings2 = bindings.copy()
         bindings3 = {}
         for v in old.universals():
             if v not in bindings:
