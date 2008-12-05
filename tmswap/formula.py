@@ -957,6 +957,12 @@ class StoredStatement(object):
         elif isinstance(pred, ReverseFunction):
             return ReverseFunction
         # BuiltIns need both fully speced.
+        
+        # log:includes is a special case.  It acts akin to a multiple
+        # function (it needs a fully speced subject, and provides a
+        # number of variables in the object)
+        elif pred.uriref() == 'http://www.w3.org/2000/10/swap/log#includes':
+            return MultipleFunction
         elif isinstance(pred, BuiltIn):
             return BuiltIn
         # And of course if we aren't a BuiltIn, behave normally.
