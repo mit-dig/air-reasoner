@@ -754,11 +754,11 @@ store = llyn.RDFStore()
 
 n3NS = store.newSymbol('http://www.w3.org/2000/10/swap/grammar/n3#n3')
 
-def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None):
-    trace, result = runPolicy(logURIs, policyURIs, logFormula=logFormula, ruleFormula=ruleFormula)
+def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with']):
+    trace, result = runPolicy(logURIs, policyURIs, logFormula=logFormula, ruleFormula=ruleFormula, filterProperties=filterProperties)
     return trace.n3String()
 
-def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None):
+def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with']):
     global baseFactsURI, baseRulesURI
     if OFFLINE[0]:
         baseFactsURI = uripath.join(uripath.base(),
@@ -853,8 +853,7 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None):
     print '  of which %s was after loading, and %s was actual reasoning' % (now-compileStartTime, now-eventStartTime)
 
 #    rete.printRete()
-    triples = list(workingContext.statementsMatching(pred=p['compliant-with']) +
-                   workingContext.statementsMatching(pred=p['non-compliant-with']))
+    triples = list(reduce(lambda x, y: x + y, [workingContext.statementsMatching(pred=workingContext.newSymbol(property)) for property in filterProperties]))
     if triples:
         print 'I can prove the following compliance statements:'
     else:
@@ -903,7 +902,9 @@ knownScenarios = {
     'arl1' : (['http://dig.csail.mit.edu/2008/ARL/log.n3'],
                      ['http://dig.csail.mit.edu/2008/ARL/udhr-policy.n3']), 
     'arl2' : (['http://dig.csail.mit.edu/2008/ARL/log.n3'],
-             ['http://dig.csail.mit.edu/2008/ARL/unresol-policy.n3'])
+             ['http://dig.csail.mit.edu/2008/ARL/unresol-policy.n3']),
+    'demo2Local' : (['./demo2.n3'],
+                    ['./demo2-rules.n3'])
 
 }
 

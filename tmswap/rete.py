@@ -370,6 +370,21 @@ generates variable bindings
                     # Do nothing.
                     pass
                 prod = ProductionNode(node, onSuccess, onFailure)
+            if self.pattern.predicate() is self.pattern.context().store.notIncludes:
+                # log:notIncludes references the (Indexed)Formula in the
+                # subject and checks it for a pattern match.
+                newIndex = self.pattern.substitution(env).subject()._index
+                node = compilePattern(newIndex, self.pattern.object().statements, self.vars)
+                def onSuccess((triples, environment, penalty)):
+                    # Do nothing.
+                    pass
+                def onFailure():
+                    newAssumption = self.pattern.substitution(env.asDict())
+                    #somebodyPleaseAssertFromBuiltin(self.pattern.predicate(), newAssumption)
+                    
+                    builtInMade.append(TripleWithBinding(newAssumption, env))
+                    self.supportBuiltin(builtInMade[-1].triple)
+                prod = ProductionNode(node, onSuccess, onFailure)
             # Alright, if we are ACTING as a function, we need to bind
             # the object.
             elif self.pattern.predicateActsAs(self.pattern.freeVariables(),
