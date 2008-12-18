@@ -370,7 +370,7 @@ generates variable bindings
                     # Do nothing.
                     pass
                 prod = ProductionNode(node, onSuccess, onFailure)
-            if self.pattern.predicate() is self.pattern.context().store.notIncludes:
+            elif self.pattern.predicate() is self.pattern.context().store.notIncludes:
                 # log:notIncludes references the (Indexed)Formula in the
                 # subject and checks it for a pattern match.
                 newIndex = self.pattern.substitution(env).subject()._index

@@ -560,7 +560,7 @@ much how the rule was represented in the rdf network
                              % (node, F.each(subj=node, pred=p['pattern'])))
         if pattern is None:
             raise ValueError('%s must have a pattern. You did not give it one' % (node,))
-        base = base or (F.any(subj=node, pred=F.store.type, obj=p['Hidden-rule']) is not None)
+        base = base or (F.contains(subj=node, pred=F.store.type, obj=p['Hidden-rule']) == 1)
         descriptions = list(F.each(subj=node, pred=p['description']))
 
         resultList  = []
@@ -904,7 +904,9 @@ knownScenarios = {
     'arl2' : (['http://dig.csail.mit.edu/2008/ARL/log.n3'],
              ['http://dig.csail.mit.edu/2008/ARL/unresol-policy.n3']),
     'demo2Local' : (['./demo2.n3'],
-                    ['./demo2-rules.n3'])
+                    ['./demo2-rules.n3']),
+    'demo6Local' : (['./demo6.n3'],
+                    ['./demo6-rules.n3'])
 
 }
 
