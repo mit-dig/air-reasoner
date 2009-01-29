@@ -280,9 +280,9 @@ class SinkParser:
             if i <0: raise BadSyntax(self._thisDoc, self.lines, str, i,
                         "Bad variable list after @forAll")
             for x in res:
-                #self._context.declareUniversal(x)
-                if x not in self._variables or x in self._parentVariables:
-                    self._variables[x] =  self._context.newUniversal(x)
+                self._context.declareUniversal(x)
+#                if x not in self._variables or x in self._parentVariables:
+#                    self._variables[x] =  self._context.newUniversal(x)
             return i
 
         j = self.tok('forSome', str, i)

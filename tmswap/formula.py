@@ -207,10 +207,10 @@ class Formula(AnonymousNode, CompoundTerm):
 
     
     def declareUniversal(self, v, key=None):
-        if key is not AnonymousUniversal:
-            raise RuntimeError("""We have now disallowed the calling of declareUniversal.
-For future reference, use newUniversal
-""")
+#        if key is not AnonymousUniversal:
+#            raise RuntimeError("""We have now disallowed the calling of declareUniversal.
+#For future reference, use newUniversal
+#""")
         if verbosity() > 90: progress("Declare universal:", v)
         if v not in self._universalVariables:
             self._universalVariables.add(v)
@@ -239,7 +239,10 @@ For future reference, use newUniversal
         """Create a named variable universally qualified within this formula
         
         See also: universals()"""
-        x = AnonymousUniversal(self, uri)
+        if uri == None:
+            x = AnonymousUniversal(self, uri)
+        else:
+            x = self.store.newUniversal(self, uri, why=why)
 ##      self._universalVariables.add(x)
         return x
 

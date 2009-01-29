@@ -904,7 +904,7 @@ knownScenarios = {
     'arl2' : (['http://dig.csail.mit.edu/2008/ARL/log.n3'],
              ['http://dig.csail.mit.edu/2008/ARL/unresol-policy.n3']),
     'demo2Local' : (['./demo2.n3'],
-                    ['./demo2-rules.n3']),
+                    ['./demo2-rules1.n3', './demo2-rules2.n3']),
     'demo6Local' : (['./demo6.n3'],
                     ['./demo6-rules.n3'])
 
