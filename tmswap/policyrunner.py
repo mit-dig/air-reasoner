@@ -274,7 +274,7 @@ class Assertion(object):
                     supportList.append(x.substitution(bindings))
             support = frozenset(supportList)
 
-        newBlankNodesBindings = dict([(x, pattern.newBlankNode()) for x in self.needsRenaming]) # if invalid, will not be run
+        newBlankNodesBindings = dict([(x, self.pattern.newBlankNode()) for x in self.needsRenaming]) # if invalid, will not be run
         bindings.update(newBlankNodesBindings)
 
         return Assertion(self.pattern.substitution(bindings), support, self.rule, validToRename=newBlankNodesBindings.values())
@@ -903,10 +903,6 @@ knownScenarios = {
                      ['http://dig.csail.mit.edu/2008/ARL/udhr-policy.n3']), 
     'arl2' : (['http://dig.csail.mit.edu/2008/ARL/log.n3'],
              ['http://dig.csail.mit.edu/2008/ARL/unresol-policy.n3']),
-    'demo2Local' : (['./demo2.n3'],
-                    ['./demo2-rules1.n3', './demo2-rules2.n3']),
-    'demo6Local' : (['./demo6.n3'],
-                    ['./demo6-rules.n3'])
 
 }
 

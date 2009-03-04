@@ -1751,6 +1751,8 @@ class RDFStore(RDFSink) :
             raise RuntimeError("Eh?  can't intern "+`what`+" of type: "+`what.__class__`)
 
         typ, urirefString = what
+        if isinstance(urirefString, Term):
+            urirefString = urirefString.uriref()
 
         if typ == LITERAL:
             return self.newLiteral(urirefString, dt, lang)
