@@ -43,7 +43,26 @@ GOAL = 1
 
 debugLevel = 0
 
+# Need to extend the List and Tuple types to do x.substitution()
+def baseSub(value, bindings):
+    if value is not None:
+        return value.substitution(bindings)
+    else:
+        return None
 
+class SubstitutingList(list):
+    pass
+
+SubstitutingList.substitution = \
+    lambda self, bindings: \
+        SubstitutingList(map(lambda x: baseSub(x, bindings), self))
+
+class SubstitutingTuple(tuple):
+    pass
+
+SubstitutingTuple.substitution = \
+    lambda self, bindings: \
+        SubstitutingTuple(map(lambda x: baseSub(x, bindings), self))
 
 class FormulaTMS(object):
     """This is the interface between the TMS and the rdf side of things
@@ -367,7 +386,12 @@ class RuleFire(object):
                     raise NotImplementedError("I don't know how to add variables")
             
             for r in result:
+                # Do any substitution and then extract the description
+                # and r12 from the particular r's tuple.
                 r12 = r.substitution(env.asDict())
+                desc = r12[1]
+                r12 = r12[0]
+                
                 r2 = r12.pattern
                 support = r12.support
                 ruleId = r12.rule
@@ -398,12 +422,20 @@ class RuleFire(object):
                 closedWorld.assume()
                 self.tms.assumedClosedWorlds.append(closedWorld)
                 altSupport = [closedWorld]
-                desc = self.altDescriptions
+#                desc = self.altDescriptions
             else:
                 altSupport = []
-                desc = [x.substitution(env.asDict()) for x in self.descriptions]
+#                desc = [x.substitution(env.asDict()) for x in self.descriptions]
+            print result
             for r in result:
+                # Do any substitution and then extract the description
+                # and r12 from the particular r's tuple.
+                print r
                 r12 = r.substitution(env.asDict())
+                print r12
+                desc = r12[1]
+                r12 = r12[0]
+                
                 r2 = r12.pattern
                 support = r12.support
                 ruleId = r12.rule
@@ -428,7 +460,7 @@ much how the rule was represented in the rdf network
     baseRules = set()
     
     def __init__(self, eventLoop, tms, vars, label,
-                 pattern, result, descriptions, alt, altDescriptions, sourceNode,
+                 pattern, result, alt, sourceNode,
                  goal=False, matchName=None, base=False, generated=False):
         self.generatedLabel = False
         if label is None or label=='None':
@@ -445,10 +477,10 @@ much how the rule was represented in the rdf network
         self.pattern = pattern
         self.patternToCompare = frozenset([x.spo() for x in pattern])
         self.result = result
-        self.descriptions = descriptions
+#        self.descriptions = descriptions
         self.alt = alt
-        assert isinstance(altDescriptions, list), altDescriptions
-        self.altDescriptions = altDescriptions
+#        assert isinstance(altDescriptions, list), altDescriptions
+#        self.altDescriptions = altDescriptions
         self.goal = goal
         self.matchName = matchName
         self.sourceNode = sourceNode
@@ -475,6 +507,7 @@ much how the rule was represented in the rdf network
                self.vars == other.vars and \
                self.patternToCompare == other.patternToCompare and \
                self.result == other.result and \
+               self.alt == other.alt and \
                self.matchName == other.matchName
 
     def __hash__(self):
@@ -484,7 +517,9 @@ much how the rule was represented in the rdf network
         assert not isinstance(self.vars, list)
         assert not isinstance(self.pattern, list)
         assert not isinstance(self.sourceNode, list)
-        return hash((Rule, self.eventLoop, self.tms, self.vars, self.pattern, frozenset(self.result), self.sourceNode, self.goal, self.matchName))
+        assert not isinstance(self.goal, list)
+        assert not isinstance(self.matchName, list)
+        return hash((Rule, self.eventLoop, self.tms, self.vars, self.pattern, self.sourceNode, self.goal, self.matchName))
 
     def __repr__(self):
         return '%s with vars %s' % (self.label.encode('utf_8'), self.vars)
@@ -523,74 +558,253 @@ much how the rule was represented in the rdf network
         pattern = self.pattern.substitution(env)
         result = [x.substitution(env) for x in self.result]
         alt = [x.substitution(env) for x in self.alt]
-        descriptions = [x.substitution(env) for x in self.descriptions]
-        altDescriptions = [x.substitution(env) for x in self.altDescriptions]
+#        descriptions = [x.substitution(env) for x in self.descriptions]
+#        altDescriptions = [x.substitution(env) for x in self.altDescriptions]
         if self.generatedLabel:
             label = None
         else:
             label = self.label
         return self.__class__(self.eventLoop, self.tms, self.vars,
-                              label, pattern, result, descriptions, alt, altDescriptions, self.sourceNode,
+                              label, pattern, result, alt, self.sourceNode,
                               self.goal, self.matchName, base=self.isBase, generated=True)
 
     @classmethod
-    def compileFromTriples(cls, eventLoop, tms, F, node, goal=False, vars=frozenset(), base=False):
+    def compileFromTriples(cls, eventLoop, tms, F, ruleNode, goal=False, vars=frozenset(), base=False):
         assert tms is not None
         rdfs = F.newSymbol('http://www.w3.org/2000/01/rdf-schema')
         rdf = F.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
         p = F.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
 
 #        vars = vars.union(F.each(subj=node, pred=p['variable']))
+        # Find the variables in this rule.
         vars = vars.union(F.universals())
 
-        realNode = node
+        realNode = ruleNode
         nodes = [realNode]
-        altNode = F.the(subj=realNode, pred=p['alt'])
-        if altNode:
-            nodes.append(altNode)
-            altDescriptions = list(F.each(subj=altNode, pred=p['description']))
-        else:
-            altDescriptions = []
 
-        label = F.the(subj=node, pred=p['label'])
+        # Get the air:then and air:else nodes.
+        thenNodes = F.each(subj=ruleNode, pred=p['then'])
+        elseNodes = F.each(subj=ruleNode, pred=p['else'])
+#        if altNode:
+#            nodes.append(altNode)
+#            altDescriptions = list(F.each(subj=altNode, pred=p['description']))
+#        else:
+#            altDescriptions = []
+
+        # Get the air:label and air:if values.
+        # TODO: get this annotated on the ontology.
+        label = F.the(subj=ruleNode, pred=p['label'])
         try:
-            pattern = F.the(subj=node, pred=p['pattern'])
+            pattern = F.the(subj=ruleNode, pred=p['if'])
         except AssertionError:
-            raise ValueError('%s has too many patterns, being all of %s'
-                             % (node, F.each(subj=node, pred=p['pattern'])))
+            raise ValueError('%s has too many air:if clauses, being all of %s'
+                             % (ruleNode, F.each(subj=ruleNode, pred=p['if'])))
         if pattern is None:
-            raise ValueError('%s must have a pattern. You did not give it one' % (node,))
-        base = base or (F.contains(subj=node, pred=F.store.type, obj=p['Hidden-rule']) == 1)
-        descriptions = list(F.each(subj=node, pred=p['description']))
+            raise ValueError('%s must have an air:if clause. You did not give it one' % (ruleNode,))
+        
+        # Is the rule an air:Trivial-rule?
+        base = base or (F.contains(subj=ruleNode, pred=F.store.type, obj=p['Trivial-rule']) == 1)
+#        descriptions = list(F.each(subj=node, pred=p['description']))
 
+        # Collect all air:then or air:else actions...
         resultList  = []
-        for node in nodes:
-            subrules = [Assertion(cls.compileFromTriples(eventLoop, tms, F, x, vars=vars, base=base))
-                        for x in F.each(subj=node, pred=p['rule'])]
-            goal_subrules = [Assertion(cls.compileFromTriples(eventLoop, tms, F, x, goal=True, vars=vars, base=base))
-                             for x in F.each(subj=node, pred=p['goal-rule'])]
-            simple_assertions = F.each(subj=node, pred=p['assert'])
-            complex_assertions = F.each(subj=node, pred=p['assertion'])
-            assertions = []
-            for assertion in simple_assertions:
-                assertions.append(Assertion(assertion))
-            for assertion in complex_assertions:
-                statement = F.the(subj=assertion, pred=p['statement'])
-                justNode = F.the(subj=assertion, pred=p['justification'])
+        
+        # For each air:then node...
+        subrules = []
+        goal_subrules = []
+        assertions = []
+        goal_assertions = []
+        for node in thenNodes:
+            actions = []
+            
+            # Get any description...
+            try:
+                description = F.the(subj=node, pred=p['description'])
+                if description == None:
+                    description = SubstitutingList()
+                else:
+                    description = SubstitutingList(description)
+            except AssertionError:
+                raise ValueError('%s has too many descriptions in an air:then, being all of %s'
+                                 % (ruleNode, F.each(subj=node, pred=p['description'])))
+            
+            # Get any subrule...
+            subrule = None
+            try:
+                subruleNode = F.the(subj=node, pred=p['rule'])
+                if subruleNode is not None:
+                    subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, subruleNode, vars=vars, base=base))
+            except AssertionError:
+                raise ValueError('%s has too many rules in an air:then, being all of %s'
+                                 % (ruleNode, F.each(subj=node, pred=p['rule'])))
+            if subrule is not None:
+                subrules.append(SubstitutingTuple((subrule, description)))
+                actions.append(subrule)
+            
+            # Get any goal-subrule...
+            goal_subrule = None
+            try:
+                goal_subruleNode = F.the(subj=node, pred=p['goal-rule'])
+                if goal_subruleNode is not None:
+                    goal_subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, goal_subruleNode, vars=vars, base=base))
+            except AssertionError:
+                raise ValueError('%s has too many goal-rules in an air:then, being all of %s'
+                                 % (ruleNode, F.each(subj=node, pred=p['goal-rule'])))
+            if goal_subrule is not None:
+                goal_subrules.append(
+                    SubstitutingTuple((goal_subrule, description)))
+                actions.append(goal_subrule)
+            
+            # Get any assertion...
+            try:
+                assertion = F.the(subj=node, pred=p['assert'])
+            except AssertionError:
+                raise ValueError('%s has too many assertions in an air:then, being all of %s'
+                                 % (ruleNode, F.each(subj=node, pred=p['assert'])))
+            if assertion is not None:
+                assertions.append(SubstitutingTuple((assertion, description)))
+                actions.append(assertion)
+            
+            # Get any goal-assertion...
+            try:
+                goal_assertion = F.the(subj=node, pred=p['assert-goal'])
+            except AssertionError:
+                raise ValueError('%s has too many goal-assertions in an air:then, being all of %s'
+                                 % (ruleNode, F.each(subj=node, pred=p['assert-goal'])))
+            if goal_assertion is not None:
+                goal_assertions.append(
+                    SubstitutingTuple((goal_assertion, description)))
+                actions.append(goal_assertion)
+            
+            # Make sure there was exactly one of the above.
+            if len(actions) != 1:
+                raise ValueError('%s has more than one of {air:rule, air:goal-rule, air:assert, air:assert-goal} in an air:then, being all of %s'
+                                 % (ruleNode, actions))
+            
+        # Get the data from the assertions.
+        assertionObjs = []
+        for assertion in assertions + goal_assertions:
+            description = assertion[1]
+            assertion = assertion[0]
+            statement = F.the(subj=assertion, pred=p['statement'])
+            justNode = F.the(subj=assertion, pred=p['justification'])
+            if justNode is not None:
                 antecedents = frozenset(F.each(subj=justNode, pred=p['antecedent']))
-                rule_id = F.the(subj=justNode, pred=p['rule-id'])
-                assertions.append(Assertion(statement, antecedents, rule_id))
-            resultList.append(subrules + assertions + goal_subrules)
-        resultList.append([]) # In case there is no alt
-        node = realNode
+            rule_id = F.the(subj=justNode, pred=p['rule-id'])
+            
+            if justNode is not None and rule_id is not None:
+                assertionObjs.append(SubstitutingTuple(
+                        (Assertion(statement, antecedents, rule_id),
+                         description)))
+            else:
+                assertionObjs.append(SubstitutingTuple(
+                        (Assertion(statement),
+                         description)))
+        resultList.append(subrules + assertionObjs + goal_subrules)
+        
+        # Now do what we did to collect the assertions and such for
+        # any air:else actions.
+        subrules = []
+        goal_subrules = []
+        assertions = []
+        goal_assertions = []
+        for node in elseNodes:
+            actions = []
+            
+            # Get any description...
+            try:
+                description = F.the(subj=node, pred=p['description'])
+                if description == None:
+                    description = SubstitutingList()
+                else:
+                    description = SubstitutingList(description)
+            except AssertionError:
+                raise ValueError('%s has too many descriptions in an air:else, being all of %s'
+                                 % (ruleNode, F.each(subj=node, pred=p['description'])))
+
+            # Get any subrule...
+            subrule = None
+            try:
+                subruleNode = F.the(subj=node, pred=p['rule'])
+                if subruleNode is not None:
+                    subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, subruleNode, vars=vars, base=base))
+            except AssertionError:
+                raise ValueError('%s has too many rules in an air:else, being all of %s'
+                                 % (ruleNode, F.each(subj=node, pred=p['rule'])))
+            if subrule is not None:
+                subrules.append(SubstitutingTuple((subrule, description)))
+                actions.append(subrule)
+            
+            # Get any goal-subrule...
+            goal_subrule = None
+            try:
+                goal_subruleNode = F.the(subj=node, pred=p['goal-rule'])
+                if goal_subruleNode is not None:
+                    goal_subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, goal_subruleNode, vars=vars, base=base))
+            except AssertionError:
+                raise ValueError('%s has too many goal-rules in an air:else, being all of %s'
+                                 % (ruleNode, F.each(subj=node, pred=p['goal-rule'])))
+            if goal_subrule is not None:
+                goal_subrules.append(
+                    SubstitutingTuple((goal_subrule, description)))
+                actions.append(goal_subrule)
+            
+            # Get any assertion...
+            try:
+                assertion = F.the(subj=node, pred=p['assert'])
+            except AssertionError:
+                raise ValueError('%s has too many assertions in an air:else, being all of %s'
+                                 % (ruleNode, F.each(subj=node, pred=p['assert'])))
+            if assertion is not None:
+                assertions.append(SubstitutingTuple((assertion, description)))
+                actions.append(assertion)
+            
+            # Get any goal-assertion...
+            try:
+                goal_assertion = F.the(subj=node, pred=p['assert-goal'])
+            except AssertionError:
+                raise ValueError('%s has too many goal-assertions in an air:else, being all of %s'
+                                 % (ruleNode, F.each(subj=node, pred=p['assert-goal'])))
+            if goal_assertion is not None:
+                goal_assertions.append(
+                    SubstitutingTuple((goal_assertion, description)))
+                actions.append(goal_assertion)
+            
+            # Make sure there was exactly one of the above.
+            if len(actions) != 1:
+                raise ValueError('%s has more than one of {air:rule, air:goal-rule, air:assert, air:assert-goal} in an air:else, being all of %s'
+                                 % (ruleNode, actions))
+            
+        # Get the data from the assertions.
+        assertionObjs = []
+        for assertion in assertions + goal_assertions:
+            description = assertion[1]
+            assertion = assertion[0]
+            statement = F.the(subj=assertion, pred=p['statement'])
+            justNode = F.the(subj=assertion, pred=p['justification'])
+            if justNode is not None:
+                antecedents = frozenset(F.each(subj=justNode, pred=p['antecedent']))
+            rule_id = F.the(subj=justNode, pred=p['rule-id'])
+            
+            if justNode is not None and rule_id is not None:
+                assertionObjs.append(SubstitutingTuple(
+                        (Assertion(statement, antecedents, rule_id),
+                         description)))
+            else:
+                assertionObjs.append(SubstitutingTuple(
+                        (Assertion(statement),
+                         description)))
+        resultList.append(subrules + assertionObjs + goal_subrules)
+        
+        node = ruleNode
         matchedGraph = F.the(subj=node, pred=p['matched-graph'])
         
         self = cls(eventLoop, tms,
                    vars, unicode(label),
                    pattern,
                    resultList[0],
-                   descriptions=descriptions,
-                   alt=resultList[1], altDescriptions=altDescriptions,
+#                   descriptions=descriptions,
+                   alt=resultList[1],# altDescriptions=altDescriptions,
                    goal=goal, matchName=matchedGraph, sourceNode=node, base=base)
         return self
 
@@ -599,13 +813,13 @@ much how the rule was represented in the rdf network
         assert tms is not None
         label = "Rule from cwm with pattern %s" % triple.subject()
         pattern = triple.subject()
-        assertions = [Assertion(triple.object())]
+        assertions = [(Assertion(triple.object()), None)]
         vars = frozenset(F.universals())
         self = cls(eventLoop, tms,
                    vars, unicode(label),
                    pattern,
-                   assertions, [],
-                   alt=[], altDescriptions=[],
+                   assertions,
+                   alt=[],
                    goal=False,
                    matchName=None,
                    sourceNode=pattern,
