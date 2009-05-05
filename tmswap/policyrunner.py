@@ -1125,7 +1125,7 @@ def runScenario(s, others=[]):
         OFFLINE[0] = True
     if s == 'test':
         rules = others[0:1]
-        facts = others[1:2]
+        facts = others[1:]
     elif s not in knownScenarios:
         facts = ['http://dig.csail.mit.edu/TAMI/2007/%s/log.n3' % s]
         rules = ['http://dig.csail.mit.edu/TAMI/2007/%s/policy.n3' % s]
