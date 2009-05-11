@@ -19,6 +19,7 @@ __cvsid__ = '$Id: cwm_math.py,v 1.26 2007/06/26 02:36:15 syosi Exp $'
 __version__ = '$Revision: 1.26 $'
 
 import sys, string, re, urllib
+import math
 
 from term import LightBuiltIn, Function, ReverseFunction, ArgumentNotLiteral, Literal
 from local_decimal import Decimal
@@ -82,6 +83,33 @@ class BI_absoluteValue(LightBuiltIn, Function):
 class BI_rounded(LightBuiltIn, Function):
     def evaluateObject(self, subj_py):
         return round(float(subj_py))
+
+def sign(num):
+    if num < 0:
+        return -1
+    elif num > 0:
+        return 1
+    else:
+        return 0
+
+class BI_fnRound(LightBuiltIn, Function):
+    def evaluateObject(self, subj_py):
+        return round(abs(float(subj_py))) * sign(float(subj_py))
+
+class BI_ceiling(LightBuiltIn, Function):
+    def evaluateObject(self, subj_py):
+        return math.ceil(float(subj_py))
+
+class BI_floor(LightBuiltIn, Function):
+    def evaluateObject(self, subj_py):
+        return math.floor(float(subj_py))
+
+class BI_round_half_to_even(LightBuiltIn, Function):
+    def evaluateObject(self, subj_py):
+        if float(subj_py) % 2 == 0.5:
+            return float(subj_py) // 2 * 2
+        else:
+            return round(float(subj_py))
 
 class BI_sum(LightBuiltIn, Function):
     def evaluateObject(self,  subj_py):
@@ -245,6 +273,13 @@ def register(store):
     str.internFrag('equalTo', BI_equalTo)
     str.internFrag('notEqualTo', BI_notEqualTo)
     str.internFrag('memberCount', BI_memberCount)
+
+    fn = store.symbol("http://www.w3.org/2005/xpath-functions")
+    fn.internFrag('abs', BI_absoluteValue)
+    fn.internFrag('ceiling', BI_ceiling)
+    fn.internFrag('floor', BI_floor)
+    fn.internFrag('round', BI_fnRound)
+    fn.internFrag('round-half-to-even', BI_round_half_to_even)
 
 if __name__=="__main__": 
    print string.strip(__doc__)

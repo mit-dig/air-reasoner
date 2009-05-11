@@ -426,13 +426,11 @@ class RuleFire(object):
             else:
                 altSupport = []
 #                desc = [x.substitution(env.asDict()) for x in self.descriptions]
-            print result
+
             for r in result:
                 # Do any substitution and then extract the description
                 # and r12 from the particular r's tuple.
-                print r
                 r12 = r.substitution(env.asDict())
-                print r12
                 desc = r12[1]
                 r12 = r12[0]
                 
@@ -623,7 +621,7 @@ much how the rule was represented in the rdf network
                 if description == None:
                     description = SubstitutingList()
                 else:
-                    description = SubstitutingList(description)
+                    description = SubstitutingList([description])
             except AssertionError:
                 raise ValueError('%s has too many descriptions in an air:then, being all of %s'
                                  % (ruleNode, F.each(subj=node, pred=p['description'])))
@@ -717,7 +715,7 @@ much how the rule was represented in the rdf network
                 if description == None:
                     description = SubstitutingList()
                 else:
-                    description = SubstitutingList(description)
+                    description = SubstitutingList([description])
             except AssertionError:
                 raise ValueError('%s has too many descriptions in an air:else, being all of %s'
                                  % (ruleNode, F.each(subj=node, pred=p['description'])))
