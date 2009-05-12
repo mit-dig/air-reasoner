@@ -302,6 +302,231 @@ class BI_resolve_uri(LightBuiltIn, Function):
         there, base = subj_py
         return uripath.join(base, there)
 
+class BI_codepoints_to_string(LightBuiltIn, Function, ReverseFunction):
+    """see http://www.w3.org/2006/xpath-functions#codepoints-to-string"""
+
+    def evaluateSubject(self, subj_py):
+        try:
+            # What about unicode?
+            return [ord(a) for a in subj_py]
+        except TypeError:
+            return None
+        
+    def evaluateObject(self, obj_py):
+        try:
+            return u"".join([unichr(a) for a in obj_py])
+        except TypeError:
+            return None
+
+class BI_string_to_codepoints(LightBuiltIn, Function, ReverseFunction):
+    """see http://www.w3.org/2006/xpath-functions#string-to-codepoints"""
+
+    def evaluateObject(self, subj_py):
+        try:
+            # What about unicode?
+            return [ord(a) for a in subj_py]
+        except TypeError:
+            return None
+        
+    def evaluateSubject(self, obj_py):
+        try:
+            return u"".join([unichr(a) for a in obj_py])
+        except TypeError:
+            return None
+
+
+class BI_compare(LightBuiltIn, Function):
+    """see http://www.w3.org/2006/xpath-functions#compare"""
+
+    def evaluateObject(self, subj_py):
+        try:
+            return [ord(a) for a in subj_py]
+        except TypeError:
+            return None
+        
+
+class BI_codepoint_equal(LightBuiltIn):
+    """see http://www.w3.org/2006/xpath-functions#codepoint-equal"""
+
+    def evaluateObject(self, subj_py):
+        str = None
+        for x in subj_py:
+            if not isString(x):
+                if type(x) == type(long()) or isinstance(x, Decimal):
+                    x = make_string(x)
+                else:
+                    x = `x`
+                if verbosity() > 34: progress("Warning: Coercing to string for codepoint-equal:"+`x`)
+#               return None # Can't
+            if str == None:
+                str = x
+            elif str != x:
+                return False
+        return True
+
+
+class BI_string_join(LightBuiltIn, Function):
+    """see http://www.w3.org/2006/xpath-functions#string-join"""
+
+    def evaluateObject(self, subj_py):
+        if len(subj_py) != 2:
+            raise Error
+        strs = []
+        for x in subj_py[0]:
+            if not isString(x):
+                if type(x) == type(long()) or isinstance(x, Decimal):
+                    strs.append(make_string(x))
+                else:
+                    strs.append(`x`)
+        return strs.join(subj_py[1])
+
+
+class BI_substring(LightBuiltIn, Function):
+    """see http://www.w3.org/2006/xpath-functions#substring"""
+
+    def evaluateObject(self, subj_py):
+        if len(subj_py) < 2 or len(subj_py) > 3:
+            raise Error
+        sourceString = subj_py[0]
+        if not isString(sourceString):
+            if type(sourceString) == type(long()) or isinstance(sourceString, Decimal):
+                strs.append(make_string(sourceString))
+            else:
+                strs.append(`sourceString`)
+        startingLoc = round(subj_py[1])
+        if len(subj_py) == 3:
+            length = round(subj_py[2])
+        else:
+            length = len(sourceString) - round(startingLoc)
+        return sourceString[startingLoc - 1:len(sourceString) - length + startingLoc]
+
+
+class BI_string_length(LightBuiltIn, Function):
+    """see http://www.w3.org/2006/xpath-functions#string-length"""
+
+    def evaluateObject(self, subj_py):
+        str = subj_py[0]
+        if not isString(str):
+            if type(str) == type(long()) or isinstance(str, Decimal):
+                strs.append(make_string(str))
+            else:
+                strs.append(`str`)
+        return len(str)
+
+
+class BI_normalize_unicode(LightBuiltIn, Function):
+    """see http://www.w3.org/2006/xpath-functions#normalize-unicode"""
+
+    def evaluateObject(self, subj_py):
+        if len(subj_py) > 2:
+            raise Error
+        arg = subj_py[0]
+        if len(subj_py) == 2:
+            normalizationForm = subj_py[1]
+        else:
+            normalizationForm = "NFC"
+        if normalizationForm == "":
+            return arg
+        return unicodedata.normalize(arg, normalizationForm)
+
+
+class BI_upper_case(LightBuiltIn, Function):
+    """see http://www.w3.org/2006/xpath-functions#upper-case"""
+
+    def evaluateObject(self, subj_py):
+        return subj_py.upper()
+
+
+class BI_lower_case(LightBuiltIn, Function):
+    """see http://www.w3.org/2006/xpath-functions#lower-case"""
+
+    def evaluateObject(self, subj_py):
+        return subj_py.lower()
+
+
+class BI_translate(LightBuiltIn, Function):
+    """see http://www.w3.org/2006/xpath-functions#lower-case"""
+
+    def evaluateObject(self, subj_py):
+        if len(subj_py) != 3:
+            raise Error
+        arg = subj_py[0]
+        mapString = subj_py[1]
+        transString = subj_py[2]
+        if len(transString) < len(mapString):
+            maxlen = len(transString)
+        else:
+            maxlen = len(mapString)
+        table = string.maketrans(mapString[:maxlen], transString[:maxlen])
+        return arg.translate(table, mapString[maxlen:])
+
+
+class BI_encode_for_uri(LightBuiltIn, Function, ReverseFunction):
+    """see http://www.w3.org/2006/xpath-functions#encode-for-uri"""
+
+    def evaluateObject(self, subj_py):
+        return uripath.canonical(subj_py)
+    
+    def evaluateSubject(self, obj_py):
+        return urllib.unquote(obj_py)
+
+
+class BI_iri_to_uri(LightBuiltIn, Function):
+    """see http://www.w3.org/2006/xpath-functions#iri-to-uri"""
+
+    def evaluateObject(self, subj_py):
+        return uripath.canonical(subj_py)
+
+
+class BI_escape_html_uri(LightBuiltIn, Function):
+    """see http://www.w3.org/2006/xpath-functions#escape-html-uri"""
+
+    # TODO: Fix me
+    unescape_re = re.compile('%20')
+
+    def evaluateObject(self, subj_py):
+        return unescape_re.sub(' ', uripath.canonical(subj_py))
+
+
+class BI_substring_before(LightBuiltIn, Function):
+    """see http://www.w3.org/2006/xpath-functions#substring-before"""
+    
+    def evaluateObject(self, subj_py):
+        if len(subj_py) != 2:
+            raise Error
+        arg1 = subj_py[0]
+        arg2 = subj_py[1]
+        if arg1.find(arg2) >= 0:
+            return arg1[:arg1.find(arg2)]
+        else:
+            return ""
+
+
+class BI_substring_after(LightBuiltIn, Function):
+    """see http://www.w3.org/2006/xpath-functions#substring-after"""
+    
+    def evaluateObject(self, subj_py):
+        if len(subj_py) != 2:
+            raise Error
+        arg1 = subj_py[0]
+        arg2 = subj_py[1]
+        if arg1.find(arg2) >= 0:
+            return arg1[arg1.find(arg2) + len(arg2):]
+        else:
+            return ""
+
+
+class BI_replace(LightBuiltIn, Function):
+    """see http://www.w3.org/2006/xpath-functions#replace"""
+    
+    def evaluateObject(self, subj_py):
+        if len(subj_py) != 3:
+            raise Error
+        input = subj_py[0]
+        pattern = subj_py[1]
+        replacement = subj_py[2]
+        return (re.compile(pattern).replace(input, replacement))
+
 
 #  Register the string built-ins with the store
 
@@ -343,4 +568,26 @@ def register(store):
     fn.internFrag("resolve-uri", BI_resolve_uri)
     fn.internFrag("tokenize", BI_tokenize)
     fn.internFrag("normalize-space", BI_normalize_space)
+    fn.internFrag("codepoints-to-string", BI_codepoints_to_string)
+    fn.internFrag("string-to-codepoints", BI_string_to_codepoints)
+    fn.internFrag("compare", BI_compare)
+    fn.internFrag("codepoint-equal", BI_codepoint_equal)
+    fn.internFrag("concat", BI_concatenation)
+    fn.internFrag("string-join", BI_string_join)
+    fn.internFrag("substring", BI_substring)
+    fn.internFrag("string-length", BI_string_length)
+    fn.internFrag("normalize-unicode", BI_normalize_unicode)
+    fn.internFrag("upper-case", BI_upper_case)
+    fn.internFrag("lower-case", BI_lower_case)
+    fn.internFrag("translate", BI_translate)
+    fn.internFrag("encode-for-uri", BI_encodeForURI)
+    fn.internFrag("iri-to-uri", BI_iri_to_uri)
+    fn.internFrag("escape-html-uri", BI_escape_html_uri)
+    fn.internFrag("contains", BI_Contains)
+    fn.internFrag("starts-with", BI_StartsWith)
+    fn.internFrag("ends-with", BI_EndsWith)
+    fn.internFrag("substring-before", BI_substring_before)
+    fn.internFrag("substring-after", BI_substring_after)
+    fn.internFrag("matches", BI_matches)
+    fn.internFrag("replace", BI_replace)
 

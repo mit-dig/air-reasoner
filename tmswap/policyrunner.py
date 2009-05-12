@@ -644,7 +644,7 @@ much how the rule was represented in the rdf network
             try:
                 goal_subruleNode = F.the(subj=node, pred=p['goal-rule'])
                 if goal_subruleNode is not None:
-                    goal_subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, goal_subruleNode, vars=vars, base=base))
+                    goal_subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, goal_subruleNode, goal=True, vars=vars, base=base))
             except AssertionError:
                 raise ValueError('%s has too many goal-rules in an air:then, being all of %s'
                                  % (ruleNode, F.each(subj=node, pred=p['goal-rule'])))
