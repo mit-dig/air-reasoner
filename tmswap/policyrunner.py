@@ -459,7 +459,8 @@ much how the rule was represented in the rdf network
     
     def __init__(self, eventLoop, tms, vars, label,
                  pattern, result, alt, sourceNode,
-                 goal=False, matchName=None, base=False, generated=False):
+                 goal=False, matchName=None, base=False, ellipsis=False,
+                 generated=False):
         self.generatedLabel = False
         if label is None or label=='None':
             self.generatedLabel = True
@@ -484,7 +485,8 @@ much how the rule was represented in the rdf network
         self.sourceNode = sourceNode
         self.generated = generated
         self.isBase = base
-        if base:
+        self.isEllipsis = ellipsis
+        if base or ellipsis:
             self.baseRules.add(sourceNode)
         if debugLevel > 15:        
             print '''just made a rule, with
@@ -564,7 +566,7 @@ much how the rule was represented in the rdf network
             label = self.label
         return self.__class__(self.eventLoop, self.tms, self.vars,
                               label, pattern, result, alt, self.sourceNode,
-                              self.goal, self.matchName, base=self.isBase, generated=True)
+                              self.goal, self.matchName, base=self.isBase, ellipsis=self.isEllipsis, generated=True)
 
     @classmethod
     def compileFromTriples(cls, eventLoop, tms, F, ruleNode, goal=False, vars=frozenset(), base=False):
@@ -600,8 +602,10 @@ much how the rule was represented in the rdf network
         if pattern is None:
             raise ValueError('%s must have an air:if clause. You did not give it one' % (ruleNode,))
         
-        # Is the rule an air:Trivial-rule?
-        base = base or (F.contains(subj=ruleNode, pred=F.store.type, obj=p['Trivial-rule']) == 1)
+        # Is the rule an air:Hidden-rule?
+        base = base or (F.contains(subj=ruleNode, pred=F.store.type, obj=p['Hidden-rule']) == 1)
+        # air:Ellipsed-rule?
+        ellipsis = (F.contains(subj=ruleNode, pred=F.store.type, obj=p['Ellipsed-rule']) == 1)
 #        descriptions = list(F.each(subj=node, pred=p['description']))
 
         # Collect all air:then or air:else actions...
@@ -738,7 +742,7 @@ much how the rule was represented in the rdf network
             try:
                 goal_subruleNode = F.the(subj=node, pred=p['goal-rule'])
                 if goal_subruleNode is not None:
-                    goal_subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, goal_subruleNode, vars=vars, base=base))
+                    goal_subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, goal_subruleNode, goal=True, vars=vars, base=base))
             except AssertionError:
                 raise ValueError('%s has too many goal-rules in an air:else, being all of %s'
                                  % (ruleNode, F.each(subj=node, pred=p['goal-rule'])))
@@ -782,7 +786,7 @@ much how the rule was represented in the rdf network
             justNode = F.the(subj=assertion, pred=p['justification'])
             if justNode is not None:
                 antecedents = frozenset(F.each(subj=justNode, pred=p['antecedent']))
-            rule_id = F.the(subj=justNode, pred=p['rule-id'])
+            rule_id = F.the(subj=justNode, pred=p['rule-id'])###here
             
             if justNode is not None and rule_id is not None:
                 assertionObjs.append(SubstitutingTuple(
@@ -803,7 +807,7 @@ much how the rule was represented in the rdf network
                    resultList[0],
 #                   descriptions=descriptions,
                    alt=resultList[1],# altDescriptions=altDescriptions,
-                   goal=goal, matchName=matchedGraph, sourceNode=node, base=base)
+                   goal=goal, matchName=matchedGraph, sourceNode=node, base=base, ellipsis=ellipsis)
         return self
 
     @classmethod
@@ -821,7 +825,8 @@ much how the rule was represented in the rdf network
                    goal=False,
                    matchName=None,
                    sourceNode=pattern,
-                   base=True)
+                   base=True,
+                   ellipsis=False)
         return self
 
 
