@@ -569,7 +569,7 @@ much how the rule was represented in the rdf network
                               self.goal, self.matchName, base=self.isBase, ellipsis=self.isEllipsis, generated=True)
 
     @classmethod
-    def compileFromTriples(cls, eventLoop, tms, F, ruleNode, goal=False, vars=frozenset(), base=False):
+    def compileFromTriples(cls, eventLoop, tms, F, ruleNode, goal=False, vars=frozenset(), preboundVars=frozenset(), base=False):
         assert tms is not None
         rdfs = F.newSymbol('http://www.w3.org/2000/01/rdf-schema')
         rdf = F.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
@@ -578,6 +578,8 @@ much how the rule was represented in the rdf network
 #        vars = vars.union(F.each(subj=node, pred=p['variable']))
         # Find the variables in this rule.
         vars = vars.union(F.universals())
+        varBinding = len(vars - preboundVars) > 0
+        preboundVars = preboundVars.union(F.universals())
 
         realNode = ruleNode
         nodes = [realNode]
@@ -585,6 +587,9 @@ much how the rule was represented in the rdf network
         # Get the air:then and air:else nodes.
         thenNodes = F.each(subj=ruleNode, pred=p['then'])
         elseNodes = F.each(subj=ruleNode, pred=p['else'])
+        if varBinding and len(elseNodes) > 0:
+            raise ValueError('%s has an air:else clause even though a variable is bound in its air:if, which is unsupported (did you mean to use @forSome instead of @forAll?)'
+                             % (ruleNode))
 #        if altNode:
 #            nodes.append(altNode)
 #            altDescriptions = list(F.each(subj=altNode, pred=p['description']))
@@ -635,7 +640,7 @@ much how the rule was represented in the rdf network
             try:
                 subruleNode = F.the(subj=node, pred=p['rule'])
                 if subruleNode is not None:
-                    subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, subruleNode, vars=vars, base=base))
+                    subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, subruleNode, vars=vars, preboundVars=preboundVars, base=base))
             except AssertionError:
                 raise ValueError('%s has too many rules in an air:then, being all of %s'
                                  % (ruleNode, F.each(subj=node, pred=p['rule'])))
@@ -648,7 +653,7 @@ much how the rule was represented in the rdf network
             try:
                 goal_subruleNode = F.the(subj=node, pred=p['goal-rule'])
                 if goal_subruleNode is not None:
-                    goal_subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, goal_subruleNode, goal=True, vars=vars, base=base))
+                    goal_subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, goal_subruleNode, goal=True, vars=vars, preboundVars=preboundVars, base=base))
             except AssertionError:
                 raise ValueError('%s has too many goal-rules in an air:then, being all of %s'
                                  % (ruleNode, F.each(subj=node, pred=p['goal-rule'])))
@@ -729,7 +734,7 @@ much how the rule was represented in the rdf network
             try:
                 subruleNode = F.the(subj=node, pred=p['rule'])
                 if subruleNode is not None:
-                    subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, subruleNode, vars=vars, base=base))
+                    subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, subruleNode, vars=vars, preboundVars=preboundVars, base=base))
             except AssertionError:
                 raise ValueError('%s has too many rules in an air:else, being all of %s'
                                  % (ruleNode, F.each(subj=node, pred=p['rule'])))
@@ -742,7 +747,7 @@ much how the rule was represented in the rdf network
             try:
                 goal_subruleNode = F.the(subj=node, pred=p['goal-rule'])
                 if goal_subruleNode is not None:
-                    goal_subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, goal_subruleNode, goal=True, vars=vars, base=base))
+                    goal_subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, goal_subruleNode, goal=True, vars=vars, preboundVars=preboundVars, base=base))
             except AssertionError:
                 raise ValueError('%s has too many goal-rules in an air:else, being all of %s'
                                  % (ruleNode, F.each(subj=node, pred=p['goal-rule'])))
