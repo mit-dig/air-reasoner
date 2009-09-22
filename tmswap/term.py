@@ -43,6 +43,7 @@ from RDFSink import CONTEXT, PRED, SUBJ, OBJ, PARTS, ALL4
 from RDFSink import FORMULA, LITERAL, LITERAL_LANG, LITERAL_DT, ANONYMOUS, \
                             SYMBOL, RDF_type_URI
 from RDFSink import Logic_NS
+from RDFSink import N3_first, N3_rest, N3_nil
 
 from OrderedSequence import merge, intersection, minus
 
@@ -1833,6 +1834,83 @@ class FiniteProperty(GenericBuiltIn, Function, ReverseFunction):
         for s, o in self.ennum():
             if s is subj: return o
         return (subj, obj) in self.ennum()
+
+
+# Added hacks for executing list built-ins with context.
+# TODO: Move this into list recognition, Include context with output.
+
+class ListBuiltIn:
+    """Demarcates a list built-in.  This is a horrible hack to signify to
+    the reasoner to do pre-processing on the inputs to listify them,
+    because we can't do so.  Ideally, this should be refactored so
+    that builtins execute in a context given by the formula it's in,
+    which we currently don't do."""
+    pass
+
+def isNonEmptyListTerm(term, context):
+    """Returns whether or not a term may be coerced into a NonEmptyList
+    via inspection of the term's store."""
+    if isinstance(term, List):
+        # TODO: Hmm, this happens in the db:lives-attributes example.
+        return True
+    elif not isinstance(term, Node):
+        return False
+    else:
+        first = term.store.intern(N3_first)
+        rest = term.store.intern(N3_rest)
+        
+        print term, context
+        this = context.statementsMatching(first, term, None)
+        if len(this) != 1:
+            print len(this)
+            return False
+        
+        next = context.statementsMatching(rest, term, None)
+        if len(next) != 1:
+            return False
+        elif next[0][OBJ] == term.store.nil:
+            return True
+        else:
+            return isNonEmptyListTerm(next[0][OBJ], context)
+
+def listify(term, context, l=[]):
+    """Coerces a term into the List object represented by the term.
+    
+    Throws an exception if the term cannot be coerced."""
+    if isinstance(term, List):
+        l += term.value()
+        l.reverse()
+        
+        n3l = term.store.nil
+        
+        for term in l:
+            n3l = n3l.prepend(term)
+        
+        return n3l
+    elif not isinstance(term, Node):
+        raise ValueError("Term `%s` is not an rdf:List" % (`term`))
+    else:
+        first = term.store.intern(N3_first)
+        rest = term.store.intern(N3_rest)
+        
+        this = context.statementsMatching(first, term, None)
+        if len(this) != 1:
+            raise ValueError("Term `%s` is not an rdf:List" % (`term`))
+        
+        next = context.statementsMatching(rest, term, None)
+        if len(next) != 1:
+            raise ValueError("Term `%s` is not an rdf:List" % (`term`))
+        elif next[0][OBJ] == term.store.nil:
+            # Finish by building the actual NonEmptyList.
+            n3l = term.store.nil
+            
+            l.reverse()
+            for term in l:
+                n3l = n3l.prepend(term)
+            
+            return n3l
+        else:
+            return listify(next[0][OBJ], context, l + [this[0][OBJ]])
 
 
 #  For examples of use, see, for example, cwm_*.py

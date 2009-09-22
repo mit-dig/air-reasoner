@@ -15,8 +15,9 @@ WKD = weakref.WeakKeyDictionary
 from collections import deque
 import itertools
 
-from term import unify, Env, BuiltIn, Function, ReverseFunction, MultipleFunction, MultipleReverseFunction
+from term import unify, Env, BuiltIn, Function, ReverseFunction, MultipleFunction, MultipleReverseFunction, ListBuiltIn, listify, isNonEmptyListTerm
 from formula import Formula, StoredStatement, WME
+from query import think as cwmThink
 
 import operator
 
@@ -25,8 +26,8 @@ VAR_PLACEHOLDER = object()
 
 fullUnify = False
 
-def compilePattern(index, patterns, vars, buildGoals=False, goalPatterns=False,
-                   supportBuiltin=None):
+def compilePattern(index, patterns, vars, context, buildGoals=False,
+                   goalPatterns=False, supportBuiltin=None):
     """Compile the RETE network for a given set of patterns and return the
     'goal' node."""
     # Start with an empty root node...
@@ -34,7 +35,7 @@ def compilePattern(index, patterns, vars, buildGoals=False, goalPatterns=False,
     for pattern in sortPatterns(patterns, vars):
         # And for each pattern in order, build the alpha filter, join
         # node, and beta memory.
-        alpha = AlphaFilter.build(index, pattern, vars,
+        alpha = AlphaFilter.build(index, pattern, vars, context,
                                   supportBuiltin=supportBuiltin)
         current = JoinNode(current, alpha, buildGoals)
         current = BetaMemory(current)
@@ -234,12 +235,14 @@ class AlphaFilter(AlphaMemory):
     """An alphaFilter connects an alpha node to a join node. It has the full pattern, and
 generates variable bindings
 """
-    def __init__(self, pattern, vars, index, parents, supportBuiltin):
+    def __init__(self, pattern, vars, context, index, parents,
+                 supportBuiltin):
         self.index = index
         self.penalty = 10
         self.parents = parents
         self.pattern = pattern
         self.supportBuiltin = supportBuiltin
+        self.context = context
         freeVariables = vars
         def findExistentials(x):
             if hasattr(x, 'spo'):
@@ -311,13 +314,14 @@ generates variable bindings
                 self.add(TripleWithBinding(s, env))
 
     @classmethod
-    def build(cls, index, pattern, vars, supportBuiltin):
-        secondaryAlpha = cls.construct(index, pattern, vars, supportBuiltin)
+    def build(cls, index, pattern, vars, context, supportBuiltin):
+        secondaryAlpha = cls.construct(index, pattern, vars, context,
+                                       supportBuiltin)
         secondaryAlpha.initialize()
         return secondaryAlpha
 
     @classmethod
-    def construct(cls, index, pattern, vars, supportBuiltin):
+    def construct(cls, index, pattern, vars, context, supportBuiltin):
         def replaceWithNil(x):
             if isinstance(x, Formula) or x.occurringIn(vars):
                 return None
@@ -327,7 +331,8 @@ generates variable bindings
                                                          pattern.object()))
 
         parents = []
-        secondaryAlpha = cls(pattern, vars, index, parents, supportBuiltin)
+        secondaryAlpha = cls(pattern, vars, context, index, parents,
+                             supportBuiltin)
         p, s, o = masterPatternTuple
         V = VAR_PLACEHOLDER
         pts = [(p, s, o)]
@@ -355,11 +360,32 @@ generates variable bindings
         assert self.initialized
         builtInMade = []
         if isinstance(self.pattern.predicate(), BuiltIn) and self.pattern.predicate() != self.pattern.predicate().store.sameAs:
-            if self.pattern.predicate() is self.pattern.context().store.includes:
+            if self.pattern.predicate() is self.pattern.context().store.supports:
+                # We also need to support the air:supports predicate
+                # as well, but that's handled differently, as we need
+                # to instantiate another AIR reasoner rather than an
+                # N3Logic reasoner.
+                knowledgeBase = self.pattern.context().store.newFormula()
+                knowledgeBase.loadFormulaWithSubstitution(self.pattern.subject(), env)
+                # TODO: think over a new formula, not the old one, so that the output is not modified.
+                cwmThink(knowledgeBase)
+                knowledgeBase.close()
+                node = compilePattern(knowledgeBase._index, self.pattern.object().statements, self.vars, self.context)
+                def onSuccess((triples, environment, penalty)):
+                    newAssumption = self.pattern.substitution(environment.asDict())
+                    #somebodyPleaseAssertFromBuiltin(self.pattern.predicate(), newAssumption)
+                    
+                    builtInMade.append(TripleWithBinding(newAssumption, environment))
+                    self.supportBuiltin(builtInMade[-1].triple)
+                def onFailure():
+                    # Do nothing.
+                    pass
+                prod = ProductionNode(node, onSuccess, onFailure)
+            elif self.pattern.predicate() is self.pattern.context().store.includes:
                 # log:includes references the (Indexed)Formula in the
                 # subject and checks it for a pattern match.
                 newIndex = self.pattern.substitution(env).subject()._index
-                node = compilePattern(newIndex, self.pattern.object().statements, self.vars)
+                node = compilePattern(newIndex, self.pattern.object().statements, self.vars, self.context)
                 def onSuccess((triples, environment, penalty)):
                     newAssumption = self.pattern.substitution(environment.asDict())
                     #somebodyPleaseAssertFromBuiltin(self.pattern.predicate(), newAssumption)
@@ -390,7 +416,14 @@ generates variable bindings
             elif self.pattern.predicateActsAs(self.pattern.freeVariables(),
                                               set(env.keys())) == Function:
                 matchedPat = self.pattern.substitution(env)
-                object = self.pattern.predicate().evalObj(matchedPat.subject(), None, None, None, None)
+                # Need to listify anything that is a term that
+                # resolves to a list for list builtins to work (since
+                # they don't execute with context)
+                if isinstance(self.pattern.predicate(), ListBuiltIn) and isNonEmptyListTerm(matchedPat.subject(), self.context):
+                    subject = listify(matchedPat.subject(), self.context)
+                else:
+                    subject = matchedPat.subject()
+                object = self.pattern.predicate().evalObj(subject, None, None, None, None)
                 if object is not None:
                     for binds, environment in unify(self.pattern.object(), object, vars = self.vars):
                         builtInMade.append(TripleWithBinding(matchedPat.substitution(binds), environment.flatten(binds)))
@@ -400,7 +433,11 @@ generates variable bindings
                 # Each item of the possible objects needs to be
                 # returned as a separate triple matching.
                 matchedPat = self.pattern.substitution(env)
-                for object in self.pattern.predicate().evalObj(matchedPat.subject(), None, None, None, None):
+                if isinstance(self.pattern.predicate(), ListBuiltIn) and isNonEmptyListTerm(matchedPat.subject(), self.context):
+                    subject = listify(matchedPat.subject(), self.context)
+                else:
+                    subject = matchedPat.subject()
+                for object in self.pattern.predicate().evalObj(subject, None, None, None, None):
                     for binds, environment in unify(self.pattern.object(), object, vars = self.vars):
                         builtInMade.append(TripleWithBinding(matchedPat.substitution(binds), environment.flatten(binds)))
                         self.supportBuiltin(builtInMade[-1].triple)
@@ -409,7 +446,11 @@ generates variable bindings
                 # If we're acting as a ReverseFunction, bind the
                 # result of the reverse function to the subject.
                 matchedPat = self.pattern.substitution(env)
-                subject = self.pattern.predicate().evalSubj(matchedPat.object(), None, None, None, None)
+                if isinstance(self.pattern.predicate(), ListBuiltIn) and isNonEmptyListTerm(matchedPat.object(), self.context):
+                    object = listify(matchedPat.object(), self.context)
+                else:
+                    object = matchedPat.object()
+                subject = self.pattern.predicate().evalSubj(object, None, None, None, None)
                 if subject is not None:
                     for binds, environment in unify(self.pattern.subject(), subject, vars = self.vars):
                         builtInMade.append(TripleWithBinding(matchedPat.substitution(binds), environment.flatten(binds)))
@@ -419,7 +460,11 @@ generates variable bindings
                 # Each item of the possible subjects needs to be
                 # returned as a separate triple matching.
                 matchedPat = self.pattern.substitution(env)
-                for subject in self.pattern.predicate().evalSubj(matchedPat.object(), None, None, None, None):
+                if isinstance(self.pattern.predicate(), ListBuiltIn) and isNonEmptyListTerm(matchedPat.object(), self.context):
+                    object = listify(matchedPat.object(), self.context)
+                else:
+                    object = matchedPat.object()
+                for subject in self.pattern.predicate().evalSubj(object, None, None, None, None):
                     for binds, environment in unify(self.pattern.subject(), subject, vars = self.vars):
                         builtInMade.append(TripleWithBinding(matchedPat.substitution(binds), environment.flatten(binds)))
                         self.supportBuiltin(builtInMade[-1].triple)
@@ -428,8 +473,15 @@ generates variable bindings
                 # If we're acting as a ReverseFunction, bind the
                 # result of the reverse function to the subject.
                 matchedPat = self.pattern.substitution(env)
-                if matchedPat.predicate().eval(matchedPat.subject(),
-                                               matchedPat.object(),
+                if isinstance(self.pattern.predicate(), ListBuiltIn) and isNonEmptyListTerm(matchedPat.subject(), self.context):
+                    subject = listify(matchedPat.subject(), self.context)
+                else:
+                    subject = matchedPat.subject()
+                if isinstance(self.pattern.predicate(), ListBuiltIn) and isNonEmptyListTerm(matchedPat.object(), self.context):
+                    object = listify(matchedPat.object(), self.context)
+                else:
+                    object = matchedPat.object()
+                if matchedPat.predicate().eval(subject, object,
                                                None, None, None, None):
                     builtInMade.append(TripleWithBinding(matchedPat, env))
                     self.supportBuiltin(builtInMade[-1].triple)

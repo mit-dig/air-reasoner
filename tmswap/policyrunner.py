@@ -458,7 +458,7 @@ much how the rule was represented in the rdf network
     baseRules = set()
     
     def __init__(self, eventLoop, tms, vars, label,
-                 pattern, result, alt, sourceNode,
+                 pattern, contextFormula, result, alt, sourceNode,
                  goal=False, matchName=None, base=False, ellipsis=False,
                  generated=False):
         self.generatedLabel = False
@@ -475,6 +475,7 @@ much how the rule was represented in the rdf network
         self.vars = vars | pattern.existentials()
         self.pattern = pattern
         self.patternToCompare = frozenset([x.spo() for x in pattern])
+        self.contextFormula = contextFormula
         self.result = result
 #        self.descriptions = descriptions
         self.alt = alt
@@ -534,7 +535,7 @@ much how the rule was represented in the rdf network
                     (s, p, o), newVars = canonicalizeVariables(triple, self.vars)
                     self.eventLoop.add(AuxTripleJustifier(self.tms, GOAL, s, p, o, newVars, self.sourceNode, [self.tms.getThing(self)]))
         index = workingContext._index
-        bottomBeta = MM.compilePattern(index, patterns, self.vars, buildGoals=False, goalPatterns=self.goal, supportBuiltin=self.addTriple)
+        bottomBeta = MM.compilePattern(index, patterns, self.vars, self.contextFormula, buildGoals=False, goalPatterns=self.goal, supportBuiltin=self.addTriple)
         trueBottom =  MM.ProductionNode(bottomBeta, self.onSuccess, self.onFailure)
         return trueBottom
 
@@ -565,8 +566,8 @@ much how the rule was represented in the rdf network
         else:
             label = self.label
         return self.__class__(self.eventLoop, self.tms, self.vars,
-                              label, pattern, result, alt, self.sourceNode,
-                              self.goal, self.matchName, base=self.isBase, ellipsis=self.isEllipsis, generated=True)
+                              label, pattern, self.contextFormula, result, alt,
+                              self.sourceNode, self.goal, self.matchName, base=self.isBase, ellipsis=self.isEllipsis, generated=True)
 
     @classmethod
     def compileFromTriples(cls, eventLoop, tms, F, ruleNode, goal=False, vars=frozenset(), preboundVars=frozenset(), base=False):
@@ -809,6 +810,7 @@ much how the rule was represented in the rdf network
         self = cls(eventLoop, tms,
                    vars, unicode(label),
                    pattern,
+                   F,
                    resultList[0],
 #                   descriptions=descriptions,
                    alt=resultList[1],# altDescriptions=altDescriptions,
