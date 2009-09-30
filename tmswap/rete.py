@@ -162,13 +162,6 @@ def sortPatterns(patterns, vars):
 
     return list(getTopologically())
 
-class BI_airJustifies(HeavyBuiltIn):
-    """A more managable version of air:supports
-The real version of this should appear in query.py
-    """
-    def eval(self, subj, obj, queue, bindings, proof, query):
-        pass
-
 ### end builtins
 
 class BogusTripleError(RuntimeError):
