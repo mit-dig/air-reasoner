@@ -1201,6 +1201,13 @@ The real version of this should appear in query.py
     def eval(self, subj, obj, queue, bindings, proof, query):
         pass
 
+class BI_airJustifies(HeavyBuiltIn):
+    """A more managable version of air:justifies
+The real version of this should appear in rete.py (i.e. this won't run in cwm mode!)
+    """
+    def eval(self, subj, obj, queue, bindings, proof, query):
+        pass
+
 class BI_filter(LightBuiltIn, Function):
     """Filtering of formulae
 
@@ -1496,6 +1503,10 @@ class RDFStore(RDFSink) :
         self.Empty = self.intern(N3_Empty)
         self.li = self.intern(N3_li)
         self.List = self.intern(N3_List)
+        
+        # Shim in air:justifies (hmm)
+        air = self.symbol("http://dig.csail.mit.edu/TAMI/2007/amord/air")
+        self.airJustifies = air.internFrag("justifies", BI_airJustifies)
 
         import cwm_string  # String builtins
         import cwm_os      # OS builtins

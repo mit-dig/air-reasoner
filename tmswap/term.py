@@ -158,7 +158,9 @@ class Env(dict):
                 retVal[key] = (other.substitution(val, self), self.id)
             else:
                 retVal[key] = (val, source)
-        retVal = self.__class__(retVal)
+        # Unclear why keywords needs to be explicitly {} here, but
+        # sometimes it's already set???
+        retVal = self.__class__(retVal, keywords={})
         retVal.id = self.id
 #        progress(lambda : '... returns %s' % retVal)
         return retVal

@@ -24,6 +24,8 @@ import operator
 from py25 import dequeRemove
 VAR_PLACEHOLDER = object()
 
+Air_NS = 'http://dig.csail.mit.edu/TAMI/2007/amord/air#'
+
 fullUnify = False
 
 def compilePattern(index, patterns, vars, context, buildGoals=False,
@@ -159,6 +161,13 @@ def sortPatterns(patterns, vars):
             raise CyclicError, "You've got a cyclic dependency in your rule, buddy!"
 
     return list(getTopologically())
+
+class BI_airJustifies(HeavyBuiltIn):
+    """A more managable version of air:supports
+The real version of this should appear in query.py
+    """
+    def eval(self, subj, obj, queue, bindings, proof, query):
+        pass
 
 ### end builtins
 
@@ -360,6 +369,7 @@ generates variable bindings
         assert self.initialized
         builtInMade = []
         if isinstance(self.pattern.predicate(), BuiltIn) and self.pattern.predicate() != self.pattern.predicate().store.sameAs:
+            # TODO: log:conclusion, air:conclusion
             if self.pattern.predicate() is self.pattern.context().store.supports:
                 # We also need to support the air:supports predicate
                 # as well, but that's handled differently, as we need
@@ -367,10 +377,28 @@ generates variable bindings
                 # N3Logic reasoner.
                 knowledgeBase = self.pattern.context().store.newFormula()
                 knowledgeBase.loadFormulaWithSubstitution(self.pattern.subject(), env)
-                # TODO: think over a new formula, not the old one, so that the output is not modified.
+                # Think over a new formula, not the old one, so that the output is not modified.
                 cwmThink(knowledgeBase)
                 knowledgeBase.close()
                 node = compilePattern(knowledgeBase._index, self.pattern.object().statements, self.vars, self.context)
+                def onSuccess((triples, environment, penalty)):
+                    newAssumption = self.pattern.substitution(environment.asDict())
+                    #somebodyPleaseAssertFromBuiltin(self.pattern.predicate(), newAssumption)
+                    
+                    builtInMade.append(TripleWithBinding(newAssumption, environment))
+                    self.supportBuiltin(builtInMade[-1].triple)
+                def onFailure():
+                    # Do nothing.
+                    pass
+                prod = ProductionNode(node, onSuccess, onFailure)
+            elif self.pattern.predicate() is self.pattern.context().store.airJustifies:
+                from policyrunner import runPolicy as airThink
+                subject = self.pattern.substitution(env).subject()
+                # HACK! I don't know what base URI these really are!
+                logs = subject[0]
+                rules = subject[1]
+                f, workingContext = airThink([], [], logFormulaObjs=logs, ruleFormulaObjs=rules, store=self.pattern.context().store)
+                node = compilePattern(workingContext._index, self.pattern.object().statements, self.vars, self.context)
                 def onSuccess((triples, environment, penalty)):
                     newAssumption = self.pattern.substitution(environment.asDict())
                     #somebodyPleaseAssertFromBuiltin(self.pattern.predicate(), newAssumption)

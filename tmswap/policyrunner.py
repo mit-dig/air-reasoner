@@ -952,6 +952,16 @@ def parseN3(store, f, string):
     return f
 
 
+def loadFactFormulaObj(formulaTMS, f, closureMode=""):
+    if loadFactFormula.pClosureMode:
+        closureMode += "p"
+    fCopy = store.newFormula()
+    fCopy.setClosureMode(closureMode)
+    fCopy.loadFormulaWithSubstitution(f, Env())
+    formulaTMS.getThing(fCopy).assume()
+    formulaTMS.assumedStrings.append(formulaTMS.workingContext.newLiteral(f.n3String(), dt=n3NS))
+    return fCopy
+
 
 def loadFactN3(formulaTMS, string, closureMode=""):
     if loadFactFormula.pClosureMode:
@@ -982,7 +992,7 @@ def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterPro
     trace, result = runPolicy(logURIs, policyURIs, logFormula=logFormula, ruleFormula=ruleFormula, filterProperties=filterProperties)
     return trace.n3String()
 
-def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with']):
+def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with'], logFormulaObjs=[], ruleFormulaObjs=[], store=store):
     global baseFactsURI, baseRulesURI
     if OFFLINE[0]:
         baseFactsURI = uripath.join(uripath.base(),
@@ -1005,6 +1015,8 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
         logFormulae.append(loadFactN3(formulaTMS, logFormula, ""))
     for logURI in logURIs:
         logFormulae.append(loadFactFormula(formulaTMS, logURI, "")) # should it be "p"?
+    for logFormulaObj in logFormulaObjs:
+        logFormulae.append(loadFactFormulaObj(formulaTMS, logFormulaObj, ""))
 
     baseFactsFormula = loadFactFormula(formulaTMS, baseFactsURI)
 
@@ -1016,6 +1028,10 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
         policyFormulae.append(parseN3(store, store.newFormula(), ruleFormula))
     for policyURI in policyURIs:
         policyFormulae.append(store.load(policyURI))
+    for ruleFormulaObj in ruleFormulaObjs:
+        fCopy = store.newFormula()
+        fCopy.loadFormulaWithSubstitution(ruleFormulaObj, Env())
+        policyFormulae.append(fCopy)
     baseRulesFormula = store.load(baseRulesURI)
 
 #    rdfsRulesFormula = store.load('http://python-dlp.googlecode.com/files/pD-rules.n3')
