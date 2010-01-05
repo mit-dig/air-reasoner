@@ -1140,15 +1140,14 @@ knownScenarios = {
     'ucsd' : (['http://dig.csail.mit.edu/2008/Talks/0513-UCSD/simple/policy-explicit.n3'],
             ['http://dig.csail.mit.edu/2008/Talks/0513-UCSD/simple/data1.n3']),
     'arl1' : (['http://dig.csail.mit.edu/2008/ARL/log.n3'],
-                     ['http://dig.csail.mit.edu/2008/ARL/udhr-policy.n3']), 
+              ['http://dig.csail.mit.edu/2008/ARL/udhr-policy.n3']), 
     'arl2' : (['http://dig.csail.mit.edu/2008/ARL/log.n3'],
              ['http://dig.csail.mit.edu/2008/ARL/unresol-policy.n3']),
     'dhs' : (['http://dig.csail.mit.edu/2009/DHS-fusion/samples/request.n3'],
              ['http://dig.csail.mit.edu/2009/DHS-fusion/samples/uri-content.n3']),
     'dhs2' : (['http://dig.csail.mit.edu/2009/DHS-fusion/samples/request.n3'],
              ['http://dig.csail.mit.edu/2009/DHS-fusion/Mass/MGL_6-172/MGL_temp_1112.n3']),
-    'dhs3' : (['http://dig.csail.mit.edu/2009/DHS-fusion/samples/request.n3'],
-             ['../../2009/DHS-fusion/Mass/MGL_6-172/MGL_temp_1112.n3'])
+    'privacy' : (['http://dig.csail.mit.edu/2009/DHS-fusion/PrivacyAct/log.n3'], ['http://dig.csail.mit.edu/2009/DHS-fusion/PrivacyAct/policy.n3'])
 }
 
 def runScenario(s, others=[]):
