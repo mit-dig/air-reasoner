@@ -1143,7 +1143,12 @@ knownScenarios = {
                      ['http://dig.csail.mit.edu/2008/ARL/udhr-policy.n3']), 
     'arl2' : (['http://dig.csail.mit.edu/2008/ARL/log.n3'],
              ['http://dig.csail.mit.edu/2008/ARL/unresol-policy.n3']),
-
+    'dhs' : (['http://dig.csail.mit.edu/2009/DHS-fusion/samples/request.n3'],
+             ['http://dig.csail.mit.edu/2009/DHS-fusion/samples/uri-content.n3']),
+    'dhs2' : (['http://dig.csail.mit.edu/2009/DHS-fusion/samples/request.n3'],
+             ['http://dig.csail.mit.edu/2009/DHS-fusion/Mass/MGL_6-172/MGL_temp_1112.n3']),
+    'dhs3' : (['http://dig.csail.mit.edu/2009/DHS-fusion/samples/request.n3'],
+             ['../../2009/DHS-fusion/Mass/MGL_6-172/MGL_temp_1112.n3'])
 }
 
 def runScenario(s, others=[]):
