@@ -1239,7 +1239,7 @@ for the future, but may still be buggy.
         stats.sort_stats('time', 'cumulative', 'calls')
         stats.print_stats(60)
     else:
-        print call()
+        print call().encode("utf-8")
 
         
 
