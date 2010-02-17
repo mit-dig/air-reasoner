@@ -17,6 +17,10 @@ from RDFSink import RDFSink
 from set_importer import Set
 
 import uripath
+import urllib
+import urllib2
+import sys
+import StringIO
 
 from toXML import XMLWriter
 
@@ -199,6 +203,47 @@ class BI_query(LightBuiltIn, Function):
         if query.contains(obj=ns['SelectQuery']) or query.contains(obj=ns['AskQuery']):
             return self.store.newLiteral(sparql_output(query, F))
 
+# TODO: default-graph-uri??
+# TODO: Handle alternate SPARQL N3 representation
+# TODO: Go from SPARQL N3 -> SPARQL text
+class BI_queryEndpoint(LightBuiltIn, Function):
+    def evalObj(self, subj, queue, bindings, proof, query):
+        # Like sparql:query, except we send the request to a remote
+        # endpoint.
+        ns = self.store.newSymbol(SPARQL_NS)
+        assert isinstance(subj, List)
+        subj = [a for a in subj]
+        assert len(subj) == 2
+        source, query = subj
+        # Default-graph-uri?
+        source = source.uriref() + '?query=' + urllib.quote(str(query))
+        
+        def sparqlSemantics(subj):
+            oldstdin = sys.stdin
+            sys.stdin = subj
+            F = self.store.load(None, contentType="x-application/sparql")
+            sys.stdin = oldstdin
+            if diag.chatty_flag>10: progress("    semantics: %s" % (F))
+            if diag.tracking:
+                proof.append(F.collector)
+            return F.canonicalize()
+        
+        query = sparqlSemantics(StringIO.StringIO(query))
+        
+        if query.contains(obj=ns['ConstructQuery']):
+            F = self.store.load(source) # Load it from the SPARQL
+                                        # endpoint directly.
+            return F.canonicalize()
+        if query.contains(obj=ns['SelectQuery']) or query.contains(obj=ns['AskQuery']):
+            f = urllib2.urlopen(source)
+            res = f.read()
+            f.close()
+            return self.store.newLiteral(res)
+
+class BI_endpointContains(LightBuiltIn, Function):
+    def eval(self, subj, obj, queue, bindings, proof, query):
+        pass
+    
 def sparql_output(query, F):
     store = F.store
     RESULTS_NS = 'http://www.w3.org/2005/sparql-results#'
@@ -299,7 +344,7 @@ def sparql_queryString(source, queryString):
 ##    print 'result is ', F
 ##    print 'query is ', q.n3String()
     return outputString(q, F)
-    
+
 def outputString(q, F):
     store = q.store
     ns = store.newSymbol(SPARQL_NS)
@@ -346,3 +391,5 @@ def register(store):
     ns.internFrag('semantics', BI_semantics)
     ns.internFrag('dtLit', BI_dtLit)
     ns.internFrag('langLit', BI_langLit)
+    ns.internFrag('queryEndpoint', BI_queryEndpoint)
+#    ns.internFrag('endpointContains', BI_endpointContains)
