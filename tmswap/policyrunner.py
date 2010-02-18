@@ -1093,7 +1093,7 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
     print '  of which %s was after loading, and %s was actual reasoning' % (now-compileStartTime, now-eventStartTime)
 
 #    rete.printRete()
-    if len(filterProperties > 0):
+    if len(filterProperties) > 0:
         triples = list(reduce(lambda x, y: x + y, [workingContext.statementsMatching(pred=workingContext.newSymbol(property)) for property in filterProperties]))
     else:
         triples = workingContext.any()
