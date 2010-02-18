@@ -1096,7 +1096,7 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
     if len(filterProperties) > 0:
         triples = list(reduce(lambda x, y: x + y, [workingContext.statementsMatching(pred=workingContext.newSymbol(property)) for property in filterProperties]))
     else:
-        triples = workingContext.any()
+        triples = workingContext.statementsMatching()
     if triples:
         print 'I can prove the following compliance statements:'
     else:
