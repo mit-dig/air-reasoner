@@ -28,6 +28,8 @@ Air_NS = 'http://dig.csail.mit.edu/TAMI/2007/amord/air#'
 
 fullUnify = False
 
+OWL_RULES = 'http://dig.csail.mit.edu/TAMI/2007/amord/owl-rules.n3'
+
 def compilePattern(index, patterns, vars, context, buildGoals=False,
                    goalPatterns=False, supportBuiltin=None):
     """Compile the RETE network for a given set of patterns and return the
@@ -368,8 +370,37 @@ generates variable bindings
                 # as well, but that's handled differently, as we need
                 # to instantiate another AIR reasoner rather than an
                 # N3Logic reasoner.
+                subject = self.pattern.substitution(env).subject()
+                
                 knowledgeBase = self.pattern.context().store.newFormula()
-                knowledgeBase.loadFormulaWithSubstitution(self.pattern.subject(), env)
+                knowledgeBase.loadFormulaWithSubstitution(subject, env)
+                # Think over a new formula, not the old one, so that the output is not modified.
+                cwmThink(knowledgeBase)
+                knowledgeBase.close()
+                node = compilePattern(knowledgeBase._index, self.pattern.object().statements, self.vars, self.context)
+                def onSuccess((triples, environment, penalty)):
+                    newAssumption = self.pattern.substitution(environment.asDict())
+                    #somebodyPleaseAssertFromBuiltin(self.pattern.predicate(), newAssumption)
+                    
+                    builtInMade.append(TripleWithBinding(newAssumption, environment))
+                    self.supportBuiltin(builtInMade[-1].triple)
+                def onFailure():
+                    # Do nothing.
+                    pass
+                prod = ProductionNode(node, onSuccess, onFailure)
+            elif self.pattern.predicate() is self.pattern.context().store.owlEntails:
+                # We also need to support the air:supports predicate
+                # as well, but that's handled differently, as we need
+                # to instantiate another AIR reasoner rather than an
+                # N3Logic reasoner.
+                subject = self.pattern.substitution(env).subject()
+                
+                knowledgeBase = self.pattern.context().store.newFormula()
+                print subject
+                knowledgeBase.loadFormulaWithSubstitution(subject, env)
+                # Also load the OWL rules formula.
+                owlFormula = self.pattern.context().store.load(OWL_RULES)
+                knowledgeBase.loadFormulaWithSubstitution(owlFormula, env)
                 # Think over a new formula, not the old one, so that the output is not modified.
                 cwmThink(knowledgeBase)
                 knowledgeBase.close()

@@ -1208,6 +1208,13 @@ The real version of this should appear in rete.py (i.e. this won't run in cwm mo
     def eval(self, subj, obj, queue, bindings, proof, query):
         pass
 
+class BI_owlEntails(HeavyBuiltIn):
+    """A more managable version of log:owlEntails
+The real version of this should appear in rete.py (i.e. this won't run in cwm mode!)
+    """
+    def eval(self, subj, obj, queue, bindings, proof, query):
+        pass
+
 class BI_filter(LightBuiltIn, Function):
     """Filtering of formulae
 
@@ -1504,9 +1511,10 @@ class RDFStore(RDFSink) :
         self.li = self.intern(N3_li)
         self.List = self.intern(N3_List)
         
-        # Shim in air:justifies (hmm)
+        # Shim in air:justifies and air:owlEntails (hmm)
         air = self.symbol("http://dig.csail.mit.edu/TAMI/2007/amord/air")
         self.airJustifies = air.internFrag("justifies", BI_airJustifies)
+        self.owlEntails = air.internFrag("owlEntails", BI_owlEntails)
 
         import cwm_string  # String builtins
         import cwm_os      # OS builtins
