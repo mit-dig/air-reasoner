@@ -1093,13 +1093,10 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
     print '  of which %s was after loading, and %s was actual reasoning' % (now-compileStartTime, now-eventStartTime)
 
 #    rete.printRete()
-#    if len(filterProperties) > 0:
-    # TODO: This needs to be fixed to work when filterProperties is
-    # empty.  Only problem is that justifications aren't always
-    # provided for all reasoning output.
-    triples = list(reduce(lambda x, y: x + y, [workingContext.statementsMatching(pred=workingContext.newSymbol(property)) for property in filterProperties]))
-#    else:
-#        triples = workingContext.statementsMatching()
+    if len(filterProperties) > 0:
+        triples = list(reduce(lambda x, y: x + y, [workingContext.statementsMatching(pred=workingContext.newSymbol(property)) for property in filterProperties]))
+    else:
+        triples = workingContext.statements
     if triples:
         print 'I can prove the following compliance statements:'
     else:

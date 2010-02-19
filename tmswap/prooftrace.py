@@ -112,9 +112,14 @@ def simpleTraceOutput(tmsNodes, reasons, premises):
         if self in premises:
             retVal = True
             strings.append('%s [premise]' % self)
-        else:
+        elif self in reasons:
             retVal = reasons[self].evaluate(nf2)
             strings.append('%s <= %s(%s)' % (self, reasons[self].rule.uriref(), ', '.join([str(x) for x in reasons[self].expression.nodes()])))
+        else:
+            # Sometimes when not filtering, self may not be in
+            # premises or reasons (why???)
+            retVal = True
+            strings.append('%s [assuming to be premise]' % self)
         return retVal
     for tmsNode in tmsNodes:
         nf2(tmsNode)
@@ -210,7 +215,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
             elif self.assumed():
                 retVal = True
                 formula.add(termsFor[self], t['justification'], t['premise'])
-            else:
+            elif self in expressions:
                 retVal = expressions[self].evaluate(nf2)
                 antecedents = expressions[self].nodes()
                 rule = reasons[self].rule
@@ -227,6 +232,14 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                 assert formula.contains(subj=justTerm, pred=t['rule-name'], obj=rule)
                 formula.add(justTerm, t['antecedent-expr'], antecedentExpr)
     #            print 'adding (%s, %s, %s), (%s, %s, %s)' % (selfTerm, t['rule-name'], rule, selfTerm, t['antecedent-expr'], antecedentExpr)
+            else:
+                # We really shouldn't get here, but right now not
+                # having a filter means that we sometimes can.
+                retVal = True
+                if isinstance(termsFor[self], Formula):
+                    premiseFormula.loadFormulaWithSubstitution(termsFor[self])
+                else:
+                    formula.add(termsFor[self], t['justification'], t['premise'])
         else:
             retVal = False # it does not matter
         return retVal

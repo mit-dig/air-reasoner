@@ -396,7 +396,6 @@ generates variable bindings
                 subject = self.pattern.substitution(env).subject()
                 
                 knowledgeBase = self.pattern.context().store.newFormula()
-                print subject
                 knowledgeBase.loadFormulaWithSubstitution(subject, env)
                 # Also load the OWL rules formula.
                 owlFormula = self.pattern.context().store.load(OWL_RULES)
@@ -421,7 +420,7 @@ generates variable bindings
                 # HACK! I don't know what base URI these really are!
                 logs = subject[0]
                 rules = subject[1]
-                f, workingContext = airThink([], [], logFormulaObjs=logs, ruleFormulaObjs=rules, store=self.pattern.context().store)
+                f, workingContext = airThink([], [], logFormulaObjs=logs, ruleFormulaObjs=rules, filterProperties=[], store=self.pattern.context().store)
                 node = compilePattern(workingContext._index, self.pattern.object().statements, self.vars, self.context)
                 def onSuccess((triples, environment, penalty)):
                     newAssumption = self.pattern.substitution(environment.asDict())
