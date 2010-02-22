@@ -153,6 +153,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
     pmll = formula.newSymbol('http://www.example.com/pmllite')
     done = set()
     termsFor = {}
+    newTermsFor = {}
     expressions = removeBaseRules(reasons, premises, Rule.baseRules)
 ##    expressions = dict((node, reasons[node].expression)
 ##                       for node in reasons
@@ -160,12 +161,12 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
     for justification in reasons.values():
         termsFor[justification] = formula.newBlankNode()
 
-    def booleanExpressionToRDF(expr, node=None):
+    def booleanExpressionToRDF(expr):
         if expr in termsFor:
             return termsFor[expr]
-        if node is None:
-            node = formula.newBlankNode()
+        node = formula.newBlankNode()
         termsFor[expr] = node
+        newTermsFor[expr] = None
         formula.add(node, store.type, {tms.NotExpression: t['Not-justification'],
                                        tms.AndExpression: t['And-justification'],
                                        tms.OrExpression: t['Or-justification']}[expr.__class__])
@@ -178,13 +179,35 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                     newFormula.loadFormulaWithSubstitution(node2)
                 else:
                     formula.add(node, t['sub-expr'], node2)
+            formula.add(node, t['sub-expr'], newFormula.close())
+        else:
+            for arg in expr.args:
+                formula.add(node, t['sub-expr'], booleanExpressionToRDF(arg))
+        return node
+
+    def booleanExpressionToNewRDF(expr, node):
+        print "new rdf", expr, node
+        if expr in termsFor and expr not in newTermsFor:
+            return termsFor[expr]
+        elif expr in newTermsFor and newTermsFor[expr] is not None:
+            return newTermsFor[expr]
+        newTermsFor[expr] = node
+        formula.add(node, airj['branch'], {tms.NotExpression: air['else'],
+                                           tms.AndExpression: air['then'],
+                                           tms.OrExpression: t['Or-justification']}[expr.__class__])
+        if isinstance(expr, tms.AndExpression):
+            #We have a shorthand!
+            newFormula = formula.newFormula()
+            for arg in expr.args:
+                node2 = booleanExpressionToNewRDF(arg, store.newSymbol(store.genId()))
                 
                 # For now, shim in our dataDependency and air:rule.
                 if arg.dataEvent is not None:
                     formula.add(node, airj['dataDependency'], arg.dataEvent)
+                    # Eeh, I don't like this.
+                    formula.add(node, airj['flowDependency'], arg.dataEvent)
                 elif isinstance(arg.datum, Rule):
                     formula.add(node, air['rule'], node2)
-            formula.add(node, t['sub-expr'], newFormula.close())
         else:
             for arg in expr.args:
                 formula.add(node, t['sub-expr'], booleanExpressionToRDF(arg))
@@ -258,15 +281,18 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                 retVal = expressions[self].evaluate(nf2)
                 antecedents = expressions[self].nodes()
                 rule = reasons[self].rule
+                antecedentExpr = booleanExpressionToRDF(expressions[self])
                 selfTerm = termsFor[self]
                 justTerm = termsFor[reasons[self]]
                 
                 # Generate the event for this particular expression's
                 # final event.
                 selfEvent = store.newSymbol(store.genId())
+                formula.add(selfEvent, store.type, airj['RuleApplication'])
                 formula.add(selfEvent, pmll['outputdata'], selfTerm)
+                booleanExpressionToNewRDF(expressions[self], selfEvent)
                 
-                antecedentExpr = booleanExpressionToRDF(expressions[self], selfTerm)
+                # Back to the old-school stuff.
                 if hasattr(rule, 'descriptions'):
                     desc = rule.descriptions
                     rule = rule.name
