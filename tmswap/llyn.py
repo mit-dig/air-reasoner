@@ -1201,18 +1201,18 @@ The real version of this should appear in query.py
     def eval(self, subj, obj, queue, bindings, proof, query):
         pass
 
-class BI_airJustifies(HeavyBuiltIn):
+class BI_airJustifies(HeavyBuiltIn, Function):
     """A more managable version of air:justifies
 The real version of this should appear in rete.py (i.e. this won't run in cwm mode!)
     """
-    def eval(self, subj, obj, queue, bindings, proof, query):
+    def evalObj(self, subj, queue, bindings, proof, query):
         pass
 
-class BI_owlEntails(HeavyBuiltIn):
+class BI_owlEntails(HeavyBuiltIn, Function):
     """A more managable version of log:owlEntails
 The real version of this should appear in rete.py (i.e. this won't run in cwm mode!)
     """
-    def eval(self, subj, obj, queue, bindings, proof, query):
+    def evalObj(self, subj, queue, bindings, proof, query):
         pass
 
 class BI_filter(LightBuiltIn, Function):
