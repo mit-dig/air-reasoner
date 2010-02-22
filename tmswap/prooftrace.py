@@ -127,6 +127,23 @@ def simpleTraceOutput(tmsNodes, reasons, premises):
         nf2(tmsNode)
     return strings
 
+#def eventFragmentGenerator():
+#    # Generate a fragment to represent an event uniquely.
+#    i = 0
+#    while True:
+#        i += 1
+#        yield "#event%d" % (i)
+
+#mintEventFragment = eventFragmentGenerator().next
+
+#def dataIDGenerator():
+#    # Generate a fragment to represent log-file semantics uniquely.
+#    i = 0
+#    while True:
+#        i += 1
+#        yield "log%d" % (i)
+
+#mintDataID = dataIDGenerator().next
 
 def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
     formula = store.newFormula()
@@ -143,10 +160,11 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
     for justification in reasons.values():
         termsFor[justification] = formula.newBlankNode()
 
-    def booleanExpressionToRDF(expr):
+    def booleanExpressionToRDF(expr, node=None):
         if expr in termsFor:
             return termsFor[expr]
-        node = formula.newBlankNode()
+        if node is None:
+            node = formula.newBlankNode()
         termsFor[expr] = node
         formula.add(node, store.type, {tms.NotExpression: t['Not-justification'],
                                        tms.AndExpression: t['And-justification'],
@@ -161,9 +179,11 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                 else:
                     formula.add(node, t['sub-expr'], node2)
                 
-                # For now, shim in our dataDependency.
+                # For now, shim in our dataDependency and air:rule.
                 if arg.dataEvent is not None:
                     formula.add(node, airj['dataDependency'], arg.dataEvent)
+                elif isinstance(arg.datum, Rule):
+                    formula.add(node, air['rule'], node2)
             formula.add(node, t['sub-expr'], newFormula.close())
         else:
             for arg in expr.args:
@@ -214,17 +234,18 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
         else:
             raise TypeError(datum)
         if recurse:
-            print "heyo", self
-            print premises
             if self in premises:
                 retVal = True
                 if isinstance(termsFor[self], Formula):
                     premiseFormula.loadFormulaWithSubstitution(termsFor[self])
                 else:
                     formula.add(termsFor[self], t['justification'], t['premise'])
+                # We need to generate extraction events.
                 if self.extractedFrom is not None:
-                    self.dataEvent = mintEventFragment()
-                    self.dataID = mintDataID()
+#                    self.dataEvent = mintEventFragment()
+                    self.dataEvent = store.newSymbol(store.genId())
+#                    self.dataID = mintDataID()
+                    self.dataID = store.newSymbol(store.genId())
                     formula.add(store.newSymbol(self.extractedFrom),
                                 store.semantics,
                                 self.dataID)
@@ -237,9 +258,15 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                 retVal = expressions[self].evaluate(nf2)
                 antecedents = expressions[self].nodes()
                 rule = reasons[self].rule
-                antecedentExpr = booleanExpressionToRDF(expressions[self])
                 selfTerm = termsFor[self]
                 justTerm = termsFor[reasons[self]]
+                
+                # Generate the event for this particular expression's
+                # final event.
+                selfEvent = store.newSymbol(store.genId())
+                formula.add(selfEvent, pmll['outputdata'], selfTerm)
+                
+                antecedentExpr = booleanExpressionToRDF(expressions[self], selfTerm)
                 if hasattr(rule, 'descriptions'):
                     desc = rule.descriptions
                     rule = rule.name

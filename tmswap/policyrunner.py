@@ -133,7 +133,6 @@ This is currently only used for goals
             if isinstance(node.datum, tuple) and len(node.datum) == 2:
                 pass # Better than the alternative?
             else:
-#                print "adding premise", node
                 self.premises.add(node)
         if justification is False:
             if isinstance(node.datum, Rule):

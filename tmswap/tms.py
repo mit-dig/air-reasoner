@@ -76,7 +76,13 @@ class Node(object):
     def assumeByExtraction(self, uri):
         # Like assume(), but adds the fact that it was extracted from uri.
         self.assume()
+        self.setExtractedFrom(uri)
+    
+    def setExtractedFrom(self, uri):
+        # Sets the extractedFrom value recursively.
         self.extractedFrom = uri
+        for just in self.consequents:
+            just.consequent.setExtractedFrom(uri)
 
     def support(self, justification):
         if self.supported:
