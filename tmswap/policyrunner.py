@@ -133,6 +133,7 @@ This is currently only used for goals
             if isinstance(node.datum, tuple) and len(node.datum) == 2:
                 pass # Better than the alternative?
             else:
+#                print "adding premise", node
                 self.premises.add(node)
         if justification is False:
             if isinstance(node.datum, Rule):
@@ -927,7 +928,7 @@ def loadFactFormula(formulaTMS, uri, closureMode=""): #what to do about closureM
 ##    formulaTMS.getThing(s).assume()
 ##    return s
     f = _loadF(formulaTMS, uri, closureMode)
-    formulaTMS.getThing(f).assume()
+    formulaTMS.getThing(f).assumeByExtraction(uri)
     formulaTMS.assumedURIs.append(formulaTMS.workingContext.newSymbol(uri))
     return f
 

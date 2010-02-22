@@ -116,8 +116,10 @@ def simpleTraceOutput(tmsNodes, reasons, premises):
             retVal = reasons[self].evaluate(nf2)
             strings.append('%s <= %s(%s)' % (self, reasons[self].rule.uriref(), ', '.join([str(x) for x in reasons[self].expression.nodes()])))
         else:
-            # Sometimes when not filtering, self may not be in
-            # premises or reasons (why???)
+            # Sometimes when not filtering on the properties when
+            # doing AIR reasoning, self may not be in premises or
+            # reasons (why???)
+            # TODO: find out why.
             retVal = True
             strings.append('%s [assuming to be premise]' % self)
         return retVal
@@ -130,6 +132,8 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
     formula = store.newFormula()
     t = formula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/tms')
     air = formula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
+    airj = formula.newSymbol('http://www.example.com/airj')
+    pmll = formula.newSymbol('http://www.example.com/pmllite')
     done = set()
     termsFor = {}
     expressions = removeBaseRules(reasons, premises, Rule.baseRules)
@@ -156,6 +160,10 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                     newFormula.loadFormulaWithSubstitution(node2)
                 else:
                     formula.add(node, t['sub-expr'], node2)
+                
+                # For now, shim in our dataDependency.
+                if arg.dataEvent is not None:
+                    formula.add(node, airj['dataDependency'], arg.dataEvent)
             formula.add(node, t['sub-expr'], newFormula.close())
         else:
             for arg in expr.args:
@@ -206,12 +214,22 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
         else:
             raise TypeError(datum)
         if recurse:
+            print "heyo", self
+            print premises
             if self in premises:
                 retVal = True
                 if isinstance(termsFor[self], Formula):
                     premiseFormula.loadFormulaWithSubstitution(termsFor[self])
                 else:
                     formula.add(termsFor[self], t['justification'], t['premise'])
+                if self.extractedFrom is not None:
+                    self.dataEvent = mintEventFragment()
+                    self.dataID = mintDataID()
+                    formula.add(store.newSymbol(self.extractedFrom),
+                                store.semantics,
+                                self.dataID)
+                    formula.add(self.dataEvent, store.type, airj['Extraction'])
+                    formula.add(self.dataEvent, pmll['outputdata'], self.dataID)
             elif self.assumed():
                 retVal = True
                 formula.add(termsFor[self], t['justification'], t['premise'])
@@ -235,6 +253,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
             else:
                 # We really shouldn't get here, but right now not
                 # having a filter means that we sometimes can.
+                # TODO: Find out why we get here.
                 retVal = True
                 if isinstance(termsFor[self], Formula):
                     premiseFormula.loadFormulaWithSubstitution(termsFor[self])

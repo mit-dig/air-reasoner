@@ -29,6 +29,8 @@ class Node(object):
         self.supported = False
         self.justifications = set()
         self.consequents = set()
+        self.extractedFrom = None
+        self.dataEvent = None
 
     def justify(self, rule, expression, hypotheses=None):
         if hypotheses is None:
@@ -70,6 +72,11 @@ class Node(object):
         else:
             just = Premise(self)
         self.support(just)
+        
+    def assumeByExtraction(self, uri):
+        # Like assume(), but adds the fact that it was extracted from uri.
+        self.assume()
+        self.extractedFrom = uri
 
     def support(self, justification):
         if self.supported:
