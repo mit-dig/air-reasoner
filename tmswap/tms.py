@@ -31,6 +31,7 @@ class Node(object):
         self.consequents = set()
         self.extractedFrom = None
         self.dataEvent = None
+        self.assumedURIs = []
 
     def justify(self, rule, expression, hypotheses=None):
         if hypotheses is None:
@@ -83,6 +84,15 @@ class Node(object):
         self.extractedFrom = uri
         for just in self.consequents:
             just.consequent.setExtractedFrom(uri)
+            
+    def assumeByClosingWorld(self, assumedPolicies, assumedURIs, assumedStrings,
+                             assumedCWAs):
+        # Like assume(), but adds the assumedURIs. (Anything else???)
+        self.assume()
+        self.setAssumedURIs(assumedURIs)
+    
+    def setAssumedURIs(self, assumedURIs):
+        self.assumedURIs = assumedURIs
 
     def support(self, justification):
         if self.supported:

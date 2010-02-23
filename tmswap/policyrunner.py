@@ -419,7 +419,10 @@ class RuleFire(object):
                                                      self.tms.assumedURIs +
                                                      self.tms.assumedStrings +
                                                      self.tms.assumedClosedWorlds)))
-                closedWorld.assume()
+                closedWorld.assumeByClosingWorld(self.tms.assumedPolicies,
+                                                 self.tms.assumedURIs,
+                                                 self.tms.assumedStrings,
+                                                 self.tms.assumedClosedWorlds)
                 self.tms.assumedClosedWorlds.append(closedWorld)
                 altSupport = [closedWorld]
 #                desc = self.altDescriptions

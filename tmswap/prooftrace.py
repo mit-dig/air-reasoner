@@ -192,22 +192,32 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
         elif expr in newTermsFor and newTermsFor[expr] is not None:
             return newTermsFor[expr]
         newTermsFor[expr] = node
-        formula.add(node, airj['branch'], {tms.NotExpression: air['else'],
-                                           tms.AndExpression: air['then'],
-                                           tms.OrExpression: t['Or-justification']}[expr.__class__])
+#        formula.add(node, airj['branch'], {tms.NotExpression: air['else'],
+#                                           tms.AndExpression: air['then'],
+#                                           tms.OrExpression: t['Or-justification']}[expr.__class__])
         if isinstance(expr, tms.AndExpression):
             #We have a shorthand!
             newFormula = formula.newFormula()
+            hasCWA = False
             for arg in expr.args:
                 node2 = booleanExpressionToNewRDF(arg, store.newSymbol(store.genId()))
                 
                 # For now, shim in our dataDependency and air:rule.
                 if arg.dataEvent is not None:
                     formula.add(node, airj['dataDependency'], arg.dataEvent)
-                    # Eeh, I don't like this.
                     formula.add(node, airj['flowDependency'], arg.dataEvent)
                 elif isinstance(arg.datum, Rule):
                     formula.add(node, air['rule'], node2)
+                elif isinstance(arg.datum, tuple) and len(arg.datum) == 2 \
+                        and arg.datum[0] == 'closedWorld':
+                    # How do we model closing the world again?
+                    formula.add(node, airj['dataDependency'], node2)
+                    formula.add(node, airj['flowDependency'], node2)
+                    hasCWA = True
+            if hasCWA:
+                formula.add(node, airj['branch'], air['else'])
+            else:
+                formula.add(node, airj['branch'], air['then'])
         else:
             for arg in expr.args:
                 formula.add(node, t['sub-expr'], booleanExpressionToRDF(arg))
@@ -243,6 +253,42 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                     formula.add(newNode, air['closed-world-assumption'], formula.newList([termsFor[x] for x in datum[1]]))
 ##                    formula.add(newNode, air['closed-world-assumption'], formula.newList([x for x in datum[1]]))
                     termsFor[self] = newNode
+                    
+                    # And now the ClosingTheWorld event
+                    newNode = formula.newSymbol(store.genId())
+                    formula.add(newNode, store.type, airj['ClosingTheWorld'])
+                    for term in datum[1]:
+                        if term in newTermsFor:
+                            formula.add(newNode, pmll['flowDependency'],
+                                        newTermsFor[term])
+                            formula.add(newNode, pmll['dataDependency'],
+                                        newTermsFor[term])
+                        elif term in self.assumedURIs:
+                            # Generate any needed extraction events,
+                            # or find the corresponding one.
+                            
+                            log = formula.any(subj=term, pred=store.semantics)
+                            if log:
+                                event = formula.any(pred=pmll['outputdata'],
+                                                    obj=log)
+                                if event:
+                                    newTermsFor[term] = (event, log)
+                            if term not in newTermsFor:
+#                                event = mintEventFragment()
+                                event = store.newSymbol(store.genId())
+                                if not log:
+#                                    log = mintDataID()
+                                    log = store.newSymbol(store.genId())
+                                newTermsFor[term] = (event, log)
+                                formula.add(term, store.semantics, log)
+                                formula.add(event, store.type,
+                                            airj['Extraction'])
+                                formula.add(event, pmll['outputdata'], log)
+                            formula.add(newNode, pmll['flowDependency'],
+                                        event)
+                            formula.add(newNode, pmll['dataDependency'],
+                                        event)
+                    newTermsFor[self] = newNode
                 else:
                     raise RuntimeError(self)
             elif len(datum) == 4:
@@ -265,10 +311,15 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                     formula.add(termsFor[self], t['justification'], t['premise'])
                 # We need to generate extraction events.
                 if self.extractedFrom is not None:
-#                    self.dataEvent = mintEventFragment()
-                    self.dataEvent = store.newSymbol(store.genId())
-#                    self.dataID = mintDataID()
-                    self.dataID = store.newSymbol(store.genId())
+                    if self in newTermsFor:
+                        (self.dataEvent, self.dataID) = newTermsFor[self]
+                    else:
+#                        self.dataEvent = mintEventFragment()
+                        self.dataEvent = store.newSymbol(store.genId())
+#                        self.dataID = mintDataID()
+                        self.dataID = store.newSymbol(store.genId())
+                        newTermsFor[self] = (self.dataEvent, self.dataID)
+                        
                     formula.add(store.newSymbol(self.extractedFrom),
                                 store.semantics,
                                 self.dataID)
