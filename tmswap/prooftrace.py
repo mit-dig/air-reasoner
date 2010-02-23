@@ -186,7 +186,6 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
         return node
 
     def booleanExpressionToNewRDF(expr, node):
-        print "new rdf", expr, node
         if expr in termsFor and expr not in newTermsFor:
             return termsFor[expr]
         elif expr in newTermsFor and newTermsFor[expr] is not None:
@@ -203,6 +202,9 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                 node2 = booleanExpressionToNewRDF(arg, store.newSymbol(store.genId()))
                 
                 # For now, shim in our dataDependency and air:rule.
+                if arg.fireEvent is not None:
+                    formula.add(node, airj['flowDependency'], arg.fireEvent)
+                
                 if arg.dataEvent is not None:
                     formula.add(node, airj['dataDependency'], arg.dataEvent)
                     formula.add(node, airj['flowDependency'], arg.dataEvent)
@@ -210,7 +212,6 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                     formula.add(node, air['rule'], node2)
                 elif isinstance(arg.datum, tuple) and len(arg.datum) == 2 \
                         and arg.datum[0] == 'closedWorld':
-                    # How do we model closing the world again?
                     formula.add(node, airj['dataDependency'], node2)
                     formula.add(node, airj['flowDependency'], node2)
                     hasCWA = True
@@ -311,6 +312,12 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                     formula.add(termsFor[self], t['justification'], t['premise'])
                 # We need to generate extraction events.
                 if self.extractedFrom is not None:
+                    symb = store.newSymbol(self.extractedFrom)
+                    log = formula.any(subj=symb, pred=store.semantics)
+                    if log:
+                        event = formula.any(pred=pmll['outputdata'], obj=log)
+                        if event:
+                            newTermsFor[self] = (event, log)
                     if self in newTermsFor:
                         (self.dataEvent, self.dataID) = newTermsFor[self]
                     else:
@@ -337,11 +344,12 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                 justTerm = termsFor[reasons[self]]
                 
                 # Generate the event for this particular expression's
-                # final event.
-                selfEvent = store.newSymbol(store.genId())
-                formula.add(selfEvent, store.type, airj['RuleApplication'])
-                formula.add(selfEvent, pmll['outputdata'], selfTerm)
-                booleanExpressionToNewRDF(expressions[self], selfEvent)
+                # RuleApplication event.
+                self.fireEvent = store.newSymbol(store.genId())
+                formula.add(self.fireEvent, store.type, airj['RuleApplication'])
+                if isinstance(selfTerm, Formula):
+                    formula.add(self.fireEvent, pmll['outputdata'], selfTerm)
+                booleanExpressionToNewRDF(expressions[self], self.fireEvent)
                 
                 # Back to the old-school stuff.
                 if hasattr(rule, 'descriptions'):

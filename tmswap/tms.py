@@ -29,9 +29,11 @@ class Node(object):
         self.supported = False
         self.justifications = set()
         self.consequents = set()
+        # Hacks to make the new justification ontology work.
         self.extractedFrom = None
         self.dataEvent = None
         self.assumedURIs = []
+        self.fireEvent = None
 
     def justify(self, rule, expression, hypotheses=None):
         if hypotheses is None:
@@ -74,6 +76,7 @@ class Node(object):
             just = Premise(self)
         self.support(just)
         
+    # The following four are for the new ontology working.
     def assumeByExtraction(self, uri):
         # Like assume(), but adds the fact that it was extracted from uri.
         self.assume()
