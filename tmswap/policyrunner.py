@@ -844,7 +844,9 @@ much how the rule was represented in the rdf network
     def compileFormula(cls, eventLoop, formulaTMS, pf, base=False):
         rdf = pf.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
         p = pf.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
-        policies = pf.each(pred=rdf['type'], obj=p['Policy'])
+        # New AIR terminology.
+        policies = pf.each(pred=rdf['type'], obj=p['RuleSet'])
+        policies += pf.each(pred=rdf['type'], obj=p['Policy'])
 #        globalVars = frozenset(pf.each(pred=rdf['type'], obj=p['Variable']))
         globalVars = frozenset(pf.universals())
         cwm_rules = [cls.compileCwmRule(eventLoop,

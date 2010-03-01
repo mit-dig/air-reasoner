@@ -202,6 +202,10 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                 node2 = booleanExpressionToNewRDF(arg, store.newSymbol(store.genId()))
                 
                 # For now, shim in our dataDependency and air:rule.
+                # TODO: outputVariableMappingList
+                # TODO: clean up flow/dataDependency
+                # TODO: built-in functions???
+                # TODO: hidden/ellipsed rules
                 if arg.fireEvent is not None:
                     formula.add(node, airj['flowDependency'], arg.fireEvent)
                 
