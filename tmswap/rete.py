@@ -420,7 +420,11 @@ generates variable bindings
                 # HACK! I don't know what base URI these really are!
                 logs = subject[0]
                 rules = subject[1]
-                f, workingContext = airThink([], [], logFormulaObjs=logs, ruleFormulaObjs=rules, filterProperties=[], store=self.pattern.context().store)
+                if len(subject) == 3:
+                    filterProperties = list(subject[2])
+                else:
+                    filterProperties = ['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with']
+                f, workingContext = airThink([], [], logFormulaObjs=logs, ruleFormulaObjs=rules, filterProperties=filterProperties, store=self.pattern.context().store)
                 node = compilePattern(workingContext._index, self.pattern.object().statements, self.vars, self.context)
                 def onSuccess((triples, environment, penalty)):
                     newAssumption = self.pattern.substitution(environment.asDict())

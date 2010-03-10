@@ -696,21 +696,21 @@ much how the rule was represented in the rdf network
         assertionObjs = []
         for assertion in assertions + goal_assertions:
             description = assertion[1]
-            assertion = assertion[0]
-            statement = F.the(subj=assertion, pred=p['statement'])
-            justNode = F.the(subj=assertion, pred=p['justification'])
-            if justNode is not None:
-                antecedents = frozenset(F.each(subj=justNode, pred=p['antecedent']))
-            rule_id = F.the(subj=justNode, pred=p['rule-id'])
-            
-            if justNode is not None and rule_id is not None:
-                assertionObjs.append(SubstitutingTuple(
-                        (Assertion(statement, antecedents, rule_id),
-                         description)))
-            else:
-                assertionObjs.append(SubstitutingTuple(
-                        (Assertion(statement),
-                         description)))
+            statement = assertion[0]
+#            statement = F.the(subj=assertion, pred=p['statement'])
+#            justNode = F.the(subj=assertion, pred=p['justification'])
+#            if justNode is not None:
+#                antecedents = frozenset(F.each(subj=justNode, pred=p['antecedent']))
+#            rule_id = F.the(subj=justNode, pred=p['rule-id'])
+#            
+#            if justNode is not None and rule_id is not None:
+#                assertionObjs.append(SubstitutingTuple(
+#                        (Assertion(statement, antecedents, rule_id),
+#                         description)))
+#            else:
+            assertionObjs.append(SubstitutingTuple(
+                    (Assertion(statement),
+                     description)))
         resultList.append(subrules + assertionObjs + goal_subrules)
         
         # Now do what we did to collect the assertions and such for
@@ -790,21 +790,21 @@ much how the rule was represented in the rdf network
         assertionObjs = []
         for assertion in assertions + goal_assertions:
             description = assertion[1]
-            assertion = assertion[0]
-            statement = F.the(subj=assertion, pred=p['statement'])
-            justNode = F.the(subj=assertion, pred=p['justification'])
-            if justNode is not None:
-                antecedents = frozenset(F.each(subj=justNode, pred=p['antecedent']))
-            rule_id = F.the(subj=justNode, pred=p['rule-id'])###here
-            
-            if justNode is not None and rule_id is not None:
-                assertionObjs.append(SubstitutingTuple(
-                        (Assertion(statement, antecedents, rule_id),
-                         description)))
-            else:
-                assertionObjs.append(SubstitutingTuple(
-                        (Assertion(statement),
-                         description)))
+            statement = assertion[0]
+#            statement = F.the(subj=assertion, pred=p['statement'])
+#            justNode = F.the(subj=assertion, pred=p['justification'])
+#            if justNode is not None:
+#                antecedents = frozenset(F.each(subj=justNode, pred=p['antecedent']))
+#            rule_id = F.the(subj=justNode, pred=p['rule-id'])###here
+#            
+#            if justNode is not None and rule_id is not None:
+#                assertionObjs.append(SubstitutingTuple(
+#                        (Assertion(statement, antecedents, rule_id),
+#                         description)))
+#            else:
+            assertionObjs.append(SubstitutingTuple(
+                    (Assertion(statement),
+                     description)))
         resultList.append(subrules + assertionObjs + goal_subrules)
         
         node = ruleNode
