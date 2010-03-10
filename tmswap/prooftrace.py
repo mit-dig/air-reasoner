@@ -116,10 +116,8 @@ def simpleTraceOutput(tmsNodes, reasons, premises):
             retVal = reasons[self].evaluate(nf2)
             strings.append('%s <= %s(%s)' % (self, reasons[self].rule.uriref(), ', '.join([str(x) for x in reasons[self].expression.nodes()])))
         else:
-            # Sometimes when not filtering on the properties when
-            # doing AIR reasoning, self may not be in premises or
-            # reasons (why???)
-            # TODO: find out why.
+            # Sometimes when not filtering, self may not be in
+            # premises or reasons (why???)
             retVal = True
             strings.append('%s [assuming to be premise]' % self)
         return retVal
@@ -127,33 +125,13 @@ def simpleTraceOutput(tmsNodes, reasons, premises):
         nf2(tmsNode)
     return strings
 
-#def eventFragmentGenerator():
-#    # Generate a fragment to represent an event uniquely.
-#    i = 0
-#    while True:
-#        i += 1
-#        yield "#event%d" % (i)
-
-#mintEventFragment = eventFragmentGenerator().next
-
-#def dataIDGenerator():
-#    # Generate a fragment to represent log-file semantics uniquely.
-#    i = 0
-#    while True:
-#        i += 1
-#        yield "log%d" % (i)
-
-#mintDataID = dataIDGenerator().next
 
 def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
     formula = store.newFormula()
     t = formula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/tms')
     air = formula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
-    airj = formula.newSymbol('http://www.example.com/airj')
-    pmll = formula.newSymbol('http://www.example.com/pmllite')
     done = set()
     termsFor = {}
-    newTermsFor = {}
     expressions = removeBaseRules(reasons, premises, Rule.baseRules)
 ##    expressions = dict((node, reasons[node].expression)
 ##                       for node in reasons
@@ -166,7 +144,6 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
             return termsFor[expr]
         node = formula.newBlankNode()
         termsFor[expr] = node
-        newTermsFor[expr] = None
         formula.add(node, store.type, {tms.NotExpression: t['Not-justification'],
                                        tms.AndExpression: t['And-justification'],
                                        tms.OrExpression: t['Or-justification']}[expr.__class__])
@@ -180,49 +157,6 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                 else:
                     formula.add(node, t['sub-expr'], node2)
             formula.add(node, t['sub-expr'], newFormula.close())
-        else:
-            for arg in expr.args:
-                formula.add(node, t['sub-expr'], booleanExpressionToRDF(arg))
-        return node
-
-    def booleanExpressionToNewRDF(expr, node):
-        if expr in termsFor and expr not in newTermsFor:
-            return termsFor[expr]
-        elif expr in newTermsFor and newTermsFor[expr] is not None:
-            return newTermsFor[expr]
-        newTermsFor[expr] = node
-#        formula.add(node, airj['branch'], {tms.NotExpression: air['else'],
-#                                           tms.AndExpression: air['then'],
-#                                           tms.OrExpression: t['Or-justification']}[expr.__class__])
-        if isinstance(expr, tms.AndExpression):
-            #We have a shorthand!
-            newFormula = formula.newFormula()
-            hasCWA = False
-            for arg in expr.args:
-                node2 = booleanExpressionToNewRDF(arg, store.newSymbol(store.genId()))
-                
-                # For now, shim in our dataDependency and air:rule.
-                # TODO: outputVariableMappingList
-                # TODO: clean up flow/dataDependency
-                # TODO: built-in functions???
-                # TODO: hidden/ellipsed rules
-                if arg.fireEvent is not None:
-                    formula.add(node, airj['flowDependency'], arg.fireEvent)
-                
-                if arg.dataEvent is not None:
-                    formula.add(node, airj['dataDependency'], arg.dataEvent)
-                    formula.add(node, airj['flowDependency'], arg.dataEvent)
-                elif isinstance(arg.datum, Rule):
-                    formula.add(node, air['rule'], node2)
-                elif isinstance(arg.datum, tuple) and len(arg.datum) == 2 \
-                        and arg.datum[0] == 'closedWorld':
-                    formula.add(node, airj['dataDependency'], node2)
-                    formula.add(node, airj['flowDependency'], node2)
-                    hasCWA = True
-            if hasCWA:
-                formula.add(node, airj['branch'], air['else'])
-            else:
-                formula.add(node, airj['branch'], air['then'])
         else:
             for arg in expr.args:
                 formula.add(node, t['sub-expr'], booleanExpressionToRDF(arg))
@@ -258,42 +192,6 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                     formula.add(newNode, air['closed-world-assumption'], formula.newList([termsFor[x] for x in datum[1]]))
 ##                    formula.add(newNode, air['closed-world-assumption'], formula.newList([x for x in datum[1]]))
                     termsFor[self] = newNode
-                    
-                    # And now the ClosingTheWorld event
-                    newNode = formula.newSymbol(store.genId())
-                    formula.add(newNode, store.type, airj['ClosingTheWorld'])
-                    for term in datum[1]:
-                        if term in newTermsFor:
-                            formula.add(newNode, pmll['flowDependency'],
-                                        newTermsFor[term])
-                            formula.add(newNode, pmll['dataDependency'],
-                                        newTermsFor[term])
-                        elif term in self.assumedURIs:
-                            # Generate any needed extraction events,
-                            # or find the corresponding one.
-                            
-                            log = formula.any(subj=term, pred=store.semantics)
-                            if log:
-                                event = formula.any(pred=pmll['outputdata'],
-                                                    obj=log)
-                                if event:
-                                    newTermsFor[term] = (event, log)
-                            if term not in newTermsFor:
-#                                event = mintEventFragment()
-                                event = store.newSymbol(store.genId())
-                                if not log:
-#                                    log = mintDataID()
-                                    log = store.newSymbol(store.genId())
-                                newTermsFor[term] = (event, log)
-                                formula.add(term, store.semantics, log)
-                                formula.add(event, store.type,
-                                            airj['Extraction'])
-                                formula.add(event, pmll['outputdata'], log)
-                            formula.add(newNode, pmll['flowDependency'],
-                                        event)
-                            formula.add(newNode, pmll['dataDependency'],
-                                        event)
-                    newTermsFor[self] = newNode
                 else:
                     raise RuntimeError(self)
             elif len(datum) == 4:
@@ -314,28 +212,6 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                     premiseFormula.loadFormulaWithSubstitution(termsFor[self])
                 else:
                     formula.add(termsFor[self], t['justification'], t['premise'])
-                # We need to generate extraction events.
-                if self.extractedFrom is not None:
-                    symb = store.newSymbol(self.extractedFrom)
-                    log = formula.any(subj=symb, pred=store.semantics)
-                    if log:
-                        event = formula.any(pred=pmll['outputdata'], obj=log)
-                        if event:
-                            newTermsFor[self] = (event, log)
-                    if self in newTermsFor:
-                        (self.dataEvent, self.dataID) = newTermsFor[self]
-                    else:
-#                        self.dataEvent = mintEventFragment()
-                        self.dataEvent = store.newSymbol(store.genId())
-#                        self.dataID = mintDataID()
-                        self.dataID = store.newSymbol(store.genId())
-                        newTermsFor[self] = (self.dataEvent, self.dataID)
-                        
-                    formula.add(store.newSymbol(self.extractedFrom),
-                                store.semantics,
-                                self.dataID)
-                    formula.add(self.dataEvent, store.type, airj['Extraction'])
-                    formula.add(self.dataEvent, pmll['outputdata'], self.dataID)
             elif self.assumed():
                 retVal = True
                 formula.add(termsFor[self], t['justification'], t['premise'])
@@ -346,16 +222,6 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                 antecedentExpr = booleanExpressionToRDF(expressions[self])
                 selfTerm = termsFor[self]
                 justTerm = termsFor[reasons[self]]
-                
-                # Generate the event for this particular expression's
-                # RuleApplication event.
-                self.fireEvent = store.newSymbol(store.genId())
-                formula.add(self.fireEvent, store.type, airj['RuleApplication'])
-                if isinstance(selfTerm, Formula):
-                    formula.add(self.fireEvent, pmll['outputdata'], selfTerm)
-                booleanExpressionToNewRDF(expressions[self], self.fireEvent)
-                
-                # Back to the old-school stuff.
                 if hasattr(rule, 'descriptions'):
                     desc = rule.descriptions
                     rule = rule.name
@@ -369,7 +235,6 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
             else:
                 # We really shouldn't get here, but right now not
                 # having a filter means that we sometimes can.
-                # TODO: Find out why we get here.
                 retVal = True
                 if isinstance(termsFor[self], Formula):
                     premiseFormula.loadFormulaWithSubstitution(termsFor[self])
