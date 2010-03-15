@@ -583,7 +583,12 @@ much how the rule was represented in the rdf network
 #        vars = vars.union(F.each(subj=node, pred=p['variable']))
         # Find the variables in this rule.
         vars = vars.union(F.universals())
-        varBinding = len(vars - preboundVars) > 0
+        varsUsed = set()
+        ifNode = F.any(subj=ruleNode, pred=p['if'])
+        for var in vars:
+            if ifNode.contains(subj=var) or ifNode.contains(pred=var) or ifNode.contains(obj=var):
+                varsUsed.add(var)
+        varBinding = len(varsUsed - preboundVars) > 0
         preboundVars = preboundVars.union(F.universals())
 
         realNode = ruleNode
