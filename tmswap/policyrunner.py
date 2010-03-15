@@ -991,7 +991,7 @@ loadFactFormula.pClosureMode = False
 
 
 baseFactsURI = 'http://dig.csail.mit.edu/TAMI/2007/amord/base-assumptions.ttl'
-baseRulesURI = 'http://dig.csail.mit.edu/TAMI/2007/amord/base-rules.air_2_0.ttl'
+baseRulesURI = 'http://dig.csail.mit.edu/TAMI/2007/amord/base-rules.air_2_5.ttl'
 
 #baseFactsURI =
 #baseRulesURI = 'data:text/rdf+n3;charset=utf-8,' # quite empty
