@@ -13,8 +13,9 @@ See cwm.py and the os module in python
 
 
 from term import LightBuiltIn, RDFBuiltIn, Function, ReverseFunction, \
-    MultipleFunction, MultipleReverseFunction, \
+    MultipleFunction, MultipleReverseFunction, Term, \
     CompoundTerm, N3Set, List, EmptyList, NonEmptyList, Node, ListBuiltIn
+import types
 
 from set_importer import Set
 
@@ -87,12 +88,18 @@ class BI_in(LightBuiltIn, MultipleReverseFunction, ListBuiltIn):
         
 
     def evalSubj(self, obj, queue, bindings, proof, query):
+        def fixTerm(x):
+            if isinstance(x, Term):
+                return x
+            elif isinstance(x, types.StringTypes):
+                return obj.store.intern(x)
+        
 #        print isNonEmptyListTerm(obj)
 #        if not isinstance(obj, NonEmptyList) and not isinstance(obj, N3Set) and not isNonEmptyListTerm(obj): return None
 #        elif isNonEmptyListTerm(obj): obj = listify(obj)
         if not isinstance(obj, NonEmptyList) and not isinstance(obj, N3Set): return None
         rea = None
-        return [x for x in obj]  # [({subj:x}, rea) for x in obj]
+        return [fixTerm(x) for x in obj]  # [({subj:x}, rea) for x in obj]
 
 class BI_member(LightBuiltIn, MultipleFunction, ListBuiltIn):
     """Is the subject in the object?
