@@ -580,13 +580,21 @@ much how the rule was represented in the rdf network
         rdf = F.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
         p = F.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
 
+        # Get the pattern (we'll need it for testing variable binding)
+        try:
+            pattern = F.the(subj=ruleNode, pred=p['if'])
+        except AssertionError:
+            raise ValueError('%s has too many air:if clauses, being all of %s'
+                             % (ruleNode, F.each(subj=ruleNode, pred=p['if'])))
+        if pattern is None:
+            raise ValueError('%s must have an air:if clause. You did not give it one' % (ruleNode,))
+        
 #        vars = vars.union(F.each(subj=node, pred=p['variable']))
         # Find the variables in this rule.
         vars = vars.union(F.universals())
         varsUsed = set()
-        ifNode = F.any(subj=ruleNode, pred=p['if'])
         for var in vars:
-            if ifNode.contains(subj=var) or ifNode.contains(pred=var) or ifNode.contains(obj=var):
+            if pattern.contains(subj=var) or pattern.contains(pred=var) or pattern.contains(obj=var):
                 varsUsed.add(var)
         varBinding = len(varsUsed - preboundVars) > 0
         preboundVars = preboundVars.union(F.universals())
@@ -606,16 +614,9 @@ much how the rule was represented in the rdf network
 #        else:
 #            altDescriptions = []
 
-        # Get the air:label and air:if values.
+        # Get the air:label value.
         # TODO: get this annotated on the ontology.
         label = F.the(subj=ruleNode, pred=p['label'])
-        try:
-            pattern = F.the(subj=ruleNode, pred=p['if'])
-        except AssertionError:
-            raise ValueError('%s has too many air:if clauses, being all of %s'
-                             % (ruleNode, F.each(subj=ruleNode, pred=p['if'])))
-        if pattern is None:
-            raise ValueError('%s must have an air:if clause. You did not give it one' % (ruleNode,))
         
         # Is the rule an air:Hidden-rule?
         base = base or (F.contains(subj=ruleNode, pred=F.store.type, obj=p['Hidden-rule']) == 1)
