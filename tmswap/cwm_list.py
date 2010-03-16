@@ -110,11 +110,17 @@ class BI_member(LightBuiltIn, MultipleFunction, ListBuiltIn):
         else: return None
 
     def evalObj(self,subj, queue, bindings, proof, query):
+        def fixTerm(x):
+            if isinstance(x, Term):
+                return x
+            elif isinstance(x, types.StringTypes):
+                return obj.store.intern(x)
+        
 #        if not isinstance(subj, NonEmptyList) and not isinstance(subj, N3Set) and not isNonEmptyListTerm(subj): return None
 #        elif isNonEmptyListTerm(obj): subj = listify(subj)
         if not isinstance(subj, NonEmptyList) and not isinstance(subj, N3Set): return None
         rea = None
-        return [x for x in subj] # [({obj:x}, rea) for x in subj]
+        return [fixTerm(x) for x in subj] # [({obj:x}, rea) for x in subj]
 
 
 
