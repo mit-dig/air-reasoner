@@ -19,6 +19,7 @@ from set_importer import Set
 import uripath
 import urllib
 import urllib2
+import urlparse
 import sys
 import StringIO
 
@@ -216,7 +217,12 @@ class BI_queryEndpoint(LightBuiltIn, Function):
         assert len(subj) == 2
         source, query = subj
         # Default-graph-uri?
-        source = source.uriref() + '?query=' + urllib.quote(str(query))
+        sourceurl = list(urlparse.urlparse(source.uriref()))
+        if sourceurl[4] == '':
+            sourceurl[4] = 'query=' + urllib.quote(str(query))
+        else:
+            sourceurl[4] += '&query=' + urllib.quote(str(query))
+        source = urlparse.urlunparse(sourceurl)
         
         def sparqlSemantics(subj):
             oldstdin = sys.stdin
