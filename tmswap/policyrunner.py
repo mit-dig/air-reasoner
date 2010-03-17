@@ -704,6 +704,9 @@ much how the rule was represented in the rdf network
         for assertion in assertions + goal_assertions:
             description = assertion[1]
             statement = assertion[0]
+            if F.any(subj=assertion, pred=p['statement']) is not None:
+                raise ValueError('%s has an air:statement clause inside an air:assert clause.  This is no longer supported in AIR 2.5'
+                                 % (ruleNode))
 #            statement = F.the(subj=assertion, pred=p['statement'])
 #            justNode = F.the(subj=assertion, pred=p['justification'])
 #            if justNode is not None:
@@ -798,6 +801,9 @@ much how the rule was represented in the rdf network
         for assertion in assertions + goal_assertions:
             description = assertion[1]
             statement = assertion[0]
+            if F.any(subj=assertion, pred=p['statement']) is not None:
+                raise ValueError('%s has an air:statement clause inside an air:assert clause.  This is no longer supported in AIR 2.5'
+                                 % (ruleNode))
 #            statement = F.the(subj=assertion, pred=p['statement'])
 #            justNode = F.the(subj=assertion, pred=p['justification'])
 #            if justNode is not None:
