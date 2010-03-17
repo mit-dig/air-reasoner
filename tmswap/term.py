@@ -769,7 +769,10 @@ class List(CompoundTerm):
     def value(self):
         res = []
         for x in self:
-            res.append(x.value())
+            if isinstance(x, types.StringTypes):
+                res.append(x)
+            else:
+                res.append(x.value())
         return res
 
     def substitution(self, bindings, why=None, cannon=False):

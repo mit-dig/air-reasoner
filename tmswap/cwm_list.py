@@ -114,7 +114,7 @@ class BI_member(LightBuiltIn, MultipleFunction, ListBuiltIn):
             if isinstance(x, Term):
                 return x
             elif isinstance(x, types.StringTypes):
-                return obj.store.intern(x)
+                return subj.store.intern(x)
         
 #        if not isinstance(subj, NonEmptyList) and not isinstance(subj, N3Set) and not isNonEmptyListTerm(subj): return None
 #        elif isNonEmptyListTerm(obj): subj = listify(subj)
