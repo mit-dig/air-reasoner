@@ -950,14 +950,14 @@ class StoredStatement(object):
             else:
                 return None
         # Functions need to have their subject fully speced.
-        elif isinstance(pred, MultipleFunction) and unprovided and self.object().occurringIn(unprovided):
+        elif isinstance(pred, MultipleFunction):
             return MultipleFunction
-        elif isinstance(pred, Function) and unprovided and self.object().occurringIn(unprovided):
+        elif isinstance(pred, Function):
             return Function
         # ReverseFunctions need to have their object fully speced.
-        elif isinstance(pred, MultipleReverseFunction) and unprovided and self.subject().occurringIn(unprovided):
+        elif isinstance(pred, MultipleReverseFunction):
             return MultipleReverseFunction
-        elif isinstance(pred, ReverseFunction) and unprovided and self.subject().occurringIn(unprovided):
+        elif isinstance(pred, ReverseFunction):
             return ReverseFunction
         # BuiltIns need both fully speced.
         
