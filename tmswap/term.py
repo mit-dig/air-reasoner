@@ -1878,10 +1878,12 @@ def isNonEmptyListTerm(term, context):
         else:
             return isNonEmptyListTerm(next[0][OBJ], context)
 
-def listify(term, context, l=[]):
+def listify(term, context, l=None):
     """Coerces a term into the List object represented by the term.
     
     Throws an exception if the term cannot be coerced."""
+    if l == None:
+        l = []
     if isinstance(term, List):
         l += term.value()
         l.reverse()
