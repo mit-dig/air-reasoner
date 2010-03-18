@@ -1864,10 +1864,10 @@ def isNonEmptyListTerm(term, context):
         first = term.store.intern(N3_first)
         rest = term.store.intern(N3_rest)
         
-        print term, context
+#        print term, context
         this = context.statementsMatching(first, term, None)
         if len(this) != 1:
-            print len(this)
+#            print len(this)
             return False
         
         next = context.statementsMatching(rest, term, None)

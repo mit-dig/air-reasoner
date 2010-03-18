@@ -81,8 +81,14 @@ class BI_in(LightBuiltIn, MultipleReverseFunction, ListBuiltIn):
     """Is the subject in the object?
     Returnes a sequence of values."""
     def eval(self, subj, obj, queue, bindings, proof, query):
+        def fixTerm(x):
+            if isinstance(x, Term):
+                return x
+            elif isinstance(x, types.StringTypes):
+                return obj.store.intern(x)
+        
 #        print isNonEmptyListTerm(obj)
-        if isinstance(obj, CompoundTerm): return subj in obj
+        if isinstance(obj, CompoundTerm): return subj in [fixTerm(x) for x in obj]
 #        elif isNonEmptyListTerm(obj): return subj in listify(obj)
         else: return None
         
