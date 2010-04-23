@@ -219,9 +219,9 @@ class BI_queryEndpoint(LightBuiltIn, Function):
         # Default-graph-uri?
         sourceurl = list(urlparse.urlparse(source.uriref()))
         if sourceurl[4] == '':
-            sourceurl[4] = 'query=' + urllib.quote(str(query))
+            sourceurl[4] = 'query=' + urllib.quote_plus(str(query))
         else:
-            sourceurl[4] += '&query=' + urllib.quote(str(query))
+            sourceurl[4] += '&query=' + urllib.quote_plus(str(query))
         source = urlparse.urlunparse(sourceurl)
         
         def sparqlSemantics(subj):
