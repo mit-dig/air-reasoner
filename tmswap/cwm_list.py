@@ -13,8 +13,9 @@ See cwm.py and the os module in python
 
 
 from term import LightBuiltIn, RDFBuiltIn, Function, ReverseFunction, \
-    MultipleFunction, MultipleReverseFunction, \
+    MultipleFunction, MultipleReverseFunction, Term, \
     CompoundTerm, N3Set, List, EmptyList, NonEmptyList, Node, ListBuiltIn
+import types
 
 from set_importer import Set
 
@@ -80,19 +81,31 @@ class BI_in(LightBuiltIn, MultipleReverseFunction, ListBuiltIn):
     """Is the subject in the object?
     Returnes a sequence of values."""
     def eval(self, subj, obj, queue, bindings, proof, query):
+        def fixTerm(x):
+            if isinstance(x, Term):
+                return x
+            elif isinstance(x, types.StringTypes):
+                return obj.store.intern(x)
+        
 #        print isNonEmptyListTerm(obj)
-        if isinstance(obj, CompoundTerm): return subj in obj
+        if isinstance(obj, CompoundTerm): return subj in [fixTerm(x) for x in obj]
 #        elif isNonEmptyListTerm(obj): return subj in listify(obj)
         else: return None
         
 
     def evalSubj(self, obj, queue, bindings, proof, query):
+        def fixTerm(x):
+            if isinstance(x, Term):
+                return x
+            elif isinstance(x, types.StringTypes):
+                return obj.store.intern(x)
+        
 #        print isNonEmptyListTerm(obj)
 #        if not isinstance(obj, NonEmptyList) and not isinstance(obj, N3Set) and not isNonEmptyListTerm(obj): return None
 #        elif isNonEmptyListTerm(obj): obj = listify(obj)
         if not isinstance(obj, NonEmptyList) and not isinstance(obj, N3Set): return None
         rea = None
-        return [x for x in obj]  # [({subj:x}, rea) for x in obj]
+        return [fixTerm(x) for x in obj]  # [({subj:x}, rea) for x in obj]
 
 class BI_member(LightBuiltIn, MultipleFunction, ListBuiltIn):
     """Is the subject in the object?
@@ -103,11 +116,17 @@ class BI_member(LightBuiltIn, MultipleFunction, ListBuiltIn):
         else: return None
 
     def evalObj(self,subj, queue, bindings, proof, query):
+        def fixTerm(x):
+            if isinstance(x, Term):
+                return x
+            elif isinstance(x, types.StringTypes):
+                return subj.store.intern(x)
+        
 #        if not isinstance(subj, NonEmptyList) and not isinstance(subj, N3Set) and not isNonEmptyListTerm(subj): return None
 #        elif isNonEmptyListTerm(obj): subj = listify(subj)
         if not isinstance(subj, NonEmptyList) and not isinstance(subj, N3Set): return None
         rea = None
-        return [x for x in subj] # [({obj:x}, rea) for x in subj]
+        return [fixTerm(x) for x in subj] # [({obj:x}, rea) for x in subj]
 
 
 

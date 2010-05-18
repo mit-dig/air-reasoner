@@ -769,7 +769,10 @@ class List(CompoundTerm):
     def value(self):
         res = []
         for x in self:
-            res.append(x.value())
+            if isinstance(x, types.StringTypes):
+                res.append(x)
+            else:
+                res.append(x.value())
         return res
 
     def substitution(self, bindings, why=None, cannon=False):
@@ -1861,10 +1864,10 @@ def isNonEmptyListTerm(term, context):
         first = term.store.intern(N3_first)
         rest = term.store.intern(N3_rest)
         
-        print term, context
+#        print term, context
         this = context.statementsMatching(first, term, None)
         if len(this) != 1:
-            print len(this)
+#            print len(this)
             return False
         
         next = context.statementsMatching(rest, term, None)
@@ -1875,10 +1878,12 @@ def isNonEmptyListTerm(term, context):
         else:
             return isNonEmptyListTerm(next[0][OBJ], context)
 
-def listify(term, context, l=[]):
+def listify(term, context, l=None):
     """Coerces a term into the List object represented by the term.
     
     Throws an exception if the term cannot be coerced."""
+    if l == None:
+        l = []
     if isinstance(term, List):
         l += term.value()
         l.reverse()

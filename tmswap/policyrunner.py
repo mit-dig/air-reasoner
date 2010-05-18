@@ -28,6 +28,8 @@ MM = rete # or it could be treat
 
 OFFLINE = [False]
 
+airstatementWarnings = set()
+
 from prooftrace import (supportTrace,
                         removeFormulae,
                         removeBaseRules,
@@ -420,6 +422,10 @@ class RuleFire(object):
                                                      self.tms.assumedStrings +
                                                      self.tms.assumedClosedWorlds)))
                 closedWorld.assume()
+#                closedWorld.assumeByClosingWorld(self.tms.assumedPolicies,
+#                                                 self.tms.assumedURIs,
+#                                                 self.tms.assumedStrings,
+#                                                 self.tms.assumedClosedWorlds)
                 self.tms.assumedClosedWorlds.append(closedWorld)
                 altSupport = [closedWorld]
 #                desc = self.altDescriptions
@@ -576,10 +582,23 @@ much how the rule was represented in the rdf network
         rdf = F.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
         p = F.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
 
+        # Get the pattern (we'll need it for testing variable binding)
+        try:
+            pattern = F.the(subj=ruleNode, pred=p['if'])
+        except AssertionError:
+            raise ValueError('%s has too many air:if clauses, being all of %s'
+                             % (ruleNode, F.each(subj=ruleNode, pred=p['if'])))
+        if pattern is None:
+            raise ValueError('%s must have an air:if clause. You did not give it one' % (ruleNode,))
+        
 #        vars = vars.union(F.each(subj=node, pred=p['variable']))
         # Find the variables in this rule.
         vars = vars.union(F.universals())
-        varBinding = len(vars - preboundVars) > 0
+        varsUsed = set()
+        for var in vars:
+            if pattern.contains(subj=var) or pattern.contains(pred=var) or pattern.contains(obj=var):
+                varsUsed.add(var)
+        varBinding = len(varsUsed - preboundVars) > 0
         preboundVars = preboundVars.union(F.universals())
 
         realNode = ruleNode
@@ -597,16 +616,9 @@ much how the rule was represented in the rdf network
 #        else:
 #            altDescriptions = []
 
-        # Get the air:label and air:if values.
+        # Get the air:label value.
         # TODO: get this annotated on the ontology.
         label = F.the(subj=ruleNode, pred=p['label'])
-        try:
-            pattern = F.the(subj=ruleNode, pred=p['if'])
-        except AssertionError:
-            raise ValueError('%s has too many air:if clauses, being all of %s'
-                             % (ruleNode, F.each(subj=ruleNode, pred=p['if'])))
-        if pattern is None:
-            raise ValueError('%s must have an air:if clause. You did not give it one' % (ruleNode,))
         
         # Is the rule an air:Hidden-rule?
         base = base or (F.contains(subj=ruleNode, pred=F.store.type, obj=p['Hidden-rule']) == 1)
@@ -693,21 +705,26 @@ much how the rule was represented in the rdf network
         assertionObjs = []
         for assertion in assertions + goal_assertions:
             description = assertion[1]
-            assertion = assertion[0]
-            statement = F.the(subj=assertion, pred=p['statement'])
-            justNode = F.the(subj=assertion, pred=p['justification'])
-            if justNode is not None:
-                antecedents = frozenset(F.each(subj=justNode, pred=p['antecedent']))
-            rule_id = F.the(subj=justNode, pred=p['rule-id'])
-            
-            if justNode is not None and rule_id is not None:
-                assertionObjs.append(SubstitutingTuple(
-                        (Assertion(statement, antecedents, rule_id),
-                         description)))
-            else:
-                assertionObjs.append(SubstitutingTuple(
-                        (Assertion(statement),
-                         description)))
+            statement = assertion[0]
+            if F.any(subj=statement, pred=p['statement']) is not None:
+                if ruleNode not in airstatementWarnings:
+                    print "WARNING: %s has an air:statement clause inside an air:assert clause.  This is no longer supported in AIR 2.5, and will not work with future versions of the reasoner." % (ruleNode)
+                    airstatementWarnings.add(ruleNode)
+                statement = F.the(subj=statement, pred=p['statement'])
+#            statement = F.the(subj=assertion, pred=p['statement'])
+#            justNode = F.the(subj=assertion, pred=p['justification'])
+#            if justNode is not None:
+#                antecedents = frozenset(F.each(subj=justNode, pred=p['antecedent']))
+#            rule_id = F.the(subj=justNode, pred=p['rule-id'])
+#            
+#            if justNode is not None and rule_id is not None:
+#                assertionObjs.append(SubstitutingTuple(
+#                        (Assertion(statement, antecedents, rule_id),
+#                         description)))
+#            else:
+            assertionObjs.append(SubstitutingTuple(
+                    (Assertion(statement),
+                     description)))
         resultList.append(subrules + assertionObjs + goal_subrules)
         
         # Now do what we did to collect the assertions and such for
@@ -787,21 +804,26 @@ much how the rule was represented in the rdf network
         assertionObjs = []
         for assertion in assertions + goal_assertions:
             description = assertion[1]
-            assertion = assertion[0]
-            statement = F.the(subj=assertion, pred=p['statement'])
-            justNode = F.the(subj=assertion, pred=p['justification'])
-            if justNode is not None:
-                antecedents = frozenset(F.each(subj=justNode, pred=p['antecedent']))
-            rule_id = F.the(subj=justNode, pred=p['rule-id'])###here
-            
-            if justNode is not None and rule_id is not None:
-                assertionObjs.append(SubstitutingTuple(
-                        (Assertion(statement, antecedents, rule_id),
-                         description)))
-            else:
-                assertionObjs.append(SubstitutingTuple(
-                        (Assertion(statement),
-                         description)))
+            statement = assertion[0]
+            if F.any(subj=statement, pred=p['statement']) is not None:
+                if ruleNode not in airstatementWarnings:
+                    print "WARNING: %s has an air:statement clause inside an air:assert clause.  This is no longer supported in AIR 2.5, and will not work with future versions of the reasoner." % (ruleNode)
+                    airstatementWarnings.add(ruleNode)
+                statement = F.the(subj=statement, pred=p['statement'])
+#            statement = F.the(subj=assertion, pred=p['statement'])
+#            justNode = F.the(subj=assertion, pred=p['justification'])
+#            if justNode is not None:
+#                antecedents = frozenset(F.each(subj=justNode, pred=p['antecedent']))
+#            rule_id = F.the(subj=justNode, pred=p['rule-id'])###here
+#            
+#            if justNode is not None and rule_id is not None:
+#                assertionObjs.append(SubstitutingTuple(
+#                        (Assertion(statement, antecedents, rule_id),
+#                         description)))
+#            else:
+            assertionObjs.append(SubstitutingTuple(
+                    (Assertion(statement),
+                     description)))
         resultList.append(subrules + assertionObjs + goal_subrules)
         
         node = ruleNode
@@ -841,7 +863,9 @@ much how the rule was represented in the rdf network
     def compileFormula(cls, eventLoop, formulaTMS, pf, base=False):
         rdf = pf.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
         p = pf.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
-        policies = pf.each(pred=rdf['type'], obj=p['Policy'])
+        # New AIR terminology.
+        policies = pf.each(pred=rdf['type'], obj=p['RuleSet'])
+        policies += pf.each(pred=rdf['type'], obj=p['Policy'])
 #        globalVars = frozenset(pf.each(pred=rdf['type'], obj=p['Variable']))
         globalVars = frozenset(pf.universals())
         cwm_rules = [cls.compileCwmRule(eventLoop,
@@ -928,6 +952,7 @@ def loadFactFormula(formulaTMS, uri, closureMode=""): #what to do about closureM
 ##    return s
     f = _loadF(formulaTMS, uri, closureMode)
     formulaTMS.getThing(f).assume()
+#    formulaTMS.getThing(f).assumeByExtraction(uri)
     formulaTMS.assumedURIs.append(formulaTMS.workingContext.newSymbol(uri))
     return f
 
@@ -979,7 +1004,7 @@ loadFactFormula.pClosureMode = False
 
 
 baseFactsURI = 'http://dig.csail.mit.edu/TAMI/2007/amord/base-assumptions.ttl'
-baseRulesURI = 'http://dig.csail.mit.edu/TAMI/2007/amord/base-rules.air_2_0.ttl'
+baseRulesURI = 'http://dig.csail.mit.edu/TAMI/2007/amord/base-rules.air_2_5.ttl'
 
 #baseFactsURI =
 #baseRulesURI = 'data:text/rdf+n3;charset=utf-8,' # quite empty
