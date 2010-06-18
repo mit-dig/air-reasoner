@@ -421,11 +421,10 @@ class RuleFire(object):
                                                      self.tms.assumedURIs +
                                                      self.tms.assumedStrings +
                                                      self.tms.assumedClosedWorlds)))
-                closedWorld.assume()
-#                closedWorld.assumeByClosingWorld(self.tms.assumedPolicies,
-#                                                 self.tms.assumedURIs,
-#                                                 self.tms.assumedStrings,
-#                                                 self.tms.assumedClosedWorlds)
+                closedWorld.assumeByClosingWorld(self.tms.assumedPolicies,
+                                                 self.tms.assumedURIs,
+                                                 self.tms.assumedStrings,
+                                                 self.tms.assumedClosedWorlds)
                 self.tms.assumedClosedWorlds.append(closedWorld)
                 altSupport = [closedWorld]
 #                desc = self.altDescriptions
@@ -951,8 +950,7 @@ def loadFactFormula(formulaTMS, uri, closureMode=""): #what to do about closureM
 ##    formulaTMS.getThing(s).assume()
 ##    return s
     f = _loadF(formulaTMS, uri, closureMode)
-    formulaTMS.getThing(f).assume()
-#    formulaTMS.getThing(f).assumeByExtraction(uri)
+    formulaTMS.getThing(f).assumeByExtraction(uri)
     formulaTMS.assumedURIs.append(formulaTMS.workingContext.newSymbol(uri))
     return f
 
