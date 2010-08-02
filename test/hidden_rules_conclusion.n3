@@ -1,0 +1,65 @@
+rules =  [Rule 1 with vars frozenset([]), [pattern={abr:P rdf:type owl:TransitiveProperty}] with vars frozenset([abr:P1, abr:N1, abr:N, abr:N3, abr:C2, abr:S, abr:N4, abr:C, abr:P, abr:O, abr:P2, abr:C1, abr:N2]), [pattern={abr:P rdf:type owl:SymmetricProperty}] with vars frozenset([abr:P1, abr:N1, abr:N, abr:N3, abr:C2, abr:S, abr:N4, abr:C, abr:P, abr:O, abr:P2, abr:C1, abr:N2]), [pattern={abr:C1 rdfs:subClassOf abr:C2}] with vars frozenset([abr:P1, abr:N1, abr:N, abr:N3, abr:C2, abr:S, abr:N4, abr:C, abr:P, abr:O, abr:P2, abr:C1, abr:N2]), [pattern={abr:P1 rdfs:subPropertyOf abr:P2}] with vars frozenset([abr:P1, abr:N1, abr:N, abr:N3, abr:C2, abr:S, abr:N4, abr:C, abr:P, abr:O, abr:P2, abr:C1, abr:N2]), [pattern={abr:N1 owl:sameAs abr:N2}] with vars frozenset([abr:P1, abr:N1, abr:N, abr:N3, abr:C2, abr:S, abr:N4, abr:C, abr:P, abr:O, abr:P2, abr:C1, abr:N2]), [pattern={abr:P rdfs:domain abr:C}] with vars frozenset([abr:P1, abr:N1, abr:N, abr:N3, abr:C2, abr:S, abr:N4, abr:C, abr:P, abr:O, abr:P2, abr:C1, abr:N2]), [pattern={abr:P rdfs:range abr:C}] with vars frozenset([abr:P1, abr:N1, abr:N, abr:N3, abr:C2, abr:S, abr:N4, abr:C, abr:P, abr:O, abr:P2, abr:C1, abr:N2])]
+goal rules =  []
+defaultdict(<type 'int'>, {'rule': 8, 'fact': 20})
+time reasoning took= 0.823478937149
+  of which 0.699901819229 was after loading, and 0.684106826782 was actual reasoning
+I can prove the following compliance statements:
+n6 = (someValue, g, h, None) [premise]
+n5 = (someValue, e, f, None) [premise]
+n4 = (someValue, c, d, None) [premise]
+n3 = (someValue, a, b, None) [premise]
+n24 = Rule 1 with vars frozenset([]) [premise]
+n33 = Rule 2 with vars frozenset([]) <= http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#Rule1(n3 = (someValue, a, b, None), n24 = Rule 1 with vars frozenset([]))
+n73 = Rule 3 with vars frozenset([]) <= http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#Rule2(n4 = (someValue, c, d, None), n33 = Rule 2 with vars frozenset([]))
+n82 = Rule 4 with vars frozenset([]) <= http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#Rule3(n5 = (someValue, e, f, None), n73 = Rule 3 with vars frozenset([]))
+n101 = (someValue, air:compliant-with, HiddenRulePolicy, None) <= http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#Rule4(n6 = (someValue, g, h, None), n82 = Rule 4 with vars frozenset([]))
+     @prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+    @prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+    @prefix tms: <http://dig.csail.mit.edu/TAMI/2007/amord/tms#> .
+    
+    :Rule1     tms:justification tms:premise .
+    
+    :Rule2     tms:justification  [
+             tms:antecedent-expr  [
+                 a tms:And-justification;
+                 tms:sub-expr :Rule1,
+                        {:someValue     :a :b .
+                } ];
+             tms:rule-name :Rule1 ] .
+    
+    :Rule3     tms:justification  [
+             tms:antecedent-expr  [
+                 a tms:And-justification;
+                 tms:sub-expr :Rule2,
+                        {:someValue     :c :d .
+                } ];
+             tms:rule-name :Rule2 ] .
+    
+    :Rule4     tms:justification  [
+             tms:antecedent-expr  [
+                 a tms:And-justification;
+                 tms:sub-expr :Rule3,
+                        {:someValue     :e :f .
+                } ];
+             tms:rule-name :Rule3 ] .
+    
+    :someValue     air:compliant-with :HiddenRulePolicy .
+    {
+        :someValue     air:compliant-with :HiddenRulePolicy .
+        
+        }     tms:justification  [
+             tms:antecedent-expr  [
+                 a tms:And-justification;
+                 tms:sub-expr :Rule4,
+                        {:someValue     :g :h .
+                } ];
+             tms:rule-name :Rule4 ] .
+    {
+        :someValue     :a :b;
+             :c :d;
+             :e :f;
+             :g :h .
+        
+        }     tms:justification tms:premise .
+    
+

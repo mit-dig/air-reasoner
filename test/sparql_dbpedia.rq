@@ -1,0 +1,4 @@
+PREFIX dbpedia2: <http://dbpedia.org/property/>
+
+SELECT DISTINCT ?airport WHERE
+{?airport dbpedia2:iata "GS"@en .}

@@ -1,0 +1,22 @@
+# Believe this hides everything inside.  It appears to.
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+@forAll :X .
+
+:BindingRulePolicy a air:Policy;
+	air:rule :Rule1 .
+
+:Rule1 a air:Belief-rule ;
+       air:label "Rule 1";
+       air:if { :someValue :X :b . };
+       air:then [ air:rule :Rule2 ] .
+#       air:else [ air:assert [ air:statement { :someValue air:non-compliant-with :BindingRulePolicy . } ] ] .
+
+:Rule2 a air:Belief-rule ;
+       air:label "Rule 2" ;
+       air:if { :someValue :X :c . } ;
+       air:description ("rule2") ;
+       air:then [ air:assert { :someValue air:compliant-with :BindingRulePolicy . } ] ;
+       air:else [ air:assert  { :someValue air:non-compliant-with :BindingRulePolicy . } ] .
+

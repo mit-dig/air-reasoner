@@ -1,0 +1,185 @@
+
+# $Date: 2008-12-10 18:05:26 -0500 (Wed, 10 Dec 2008) $
+# $Revision: 25402 $
+# $Author: lkagal $
+
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<> rdfs:comment "Definition of the AIR (AMORD in RDF) policy language.".
+
+##### AMORD components #####
+
+air:Abstract-action a rdfs:Class;
+    rdfs:label "Abstract superclass of actions".
+
+air:Abstract-container a rdfs:Class;
+    rdfs:label "Abstract superclass of containers for actions".
+
+air:Abstract-rule rdfs:subClassOf air:Abstract-action, air:Abstract-container;
+    rdfs:label "Abstract superclass of rules".
+
+air:Abstract-assertion rdfs:subClassOf air:Abstract-action;
+    rdfs:label "Abstract superclass of assertions".
+
+air:Policy rdfs:subClassOf air:Abstract-container;
+    rdfs:label "Policy";
+    rdfs:comment "A collection of rules and assertions.".
+
+air:Belief-rule rdfs:subClassOf air:Abstract-rule;
+    rdfs:label "Belief rule";
+    rdfs:comment "Rules in this class match beliefs.".
+
+air:Goal-rule rdfs:subClassOf air:Abstract-rule;
+    rdfs:label "Goal rule";
+    rdfs:comment "Rules in this class match goals.".
+
+air:Hidden-rule rdfs:subClassOf air:Abstract-rule;
+    rdfs:label "Rules in this class are normally hidden in the output." .
+
+air:Belief rdfs:subClassOf air:Abstract-assertion;
+    rdfs:label "Belief assertion".
+
+air:Goal rdfs:subClassOf air:Abstract-assertion;
+    rdfs:label "Goal assertion".
+
+air:Graph a rdfs:Class;
+    rdfs:label "Graph";
+    rdfs:comment "This ought to be the (non-existent) standard graph class.".
+
+air:Pattern rdfs:subClassOf air:Graph;
+    rdfs:label "Pattern";
+    rdfs:comment "Pattern graph for policy rules.".
+
+air:Variable a rdfs:Class;
+    rdfs:label "Variable";
+    rdfs:comment "Pattern variables for policy rules.".
+
+air:Justification a rdfs:Class;
+    rdfs:label "Justification".
+
+air:Contradiction a rdfs:Class;
+    rdfs:label "Contradiction".
+
+# A rule consists of a pattern, an optional matched-graph variable,
+# an optional justification, and zero or more actions.  Omitting the
+# matched-graph variable means there's no direct reference for the
+# matched graph, which often isn't needed.  Omitting the justification
+# means a default justification is used, also the usual case.  Actions
+# are properties that assert statements or introduce subrules.
+
+air:pattern a rdf:Property;
+    rdfs:label "Rule pattern";
+    rdfs:domain air:Abstract-rule;
+    rdfs:range air:Pattern;
+    rdfs:comment "Pattern to be matched against a universe.".
+
+air:matched-graph a rdf:Property;
+    rdfs:label "Matched-graph variable";
+    rdfs:domain air:Abstract-rule;
+    rdfs:range air:Variable;
+    rdfs:comment "Variable to bind to a graph matching a pattern.".
+
+air:variable a rdf:Property;
+    rdfs:label "Declare variable";
+    rdfs:domain air:Abstract-container;
+    rdfs:range air:Variable;
+    rdfs:comment "Declare variable scoped to the container it appears in.".
+
+air:is-variable a rdf:Property;
+    rdfs:label "Variable condition";
+    rdfs:domain rdfs:Resource;
+    rdfs:range xsd:boolean;
+    rdfs:comment "Tests whether the subject is/isn't a goal variable.".
+
+air:label rdfs:subPropertyOf rdfs:label;
+    rdfs:label "Label for action";
+    rdfs:domain air:Abstract-action;
+    rdfs:range rdfs:Literal;
+    rdfs:comment "Debugging label for an action.".
+
+air:justification a rdf:Property;
+    rdfs:label "Justification of action";
+    rdfs:domain air:Abstract-action;
+    rdfs:range air:Justification;
+    rdfs:comment "Explicit justification for an action.".
+
+air:rule-id a rdf:Property;
+    rdfs:label "Rule ID for justification";
+    rdfs:domain air:Justification;
+    rdfs:range air:Abstract-rule.
+
+air:antecedent a rdf:Property;
+    rdfs:label "Antecedent for justification";
+    rdfs:domain air:Justification;
+    rdfs:range air:Graph.
+
+# Rules:
+
+air:rule a rdf:Property;
+    rdfs:label "Belief rule";
+    rdfs:domain air:Abstract-container;
+    rdfs:range air:Belief-rule;
+    rdfs:comment "Assert a belief rule.".
+
+air:goal-rule a rdf:Property;
+    rdfs:label "Nested goal rule";
+    rdfs:domain air:Abstract-container;
+    rdfs:range air:Goal-rule;
+    rdfs:comment "Assert a goal rule.".
+
+air:description a rdf:Property;
+    rdfs:label "Rule Description";
+    rdfs:domain air:Abstract-rule;
+    rdfs:comment "description to be displayed in ui".
+
+# Assertions:
+
+air:assertion a rdf:Property;
+    rdfs:label "Belief assertion";
+    rdfs:domain air:Abstract-container;
+    rdfs:range air:Belief;
+    rdfs:comment "Assert a belief.".
+
+air:goal-assertion a rdf:Property;
+    rdfs:label "Goal assertion";
+    rdfs:domain air:Abstract-container;
+    rdfs:range air:Goal;
+    rdfs:comment "Assert a goal.".
+
+air:statement a rdf:Property;
+    rdfs:label "Statement being asserted";
+    rdfs:domain air:Abstract-assertion;
+    rdfs:range air:Pattern;
+    rdfs:comment "A graph to be asserted.".
+
+# These are like the above but they have implicit justification:
+
+air:assert a rdf:Property;
+    rdfs:label "Simple belief assertion";
+    rdfs:domain air:Abstract-container;
+    rdfs:range air:Pattern;
+    rdfs:comment "Assert a belief, with default justification.".
+
+air:assert-goal a rdf:Property;
+    rdfs:label "Simple goal assertion";
+    rdfs:domain air:Abstract-container;
+    rdfs:range air:Pattern;
+    rdfs:comment "Assert a goal, with default justification.".
+
+##### Compliance #####
+
+air:compliant-with a rdf:Property;
+    rdfs:label "Policy compliance";
+    rdfs:domain rdfs:Resource;
+    rdfs:range air:Policy;
+    rdfs:comment "The subject resource is compliant with the object policy.".
+
+air:non-compliant-with a rdf:Property;
+    rdfs:label "Policy non-compliance";
+    rdfs:domain rdfs:Resource;
+    rdfs:range air:Policy;
+    rdfs:comment "The subject resource is non-compliant with the object policy.".

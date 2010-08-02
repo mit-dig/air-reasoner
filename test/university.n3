@@ -1,0 +1,153 @@
+
+# $Date: 2007-09-05 13:33:45 -0400 (Wed, 05 Sep 2007) $
+# $Revision: 4011 $
+# $Author: cph $
+
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+@prefix mit: <http://dig.csail.mit.edu/TAMI/2007/s0/university#> .
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/s0/university#> .
+
+<> rdfs:comment "Describes classes and properties used in scenario 0".
+
+:MITIndividual a rdfs:Class;
+	rdfs:label "MIT Individual class";
+	rdfs:comment "Anyone who works in/attends MIT".
+
+:Student rdfs:subClassOf :MITIndividual;
+	rdfs:label "Student class";
+	rdfs:comment "People who study at MIT".
+
+:registeredFor a rdf:Property;
+	rdfs:label "registeredFor property of Student class";
+	rdfs:range :Course;
+	rdfs:domain :Student;
+	rdfs:comment "student who has registered for a course".
+
+:TA rdfs:subClassOf :Student;
+	rdfs:label "Teaching Assistant class".
+
+:Professor rdfs:subClassOf :Staff;
+	rdfs:label "Professor class";
+	rdfs:comment "Professor class".
+
+:Course a rdfs:Class;
+	rdfs:label "Course class";
+	rdfs:comment "A course being taught".
+
+:teaches a rdf:Property;
+	rdfs:label "teaches property";
+	rdfs:domain :Professor;
+	rdfs:range :Course;
+	rdfs:comment "A professor teaches a course".
+
+:helpsTeach a rdf:Property;
+	rdfs:label "helpsTeach property of TA class";
+	rdfs:domain :TA;
+	rdfs:range :Course;
+	rdfs:comment "A TA helps a professor teache a course".
+
+:ProxCard a rdfs:Class;
+	rdfs:label "Prox card class";
+	rdfs:comment "Every MIT person has a prox card for entering and using the MIT premises".
+
+:hasCard a rdf:Property;
+	rdfs:label "hasCard property of MIT individual";
+	rdfs:domain :MITIndividual;
+	rdfs:range :ProxCard;
+	rdfs:comment "Every MIT person has a prox card for entering and using the MIT premises".
+
+:ProxCardEvent a rdfs:Class;
+	rdfs:label "Prox Card Event Class";
+	rdfs:comment "Use of prox card".
+
+:usedDateTime a rdf:Property;
+	rdfs:label "usedDateTime property of ProxCardEvent";
+	rdfs:domain :ProxCardEvent;
+	rdfs:range xsd:dateTime; # e.g. 2007-07-01T10:30:00-5:00
+	rdfs:comment "Date & time when prox card was used".
+
+:location a rdf:Property;
+	rdfs:label "location property of ProxCardEvent";
+	rdfs:domain :ProxCardEvent;
+	rdfs:comment "Location where prox card was used".
+
+:card a rdf:Property;
+	rdfs:label "card property of ProxCardEvent";
+	rdfs:domain :ProxCardEvent;
+	rdfs:comment "the rox card that was used".
+
+:CoDAllegation a rdf:Class.
+
+:filedBy a rdf:Property;
+	rdfs:domain :CoDAllegation;
+	rdfs:range :MITIndividual.
+
+:against a rdf:Property;
+	rdfs:domain :CoDAllegation;
+	rdfs:range :MITIndividual.
+
+:for a rdf:Property;
+	rdfs:domain :CoDAllegation.
+
+:evidence a rdf:Property;
+	rdfs:domain :CoDallegation.
+
+#### NOT USED ############################################
+
+:University a rdfs:Class;
+	rdfs:label "University class";
+	rdfs:comment "MIT is of type University".
+
+:hasSchool a rdf:Property;
+	rdfs:label "hasSchool property";
+	rdfs:domain :University;
+	rdfs:range :School;
+	rdfs:comment "University is made up of different schools".
+
+:School a rdfs:Class;
+	rdfs:label "School class";
+	rdfs:comment "University is made up of different schools".
+
+:hasLab a rdf:Property;
+	rdfs:label "hasLab property";
+	rdfs:domain :School;
+	rdfs:range :Lab;
+	rdfs:comment "A school is made up of different labs".
+
+:Lab a rdfs:Class;
+	rdfs:label "Lab class";
+	rdfs:comment "A school is made up of different labs".
+
+:Building a rdf:Class.
+:Floor a rdf:Class.
+
+:partOf a rdf:Property;
+	rdfs:domain :Floor;
+	rdfs:range :Building.
+
+
+:Staff rdfs:subClassOf :MITIndividual;
+	rdfs:label "Staff class";
+	rdfs:comment "People who work at MIT".
+
+:worksIn a rdf:Property;
+	rdfs:label "attends property";
+	rdfs:domain :Staff;
+	rdfs:range :Lab;
+	rdfs:comment "Individuals who work in the Lab".
+
+:attends a rdf:Property;
+	rdfs:label "attends property";
+	rdfs:range :University;
+	rdfs:domain :Student;
+	rdfs:comment "student who attends the University".
+
+:Paper a rdfs:Class;
+	rdfs:label "Paper class";
+	rdfs:comment "Papers".
+
+#ends

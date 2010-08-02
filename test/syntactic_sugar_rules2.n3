@@ -1,0 +1,11 @@
+# We have two assertions here.  How do they behave?
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+@prefix tms: <http://dig.csail.mit.edu/TAMI/2007/amord/tms#> .
+
+:SomePolicy a air:Policy;
+	air:rule [
+		air:label "Generic Rule";
+		air:if { :someValue :a :b . };
+		air:then [ air:assert [ air:statement { :someValue air:compliant-with :SomePolicy . } ] ] ] .

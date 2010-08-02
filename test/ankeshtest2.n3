@@ -1,0 +1,25 @@
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .	
+@prefix tami: <http://tw.rpi.edu/proj/tami/Special:URIResolver/> .
+@prefix tamic: <http://tw.rpi.edu/proj/tami/Special:URIResolver/Category-3A> .
+@prefix tamip: <http://tw.rpi.edu/proj/tami/Special:URIResolver/Property-3A> .
+@prefix :  <http://tw.rpi.edu/proj/tami/Special:URIResolver/> .
+
+@forAll :PERSON, :CITY, :STATE.
+
+:ny_neighbor_state_residency_policy a air:Policy;
+    air:rule :non-ny-residency-rule.
+
+:non-ny-residency-rule a air:Belief-rule;
+    rdfs:label "Non NY residency rule";
+    air:if {:PERSON tamip:Lives_in_city :CITY.};
+    air:then [air:rule [
+        air:if {:CITY tamip:Has_state :NY.};
+        air:else [air:rule :neighbor-state-rule]]
+    ].
+
+:neighbor-state-rule a air:Belief-rule;
+    rdfs:label "neighbor state rule";
+    air:if { :CITY tamip:Has_state :STATE.
+                  :STATE tamip:Neighbor_state :NY.};
+    air:then [air:assert [air:statement { :PERSON air:compliant-with :ny_neighbor_state_residency_policy. }]].

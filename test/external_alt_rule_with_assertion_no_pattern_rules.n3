@@ -1,0 +1,19 @@
+# Testing an air:rule that should balk when loaded.
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+@forAll :x .
+
+:ExternalAltRuleWithAssertionNoPatternPolicy a air:Policy;
+	air:rule :BadRule .
+
+:BadRule a air:Rule ;
+	air:label "Inline Rule With Assertion and No Pattern";
+	air:pattern { :this :wont :match . } ;
+	air:assert { :this :wont :fire . } ;
+	air:alt [
+		air:assertion [
+			air:statement { :x air:compliant-with :ExternalAltRuleWithAssertionNoPatternPolicy . } ;
+			air:justification [
+				air:rule-id :non-rule ;
+				air:antecedent :antecedent ] ] ] .

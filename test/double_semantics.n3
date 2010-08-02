@@ -1,0 +1,31 @@
+# This rule should return compliant with all policies.
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix log: <http://www.w3.org/2000/10/swap/log#> .
+
+@forAll :ONTOLOGY, :S, :P, :O .
+
+:DoubleSemanticsPolicy a air:Policy;
+	               air:rule :assertRule, :doubleSemanticsRule .
+
+# This doesn't thoroughly check ALL things owlEntails should do...
+# Just two common use-cases (rdfs:subClassOf and owl:sameAs)
+
+:assertRule a air:Belief-rule ;
+       air:label "assert rule";
+       air:if { <owl_entails_ontology.n3> log:semantics :ONTOLOGY . } ;
+       air:then [ air:assert [ air:statement { <owl_entails_ontology.n3> log:semantics :ONTOLOGY . <owl_entails_ontology.n3> :b :c . } ] ] .
+
+:doubleSemanticsRule a air:Belief-rule ;
+       air:label "double log:semantics Rule";
+       air:if { :S :b :c . } ;
+       air:then [ air:rule :doubleSemanticsRule_2 ] .
+
+:doubleSemanticsRule_2 a air:Belief-rule ;
+       air:label "double log:semantics Rule 2";
+       air:if { :S :P :O . } ;
+       air:then [ air:assert [ air:statement { :doubleSemanticsRule air:compliant-with :DoubleSemanticsPolicy . } ] ] ;
+       air:else [ air:assert [ air:statement { :doubleSemanticsRule air:non-compliant-with :DoubleSemanticsPolicy . } ] ] .

@@ -1,0 +1,1823 @@
+# $Date: 2009-09-10 22:27:01 -0400 (Thu, 10 Sep 2009) $
+# $Revision: 27367 $
+# $Author: mjsweig $
+
+########Namespaces########
+
+#Default Namespace
+@prefix : <http://dig.csail.mit.edu/2010/DHS-fusion/US/DHS/rules/5_USC_552a#>.
+
+#rules is an alias for :
+@prefix rules: <#>.
+
+#AIR
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#>.
+
+#owl
+@prefix owl: <http://www.w3.org/2002/07/owl#>.
+
+#log
+@prefix log: <http://www.w3.org/2000/10/swap/log#> .
+
+#FOAF
+@prefix foaf:  <http://xmlns.com/foaf/0.1/>.
+
+#Defines terms specific to this instance of the Privacy Act
+@prefix pri: <http://dig.csail.mit.edu/2010/DHS-fusion/US/DHS/rules/5_USC_552a_ONT#>.
+
+#Contains list of agencies recognized as Govenrnment Agencies
+@prefix govt_agencies: <http://dig.csail.mit.edu/2010/DHS-fusion/US/DHS/rules/PRI_Government_Agencies#>.
+
+
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+#Defines how we can find our fingers and toes so we the reasoner can work with us.
+@prefix fusion: <http://dig.csail.mit.edu/2010/DHS-fusion/common/fusion_ONT#>.
+
+# Although there are many policies, we apparently need only to associate these next lines
+# with any valid policy.
+
+# Our ontology so we can reason.
+:The_Privacy_Act_of_1974_552a_b rdfs:seeAlso "http://dig.csail.mit.edu/2010/DHS-fusion/US/DHS/rules/5_USC_552a_ONT.n3".
+
+# The ontology prefix for our transactions.
+:The_Privacy_Act_of_1974_552a_b fusion:transaction_ontology "http://dig.csail.mit.edu/2010/DHS-fusion/US/DHS/rules/5_USC_552a_ONT".
+
+# The cross-ontology reasoning file for this jurisdiction.
+:The_Privacy_Act_of_1974_552a_b rdfs:seeAlso "http://dig.csail.mit.edu/2010/DHS-fusion/US/DHS/rules/pri_sameAs.n3".
+
+
+###Policy###
+
+@forAll :S, :P, :INFO, :DATA, :DOC-DATA, :EVENT, :R, :SR.
+@forAll :SENDER, :RECEIVER, :MEMBERSHIP, :JOB_TITLE, :PURPOSE, :CONTAINS.
+
+#
+# Value Setups
+#
+# Before we run the policy or its sub-rules, we need to fetch values from various places.
+# Sometimes a value we're expecting we might find is not there.  This logic
+# fetches the value if it exists, and asserts the value as associated with another
+# global value we're working with, for example :EVENT.
+# Later we test the value, and it's assertion or lack thereof is handled properly.
+#
+
+# We pull organizational membership from the Receiver's FOAF file if it exists.
+:Org_Membership a air:Belief-rule;
+    rdfs:comment "Compute our agency affiliation.";
+    air:if {
+        :EVENT a pri:Share;
+            pri:to :R.
+	:R log:semantics :RECEIVER.
+        :RECEIVER log:includes {:R foaf:member :MEMBERSHIP. }.
+    };
+    air:then [ 
+#	air:description (  :R " is a member of organization " :MEMBERSHIP ".");
+	air:assert [air:statement {:R foaf:member :MEMBERSHIP.} ]
+#	air:assert [air:statement {:EVENT air:compliant-with :Org_Membership.}]
+    ].
+
+# We pull Job Title from the Receiver's FOAF file if it exists.
+:Job_Title a air:Belief-rule;
+    rdfs:comment "Set Job Title if any.";
+    air:if {
+        :EVENT a pri:Share;
+            pri:to :R.
+	:R log:semantics :RECEIVER.
+        :RECEIVER log:includes {:R fusion:job_title :JOB_TITLE. }.
+    };
+    air:then [ 
+#	air:description (  :R " has job title " :JOB_TITLE ".");
+	air:assert [air:statement {:R fusion:job_title :JOB_TITLE.} ]
+#	air:assert [air:statement {:EVENT air:compliant-with :Job_Title.}]
+    ].
+
+# We pull Purpose from the Document file if it exists.
+:Doc_Purpose a air:Belief-rule;
+    rdfs:comment "Find Document Purpose if any.";
+    air:if {
+        :EVENT a pri:Share;
+            pri:data :INFO;
+	    pri:doc-data :DATA.
+       	:DATA log:semantics :DOC-DATA.
+        :DOC-DATA log:includes {:INFO pri:purpose :PURPOSE. }.
+    };
+    air:then [ 
+	air:description ( :INFO " has purpose:  " :PURPOSE ".");
+	air:assert [air:statement {:EVENT pri:purpose :PURPOSE.} ]
+#	air:assert [air:statement {:EVENT air:compliant-with :Doc_Purpose.}]
+    ].
+
+# We pull reference to a contained doc from the Document file if it exists.
+:Doc_Contains a air:Belief-rule;
+    rdfs:comment "Set Document Purpose if any.";
+    air:if {
+        :EVENT a pri:Share;
+            pri:data :INFO;
+	    pri:doc-data :DATA.
+       	:DATA log:semantics :DOC-DATA.
+        :DOC-DATA log:includes {:INFO pri:contains :CONTAINS. }.
+    };
+    air:then [ 
+#	air:description ( :EVENT " contains:  " :CONTAINS ".");
+	air:assert [air:statement {:EVENT pri:contains :CONTAINS.} ]
+#	air:assert [air:statement {:EVENT air:compliant-with :Doc_Contains.}]
+    ].
+
+#
+# Debug
+#
+# This rule grows or shrinks to handle a new bit of logic we want to test.
+# Comment out most of the other sub-rule calls from the policy, and let
+# this run and assert complies-with Debug.
+# Particularly useful in debugging the situation of "Nothing to Prove."
+#
+
+:DEBUG a air:Belief-rule;
+        rdfs:label "Debugging rule.";
+        rdfs:comment "Running a debug test.";
+	air:if {
+	    :R fusion:job_title :JOB_TITLE.
+	    :JOB_TITLE owl:sameAs  pri:headOf.
+	    };
+	air:then [
+	    air:description ( :R " has job title " :JOB_TITLE "." );
+	    air:assert [air:statement {:S air:compliant-with :DEBUG.}]
+	];
+	air:else [
+	    air:description ( "Requestor: " :R " job title " :JOB_TITLE " does not match " pri:headOf " as required by The_Privacy_Act_of_1974_552a_b7.");
+	    air:assert [air:statement { :EVENT air:non-compliant-with :DEBUG. }]
+	].
+
+:The_Privacy_Act_of_1974_552a_b a air:Policy;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (b)";
+	rdfs:comment "No agency shall disclose any record which is contained in a system of records by any means of communication to any person, or to another agency";
+	air:rule :Org_Membership;
+	air:rule :Job_Title;
+	air:rule :Doc_Purpose;
+	air:rule :Doc_Contains;
+	air:rule :init_b.
+
+:init_b a air:Belief-rule;
+	air:if {
+		:EVENT a pri:Share;
+			pri:by :S;
+			pri:to :R;
+			pri:data :INFO;
+			pri:doc-data :DATA.
+        	:DATA log:semantics :DOC-DATA.
+		:DOC-DATA log:includes {:INFO a pri:PII. }.
+        	:S log:semantics :SENDER.
+		:R log:semantics :RECEIVER.
+#		:SENDER log:includes { :S foaf:government_type pri:US_Federal_Agency. }.
+#		XXX Not converted to log:semantics or owl:Entails yet.
+#		:P a pri:US_Person.
+#		:SR a pri:System_of_Records.
+#		:INFO pri:contained_in :SR.
+		};
+	air:then [air:rule :The_Privacy_Act_of_1974_552a_b_c01].
+
+:The_Privacy_Act_of_1974_552a_b_c01 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (b) c01";
+	rdfs:comment "No agency shall disclose any record which is contained in a system of records by any means of communication to any person, or to another agency";
+	air:if {
+		:DOC-DATA log:includes {:INFO pri:about :P. }.
+		};	
+	air:then [
+		air:description ( :INFO " contains PII about " :P ".  Disclosure cannot be made except under specifically defined conditions.");
+#		air:rule :DEBUG];
+		air:rule :The_Privacy_Act_of_1974_552a_b_c02;];
+	air:else [
+		air:description (:INFO " is not personally identifiable or is not about a person and therefore isn't covered by the Privacy Act");
+		air:assert [air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_b_c01.}]].
+				
+:The_Privacy_Act_of_1974_552a_b_c02 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (b) c02";
+	rdfs:comment "No agency shall disclose any record which is contained in a system of records by any means of communication to any person, or to another agency, except pursuant to a written request by, or with the prior written consent of, the individual to whom the record pertains";
+	air:if {
+		@forSome :REQINFO.
+		:REQINFO a pri:Request;
+			pri:by :P;
+			pri:to :S;
+			pri:data :INFO;
+			# Implicitly, this is a written request.
+			# pri:contains [a pri:Written_Request].
+		};
+	air:then [
+		air:description (:S " can give " :INFO " to " :P ", because the record pertains to " :P ".");
+		air:assert [air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_b_c02.}]];
+	air:else [
+		air:description (:INFO " about " :P " was not requested by " :P ". Compliant disclosure may be possible under other conditions.");
+		air:rule :The_Privacy_Act_of_1974_552a_b_c03].
+
+:The_Privacy_Act_of_1974_552a_b_c03 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (b) c03";
+	rdfs:comment "No agency shall disclose any record which is contained in a system of records by any means of communication to any person, or to another agency, except pursuant to a written request by, or with the prior written consent of, the individual to whom the record pertains";
+	air:if {
+		@forSome :CONSENT.
+		:CONSENT a pri:Event;
+			pri:by :P;
+			pri:to :S;
+			pri:data :INFO;
+			pri:contains [a pri:Written_Consent].
+		:EVENT pri:antecedent :CONSENT.
+		};
+	air:then [
+		air:description (:S " can give " :INFO " to " :R ", because " :P " gave consent for the transaction.");
+		air:assert [air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_b_c03.}]];
+	air:else [
+		air:description (:P " did not give consent to use " :INFO ". Compliant disclosure may be possible under other conditions.");
+		air:rule :PRI_Purpose_Check].
+
+:PRI_Purpose_Check a air:Belief-rule;
+	air:if{
+	    :EVENT pri:purpose :PURPOSE.
+	    };
+	air:then [
+            air:description (:EVENT " has purpose: " :PURPOSE ".");
+	    air:rule :The_Privacy_Act_of_1974_552a_b1		
+	];
+	air:else [
+            air:description (:EVENT " has no stated purpose.  No further evaluation of compliance under section b can be made.");
+	    air:assert [air:statement {:EVENT air:non-compliant-with :The_Privacy_Act_of_1974_552a_b.}]
+	].
+
+:The_Privacy_Act_of_1974_552a_b1 a air:Belief-rule;	
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (b)(1)";
+	rdfs:comment "No agency shall disclose any record which is contained in a system of records by any means of communication to any person, or to another agency, except pursuant to a written request by, or with the prior written consent of, the individual to whom the record pertains, unless disclosure of the record would be to those officers and employees of the agency which maintains the record who have a need for the record in the performance of their duties;";
+	air:if {
+		@forSome :AGENCY.
+		:R pri:employedBy :AGENCY.
+		:AGENCY pri:maintains :SR.
+		:EVENT pri:purpose pri:Need_to_Know.		
+		};
+	air:then [
+		air:description (:S " can give " :INFO " to " :R ", because " :INFO " is necessary to the performance of duties of " :R ", and " :R " is from the agency which maintains the record.");
+		air:assert [air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_b1.}]];
+	air:else [
+		air:description (:S " cannot give " :INFO " to " :R ", because purpose of inquiry " :PURPOSE " does not match " pri:Need_to_Know " or is not necessary to the performance of duties of " :R ", or because " :R " is not from the agency which maintains the record.");
+		air:rule :The_Privacy_Act_of_1974_552a_b2].		
+:The_Privacy_Act_of_1974_552a_b2 a air:Belief-rule;	
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (b)(2)";
+	rdfs:comment "No agency shall disclose any record which is contained in a system of records by any means of communication to any person, or to another agency, except pursuant to a written request by, or with the prior written consent of, the individual to whom the record pertains, unless disclosure of the record would be required under section 552 of this title";
+	air:if {
+		:EVENT pri:purpose pri:FOIA_5_USC_552.
+		};
+	air:then [
+		air:description (:S " can give " :INFO " to " :R ", because FOIA (5 USC 552) requires it");
+		air:assert [air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_b2.}]];
+	air:else [
+		air:description (:S " cannot give " :INFO " to " :R ", because purpose of inquiry " :PURPOSE " does not match " pri:FOIA_5_USC_552 " therefore FOIA (5 USC 552) does not require it.");
+		air:rule :The_Privacy_Act_of_1974_552a_b3].		
+:The_Privacy_Act_of_1974_552a_b3 a air:Belief-rule;	
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (b)(3)";
+	rdfs:comment "No agency shall disclose any record which is contained in a system of records by any means of communication to any person, or to another agency, except pursuant to a written request by, or with the prior written consent of, the individual to whom the record pertains, unless disclosure of the record would be for a routine use as defined in subsection (a)(7) of this section and described under subsection (e)(4)(D) of this section";
+	air:if {
+		:EVENT pri:purpose pri:routine_use.
+#	KKW
+#		FOR LATER:
+#		Data purpose algebra: (a)(7) requires a use of the record "compatible with" the purpose for collection.
+#		Need to call the list of routine_use policies for the particular SR and then the EVENT purpose has to be same_as one of them.
+#		Need to be able to confirm that the routine_use appears on the current published list of routine uses which can found on the web. 
+		};
+	air:then [
+		air:description (:S " can give " :INFO " to " :R ", because its purpose is permitted in a published routine use.");
+		air:assert [air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_b3.}]];
+	air:else [
+		# air:description (:S " cannot give " :INFO " to " :R ", because purpose of inquiry ":PURPOSE " does not match " pri:routine_use ".");
+		air:rule :The_Privacy_Act_of_1974_552a_b4].		
+:The_Privacy_Act_of_1974_552a_b4 a air:Belief-rule;	
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (b)(4)";
+	rdfs:comment "No agency shall disclose any record which is contained in a system of records by any means of communication to any person, or to another agency, except pursuant to a written request by, or with the prior written consent of, the individual to whom the record pertains, unless disclosure of the record would be to the Bureau of the Census for purposes of planning or carrying out a census or survey or related activity pursuant to the provisions of Title 13";
+	air:if {
+		:EVENT pri:purpose pri:Census.
+		:R a pri:Census_Bureau.
+		};
+	air:then [
+		air:description (:S " can give " :INFO " to " :R ", because its purpose is for carrying out or planning a census.");
+		air:assert [air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_b4.}]];
+	air:else [
+		# air:description (:S " cannot give " :INFO " to " :R ", because it is not being given to the Census Bureau or because its purpose does not match " pri:Census ".  Compliant disclosure may be possible under other conditions.");
+		air:rule :The_Privacy_Act_of_1974_552a_b5].		
+:The_Privacy_Act_of_1974_552a_b5 a air:Belief-rule;	
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (b)(5)";
+	rdfs:comment "No agency shall disclose any record which is contained in a system of records by any means of communication to any person, or to another agency, except pursuant to a written request by, or with the prior written consent of, the individual to whom the record pertains, unless disclosure of the record would be to a recipient who has provided the agency with advance adequate written assurance that the record will be used solely as a statistical research or reporting record, and the record is to be transferred in a form that is not individually identifiable";
+	air:if {
+	#######WHO##########
+		@forSome :SONII.
+		:SONII a pri:Event;
+			pri:by :R;
+			pri:to :S;
+			pri:contains pri:Stats_Only.
+			#[a pri:Not_II].  # Later:  Confirm record will be transferred in a non individually identifiable form.
+		:EVENT pri:purpose pri:Stats_Research.
+		};
+	air:then [
+		air:description (:S " can give " :INFO " to " :R ", because there is adequate written assurance that the record will be used solely as a statistical research or reporting record, and the record is to be transferred in a form that is not individually identifiable.");
+		air:assert [air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_b5.}]];
+	air:else [
+		# air:description (:S " cannot give " :INFO " to " :R ", because there is not adequate written assurance that the record will be used solely as a statistical research or reporting record, and the record is to be transferred in a form that is not individually identifiable.  Compliant disclosure may be possible under other conditions.");
+		air:rule :The_Privacy_Act_of_1974_552a_b6_c01].
+:The_Privacy_Act_of_1974_552a_b6_c01 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (b)(6) c01";
+	rdfs:comment "No agency shall disclose any record which is contained in a system of records by any means of communication to any person, or to another agency, except pursuant to a written request by, or with the prior written consent of, the individual to whom the record pertains, unless disclosure of the record would be to the National Archives and Records Administration as a record which has sufficient historical or other value to warrant its continued preservation by the United States Government";
+	air:if {
+		:EVENT pri:purpose pri:Historical_Record.
+		:R a pri:National_Archives_Records_Admin.
+		};
+	air:then [
+		air:description (:S " can give " :INFO " to " :R ", if " :INFO " has sufficient value to warrant its preservation by the United States Government.");
+		air:assert [air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_b6_c01.}]];
+	air:else [
+		# air:description ("The purpose of " :EVENT " is not " pri:Historical_Record ".  Compliant disclosure may be possible under other conditions.");
+		air:rule :The_Privacy_Act_of_1974_552a_b6_c02].		
+:The_Privacy_Act_of_1974_552a_b6_c02 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (b)(6) c02";
+	rdfs:comment "No agency shall disclose any record which is contained in a system of records by any means of communication to any person, or to another agency, except pursuant to a written request by, or with the prior written consent of, the individual to whom the record pertains, unless disclosure of the record would be to the National Archives and Records Administration...for evaluation by the Archivist of the United States or the designee of the Archivist to determine whether the record has such value;";
+	air:if {
+		:EVENT pri:purpose [a pri:Archivists_Evaluation].
+		:R a pri:Archivist_or_designee.
+		};
+	air:then [
+		air:description (:S " can give " :INFO " to " :R ", in order to determine if " :INFO " has sufficient value to warrant its preservation by the United States Government.");
+		air:assert [air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_b6_c02.}]];
+	air:else [
+		# air:description ("The purpose of " :EVENT " is not " pri:Archivists_Evaluation " to determine if the record has value to be preserved by the U.S. government.  Compliant disclosure may be possible under other conditions.");
+		air:rule :The_Privacy_Act_of_1974_552a_b7].		
+
+:The_Privacy_Act_of_1974_552a_b7 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (b)(7)";
+	rdfs:comment "No agency shall disclose any record which is contained in a system of records by any means of communication to any person, or to another agency, except pursuant to a written request by, or with the prior written consent of, the individual to whom the record pertains, unless disclosure of the record would be to another agency or to an instrumentality of any governmental jurisdiction within or under the control of the United States for a civil or criminal law enforcement activity if the activity is authorized by law, and if the head of the agency or instrumentality has made a written request to the agency which maintains the record specifying the particular portion desired and the law enforcement activity for which the record is sought";
+	air:if {
+	    # Later verify the system of records matches the one we care about.
+	    :SENDER log:includes { :S pri:maintains :SR }. # XXX Does this test want to be earlier?
+	    };
+	air:then [
+	    air:description ( :SR " is maintained by " :S "." );
+	    air:rule :PRI_b7_Govt_Agency
+	];
+	air:else [
+	    air:description ( :S " does not maintain a system of records.  Compliant disclosure may be possible under other conditions.");
+	    air:rule :The_Privacy_Act_of_1974_552a_b8
+	].
+
+:PRI_b7_Govt_Agency a air:Belief-rule;
+	air:if{
+	    :R foaf:member :MEMBERSHIP.
+	    @forSome :agency_list.
+            govt_agencies:Agencies log:semantics :agency_list.
+	    :agency_list log:includes { govt_agencies:Agencies foaf:Organization :MEMBERSHIP. }.
+	    };
+	air:then [
+            air:description (:R " is a member of Government Agency " :MEMBERSHIP ".");
+	    air:rule :PRI_b7_Law_Enforcement_Purpose
+	];
+	air:else [
+            air:description (:R " is not a member of a Government Agency as required by The_Privacy_Act_of_1974_552a_b7.  Compliant disclosure may be possible under other conditions.");
+	    air:rule :The_Privacy_Act_of_1974_552a_b8
+	].
+
+:PRI_b7_Law_Enforcement_Purpose a air:Belief-rule;
+	air:if{
+	    :EVENT pri:purpose pri:law_enforcement.
+	    };
+	air:then [
+            air:description (:EVENT " has law enforcement purpose.");
+	    air:rule :PRI_b7_Has_Title
+	];
+	air:else [
+            air:description (:EVENT " purpose " :PURPOSE " does not match " pri:law_enforcement ".  Compliant disclosure may be possible under other conditions.");
+	    air:rule :The_Privacy_Act_of_1974_552a_b8
+	].
+:PRI_b7_Has_Title a air:Belief-rule;
+	air:if {
+	    :R fusion:job_title :JOB_TITLE.
+	    };
+	air:then [
+	    air:description (:R " has job title " :JOB_TITLE "." );
+	    air:rule :PRI_b7_Head_of_Agency
+	];
+	air:else [
+	    air:description (:R " has no job title.  Cannot evaluate source of request.");
+	    air:rule :The_Privacy_Act_of_1974_552a_b8].		
+
+:PRI_b7_Head_of_Agency a air:Belief-rule;
+	air:if{
+	    :JOB_TITLE owl:sameAs  pri:headOf.
+	    };
+	air:then [
+		air:description (:S " can give " :INFO " to " :R ", because it is being used for an authorized law enforcement activity and the head of the recipient agency has filed the appropriate written request.");
+		air:assert [air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_b7.}]];
+	air:else [
+		air:description ( "Requestor: " :R " job title " :JOB_TITLE " does not match " pri:headOf " as required by The_Privacy_Act_of_1974_552a_b7.");
+		air:rule :The_Privacy_Act_of_1974_552a_b8].		
+:The_Privacy_Act_of_1974_552a_b8 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (b)(8)";
+	rdfs:comment "No agency shall disclose any record which is contained in a system of records by any means of communication to any person, or to another agency, except pursuant to a written request by, or with the prior written consent of, the individual to whom the record pertains, unless disclosure of the record would be to a person pursuant to a showing of compelling circumstances affecting the health or safety of an individual if upon such disclosure notification is transmitted to the last known address of such individual";
+	air:if {
+	       :EVENT pri:purpose pri:health_safety.
+	       };
+	air:then [
+	    air:description (:EVENT " has health and safety purpose.");
+	    air:rule :PRI_b8_Has_Disclosure_Note
+	    ];
+	air:else [
+            air:description (:EVENT " purpose " :PURPOSE " does not match " pri:health_safety ".  Compliant disclosure may be possible under other conditions.");
+	    air:rule :The_Privacy_Act_of_1974_552a_b9].
+
+:PRI_b8_Has_Disclosure_Note a air:Belief-rule;
+	air:if {
+		@forSome :DISNOTE.
+		:DISNOTE a pri:Event;
+			pri:by :S;
+			pri:to :P;
+			pri:contains [a pri:disclosure_notification].
+		:R a pri:Person.
+		};	
+	air:then [
+		air:description (:S " can give " :INFO " to " :R " because " :INFO " affects the health or safety of an individual, if " :S " will promptly transmit notice to the last known address of " :P ".");
+		air:assert [air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_b8.}]];
+	air:else [
+		air:description (:S " cannot give " :INFO " to " :R " because either " :INFO " because " :P " has not been properly notified.");
+		air:rule :The_Privacy_Act_of_1974_552a_b9].		
+:The_Privacy_Act_of_1974_552a_b9 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (b)(9)";
+	rdfs:comment "No agency shall disclose any record which is contained in a system of records by any means of communication to any person, or to another agency, except pursuant to a written request by, or with the prior written consent of, the individual to whom the record pertains, unless disclosure of the record would be to either House of Congress, or, to the extent of matter within its jurisdiction, any committee or subcommittee thereof, any joint committee of Congress or subcommittee of any such joint committee";
+	air:if {
+		@forSome :JURISD.
+		:JURISD a pri:within_jurisdiction.
+		:R a pri:US_Legislative_Body.
+		};
+	air:then [
+		air:description (:S " can give " :INFO " to " :R ", because it is within the jurisdiction of " :R);
+		air:assert [air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_b9.}]];
+	air:else [
+	        air:description (:S " cannot give " :INFO " to " :R " because it is not within the jurisdiction of " :R ". Compliant disclosure may be possible under other conditions.");
+		air:rule :The_Privacy_Act_of_1974_552a_b10].		
+:The_Privacy_Act_of_1974_552a_b10 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (b)(10)";
+	rdfs:comment "No agency shall disclose any record which is contained in a system of records by any means of communication to any person, or to another agency, except pursuant to a written request by, or with the prior written consent of, the individual to whom the record pertains, unless disclosure of the record would be to the Comptroller General, or any of his authorized representatives, in the course of the performance of the duties of the General Accounting Office";
+	air:if {
+		:EVENT pri:purpose pri:performance_of_duties.
+		:R a pri:Comptroller_General_or_designee.
+		};
+	air:then [
+		air:description (:S " can give " :INFO " to " :R " because it is in the course of the performance of duties of the General Accounting Office.");
+		air:assert [air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_b10.}]];
+	air:else [
+		air:description (:S " cannot give " :INFO " to " :R " because it is not in the course of the performance of duties of the General Accounting Office.  Compliant disclosure may be possible under other conditions.");
+		air:rule :The_Privacy_Act_of_1974_552a_b11].		
+:The_Privacy_Act_of_1974_552a_b11 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (b)(11)";
+	rdfs:comment "No agency shall disclose any record which is contained in a system of records by any means of communication to any person, or to another agency, except pursuant to a written request by, or with the prior written consent of, the individual to whom the record pertains, unless disclosure of the record would be pursuant to the order of a court of competent jurisdiction;";
+	air:if {
+		@forSome :COURTORDER.
+		:COURTORDER a pri:court_order.
+		};
+	air:then [
+		air:description (:S " can give " :INFO " to " :R ", because it is pursuant to the order of a court of competent jurisdiction");
+		air:assert [air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_b11.}]];
+	air:else [
+		air:description (:S " cannot give " :INFO " to " :R ", because it is not pursuant to the order of a court of competent jurisdiction.  Compliant disclosure may be possible under other conditions.");
+		air:rule :The_Privacy_Act_of_1974_552a_b12].		
+:The_Privacy_Act_of_1974_552a_b12 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (b)(12)";
+	rdfs:comment "No agency shall disclose any record which is contained in a system of records by any means of communication to any person, or to another agency, except pursuant to a written request by, or with the prior written consent of, the individual to whom the record pertains, unless disclosure of the record would be to a consumer reporting agency in accordance with section 3711(e) of Title 31";
+	air:if {
+		:EVENT pri:purpose [a pri:31_USC_3711e].
+		:R a pri:Consumer_Reporting_Agency.
+		};
+	air:then [
+		air:description (:S " can give " :INFO " to " :R " because it is in accordance with section 3711(e) of Title 31.");
+		air:assert [air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_b12.}]];
+	air:else [
+		air:description (:S " cannot give " :INFO " to " :R " because it is not in accordance with section 3711(e) of Title 31.  No compliance conditions under The_Privacy_Act_of_1974_552a (b) could be found.");
+		air:assert [air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_b.}]].
+
+:The_Privacy_Act_of_1974_552a_c a air:Policy;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (c)";
+	air:rule :init_c.
+:init_c a air:Belief-rule;
+	air:if {
+		:S a pri:US_Federal_Agency.
+		:P a pri:Person.
+		:SR a pri:System_of_Records.
+		:INFO a pri:PII;
+			pri:about :P;
+			pri:contained_in :SR.
+		:EVENT a pri:Share;
+			pri:data :INFO;
+			pri:by :S;
+			pri:to :R.
+		};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_c1_b1].
+:The_Privacy_Act_of_1974_552a_c1_b1 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (c)(1)";
+	rdfs:comment "except for disclosures made under subsections (b)(1) or (b)(2) of this section, keep an accurate accounting of";
+	air:if {
+		:S air:compliant-with :The_Privacy_Act_of_1974_552a_b1.
+		};
+	air:then[
+		air:description ("No accounting must be kept for disclosures made under subsection (b)(1).");
+		air:assert [air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_c1_b1.}]];
+	air:else[
+		air:description (:S " non-compliant with (b)(1), and therefore not exempt from keeping accounting for the disclosure of " :INFO);
+		air:rule :The_Privacy_Act_of_1974_552a_c1_b2].
+:The_Privacy_Act_of_1974_552a_c1_b2 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (c)(1)";
+	rdfs:comment "except for disclosures made under subsections (b)(1) or (b)(2) of this section, keep an accurate accounting of";
+	air:if {
+		:S air:compliant-with :The_Privacy_Act_of_1974_552a_b2.
+		};
+	air:then[
+		air:description ("No accounting must be kept for disclosures made under subsection (b)(2).");
+		air:assert [air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_c1_b2.}]];
+	air:else[
+		air:description (:S " non-compliant with (b)(2), and therefore not exempt from keeping accounting for the disclosure of " :INFO);
+		air:rule :The_Privacy_Act_of_1974_552a_c1AB].
+:The_Privacy_Act_of_1974_552a_c1AB a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (c)(1)(A)&(c)(1)(B)";
+	rdfs:comment "Each agency, with respect to each system of records under its control, shall...keep an accurate accounting of the date, nature, and purpose of each disclosure of a record to any person or to another agency made under subsection (b) of this section and the name and address of the person or agency to whom the disclosure is made.";
+	air:if {
+		@forSome :ACC.
+		:ACC a pri:Accounting;
+			pri:record_of :EVENT.
+		};
+	air:then[
+		air:description (:S " must keep an accurate accounting of the disclosure of " :INFO " to " :R " containing the necessary information.");
+		air:rule :The_Privacy_Act_of_1974_552a_c3_c01];
+	air:else[
+		air:description (:S " must keep an accurate accounting of the disclosure of " :INFO " to " :R ", and the accounting must contain all the necessary information required for compliance with section (c).");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_c1AB.}]].
+:The_Privacy_Act_of_1974_552a_c3_c01 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (c)(3)";
+	rdfs:comment "Each agency, with respect to each system of records under its control, shall, except for disclosures made under subsection (b)(7) of this section, make the accounting made under paragraph (1) of this subsection available to the individual named in the record at his request";
+	air:if {
+		:S air:compliant-with :The_Privacy_Act_of_1974_552a_b7.
+		};
+	air:then[
+		air:description ("Disclosures made under subsection (b)(7) need not follow subsection (c)(3).");
+		air:rule :The_Privacy_Act_of_1974_552a_c4];
+	air:else[
+		air:description ("Accounting from (c)(1) must be made available to the subject of the information disclosed upon his or her request.");
+		air:rule :The_Privacy_Act_of_1974_552a_c3_c02].
+:The_Privacy_Act_of_1974_552a_c3_c02 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (c)(3)";
+	rdfs:comment "Each agency, with respect to each system of records under its control, shall, except for disclosures made under subsection (b)(7) of this section, make the accounting made under paragraph (1) of this subsection available to the individual named in the record at his request";
+	air:if {
+		@forSome :EVENT02.
+		:EVENT02 a pri:Request;
+			pri:data :ACC;
+			pri:by :P;
+			pri:to :S.
+		};
+	air:then [
+		air:description (:P " has made a request for an Accounting of " :INFO " of which he/she is the subject.");
+		air:rule :accounting_requested];
+	air:else [
+		air:rule :The_Privacy_Act_of_1974_552a_c4].
+:accounting_requested a air:Belief-rule;
+	air:if {
+		@forSome :EVENT03.
+		:EVENT03 a pri:Share;
+			pri:data :ACC;
+			pri:to :P;
+			pri:by :S.
+		};
+	air:then[
+		air:description (:S " can, and must, give " :ACC " to " :P "as required by (c)(3).");
+		air:rule :The_Privacy_Act_of_1974_552a_c4];
+	air:else[
+		air:description (:S " must give " :ACC " to " :P "as required by (c)(3).");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_c3_c02.}]].
+:The_Privacy_Act_of_1974_552a_c4 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (c)(4)";
+	rdfs:comment "Each agency, with respect to each system of records under its control, shall inform any person or other agency about any correction or notation of dispute made by the agency in accordance with subsection (d) of this section of any record that has been disclosed to the person or agency if an accounting of the disclosure was made.";
+################################
+##TIME##
+################################
+	air:if {
+		@forSome :EVENT04.
+		:EVENT pri:to :R.
+		:EVENT04 a pri:Change;
+			pri:data :INFO;
+			pri:by :S.
+		};
+	air:then[
+		air:description (:S " has filed a correction or dispute about " :ACC);
+		air:rule :notify];
+	air:else[
+		air:description ("A proper accounting has been made of the disclosure.  To remain compliant with this section, the record must be retained for five years or the life of the record, whichever is longer.");
+		air:assert[ air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_c.}]].
+:notify a air:Belief-rule;
+	air:if {
+		@forSome :EVENT05.
+		:EVENT05 a pri:Notify;
+			pri:data :INFO;
+			pri:by :S;
+			pri:to :R.
+		};
+	air:then[
+		air:description ("A proper accounting has been made of the disclosure.  To remain compliant with this section, the record must be retained for five years or the life of the record, whichever is longer.");
+		air:assert[ air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_c.}]];
+	air:else[
+		air:description (:S " failed to notify " :R " of a correction or dispute regarding " :INFO " which " :S " had previously disclosed to " :R);
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_c4.}]].
+		
+:The_Privacy_Act_of_1974_552a_d a air:Policy;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (d)";
+	air:rule :init_d.
+:init_d a air:Belief-rule;
+	air:if {
+		:S a pri:US_Federal_Agency.
+		:SR a pri:System_of_Records.
+		:S pri:maintains :SR.
+		:P a pri:Person.
+		:INFO a pri:PII;
+			pri:about :P;
+			pri:contained_in :SR.
+		};
+	air:then [ 
+		air:description (:S " is an agency that maintains a System of Records.");
+		air:rule :The_Privacy_Act_of_1974_552a_d5].
+:The_Privacy_Act_of_1974_552a_d5 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (d)(5)";
+	rdfs:comment "nothing in this section shall allow an individual access to any information compiled in reasonable anticipation of a civil action or proceeding";
+	air:if {
+		:INFO pri:used_in [a pri:civil_action].
+		};
+	air:then[
+		air:description (:INFO " is to be used in a civil action or proceeding.");
+		air:rule :d5_subrule];
+	air:else[
+		air:description (:INFO "is not going to be used in a civil action or proceeding.");
+		air:rule :The_Privacy_Act_of_1974_552a_d1].
+:d5_subrule a air:Belief-rule;
+	air:if {
+		@forSome :EVENT1.
+		:EVENT1 a pri:Share;
+			pri:data :INFO;
+			pri:to [a pri:Person].
+		};
+	air:then[
+		air:description (:INFO " cannot be shared with any individual since it is to be used in a civil action or proceeding");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_d5.}]];
+	air:else[
+		air:rule :The_Privacy_Act_of_1974_552a_d1].
+:The_Privacy_Act_of_1974_552a_d1 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (d)(1)";
+	rdfs:comment "Each agency that maintains a system of records shall, upon request by any individual to gain access to his record or to any information pertaining to him which is contained in the system, permit him and upon his request, a person of his own choosing to accompany him, to review the record and have a copy made of all or any portion thereof in a form comprehensible to him, except that the agency may require the individual to furnish a written statement authorizing discussion of that individual's record in the accompanying person's presence";
+	air:if {
+		@forSome :EVENT2.
+		:EVENT2 a pri:Request;
+			pri:data :INFO;
+			pri:by :P;
+			pri:to :S.
+		};
+	air:then [
+		air:description (:P " has requested to gain access to information pertaining to him in the System.");
+		air:rule :d1_subrule];
+	air:else [
+		air:rule :The_Privacy_Act_of_1974_552a_d2A].
+:d1_subrule a air:Belief-rule;
+	air:if {
+		@forSome :EVENT3.
+		:EVENT3 a pri:Share;
+			pri:data :INFO;
+			pri:by :S;
+			pri:to :P.
+		};
+	air:then[
+		air:description (:S " is required to share " :INFO " with " :P " and an individual of " :P "'s choice, in a form comprehensible to him/her.  " :S " may require " :P " to furnish a written statement authorizing discussion of his/her record in the accompanying person's presence.");
+		air:rule :The_Privacy_Act_of_1974_552a_d2A];
+	air:else[
+		air:description (:S " is required to share " :INFO " with " :P " and an individual of " :P "'s choice, in a form comprehensible to him/her.  " :S " may require " :P " to furnish a written statement authorizing discussion of his/her record in the accompanying person's presence.");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_d1.}]].
+:The_Privacy_Act_of_1974_552a_d2A a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (d)(2)(A)";
+	rdfs:comment "Each agency that maintains a system of records shall, permit the individual to request amendment of a record pertaining to him and not later than 10 days (excluding Saturdays, Sundays, and legal public holidays) after the date of receipt of such request, acknowledge in writing such receipt";
+#######################################
+##TIME##
+#######################################
+	air:if {
+		@forSome :EVENT4.
+		:EVENT4 a pri:Change_Request;
+			pri:data :INFO;
+			pri:by :P;
+			pri:to :S.
+		};
+	air:then [
+		air:description (:P " has requested a change to " :INFO ".");
+		air:rule :d2A_subrule];
+	air:else [
+		air:description ("No request has been made to change the record");
+		air:assert[ air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_d2A}]].
+:d2A_subrule a air:Belief-rule;
+	air:if {
+		@forSome :EVENT5.
+		:EVENT5 a pri:Notify;
+	####################
+	#Acknowledge receipt of request within ten business days
+	####################
+			pri:antecedent :EVENT4;
+			pri:purpose [a pri:Acknowledgment];
+			pri:by :S;
+			pri:to :P.
+		};
+	air:then [
+		air:description (:S " complies with (d)(2)(A) so long as the acknowledgment of receipt was sent within ten business days upon receiving the request from " :P);
+		air:rule :The_Privacy_Act_of_1974_552a_d2Bi];
+	air:else [
+		air:description (:S " does not comply with (d)(2)(A) because either an acknowledgment was not sent or was not sent in the proper time frame of ten business days");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_d2A.}]].
+:The_Privacy_Act_of_1974_552a_d2Bi a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (d)(2)(B)(i)";
+	rdfs:comment "Each agency that maintains a system of records shall, permit the individual to request amendment of a record pertaining to him and promptly make any correction of any portion thereof which the individual believes is not accurate, relevant, timely, or complete";
+	air:if {
+		@forSome :EVENT6.
+		:EVENT6 a pri:Change;
+			pri:anecedent :EVENT4;
+			pri:data :INFO;
+			pri:by :S.
+		};
+	air:then[
+		air:description (:S " made the requested changes to " :INFO " as requested by " :P);
+		air:assert[ air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_d2Bi.}]];
+	air:else[
+		air:description (:S " did not make any changes to " :INFO);
+		air:rule :The_Privacy_Act_of_1974_552a_d2Bii].
+:The_Privacy_Act_of_1974_552a_d2Bii a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (d)(2)(B)(ii)";
+	rdfs:comment "Each agency that maintains a system of records shall, permit the individual to request amendment of a record pertaining to him and promptly inform the individual of its refusal to amend the record in accordance with his request, the reason for the refusal, the procedures established by the agency for the individual to request a review of that refusal by the head of the agency or an officer designated by the head of the agency, and the name and business address of that official";
+	air:if {
+		@forSome :EVENT7.
+		:EVENT7 a pri:Notify;
+			pri:antecedent :EVENT4;
+			pri:purpose [a pri:Refusal];
+			pri:by :S;
+			pri:to :P.
+		};
+	air:then[
+		air:description (:S " can refuse to change the record provided they inform " :P " of the decision and provide the reason for the refusal, the procedures established by the agency for the individual to request a review of that refusal by the head of the agency or an officer designated by the head of the agency, and the name and business address of that official");
+		air:rule :The_Privacy_Act_of_1974_552a_d3_c01];
+	air:else[
+		air:description (:S " must properly notify " :P " of the refusal to alter the record and provide him/her the necessary information in that notification of refusal.");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_d2Bi;
+			air:non-compliant-with :The_Privacy_Act_of_1974_552a_d2Bii.}]].
+:The_Privacy_Act_of_1974_552a_d3_c01 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (d)(3) clause 01";
+	rdfs:comment "Each agency that maintains a system of records shall permit the individual who disagrees with the refusal of the agency to amend his record to request a review of such refusal, and not later than 30 days (excluding Saturdays, Sundays, and legal public holidays) from the date on which the individual requests such review, complete such review and make a final determination unless, for good cause shown, the head of the agency extends such 30-day period";
+##################################
+##TIME##
+##################################
+	air:if{
+		@forSome :EVENT8, :EVENT9.
+		:EVENT8 a pri:Request;
+			pri:by :P;
+			pri:to :S;
+			pri:purpose [a pri:Review].
+		};
+	air:then[
+		air:description (:P " has requested a review of the decision to not amend " :INFO " as he/she requested.");
+		air:rule :d3c01_subrule];
+	air:else[
+		air:description (:P "has not requested a review of the decision not to amend " :INFO);
+		air:assert[ air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_d3_c01.}]].
+:d3c01_subrule a air:Belief-rule;
+	air:if {
+		@forSome :REV.
+		:REV a pri:Review;
+			pri:data :INFO;
+			pri:by :S.
+		};
+	air:then[
+		air:description ("To remain compliant, " :S " must conduct the review within thirty business days of the request unless the head of the agency extends the thirty day period and demonstrates a good cause for doing so.");
+		air:rule :d3c01_subrule2];
+	air:else[
+		 air:description (:S " must conduct the review within thirty business days of the request unless the head of the agency extends the thirty day period and demonstrates a good cause for doing so.");
+		 air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_d3_c01.}]].
+:d3c01_subrule2 a air:Belief-rule;
+	air:if{
+		@forSome :CHANGE.
+		:CHANGE a pri:Change;
+			pri:antecedent :REV;
+			pri:data :INFO;
+			pri:by :S.
+		};
+	air:then[
+		air:description ("Upon review, " :S " decided to amend the record as requested.");
+		air:assert[ air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_d3_c01.}]];
+	air:else[
+		air:description ("Upon review, " :S " decided not to amend the record as requested.");
+		air:rule :The_Privacy_Act_of_1974_552a_d3_c03].
+:The_Privacy_Act_of_1974_552a_d3_c03 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (d)(3) clause 03";
+	rdfs:comment "Each agency that maintains a system of records shall notify the individual of the provisions for judicial review of the reviewing official's determination under subsection (g)(1)(A) of this section";
+	air:if{
+		@forSome :EVENT10.
+		:EVENT10 a pri:Notify;
+			pri:by :S;
+			pri:to :P;
+			pri:contains [a pri:provisions_for_judicial_review].
+		};
+	air:then[
+		air:description (:S " must notify " :P " of the provisions for judicial review of reviewing the official's previous determination");
+		air:rule :The_Privacy_Act_of_1974_552a_d3_c02];
+	air:else[
+		air:description (:S " must notify " :P " of the provisions for judicial review of reviewing the official's previous determination");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_d3_c03.}]].
+:The_Privacy_Act_of_1974_552a_d3_c02 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (d)(3) clause 02";
+	rdfs:comment "Each agency that maintains a system of records shall if, after his review, the reviewing official also refuses to amend the record in accordance with the request, permit the individual to file with the agency a concise statement setting forth the reasons for his disagreement with the refusal of the agency";
+	air:if {
+		@forSome :EVENT11, :STATEMENT.
+		:STATEMENT a pri:statement;
+			pri:disagree_with :INFO.
+		:EVENT11 a pri:File;
+			pri:by :P;
+			pri:to :S;
+			pri:data :STATEMENT.
+		};
+	air:then[
+		air:description (:S " is required to allow " :P " to file a statement of reasons for disagreeing with the angency's refusal to amend the record.");
+		air:rule :The_Privacy_Act_of_1974_552a_d4];
+	air:else[
+		air:description (:S " is required to allow " :P " to file a statement of reasons for disagreeing with the angency's refusal to amend the record.");
+		air:assert[ air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_d3_c02.}]].
+:The_Privacy_Act_of_1974_552a_d4 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (d)(4)";
+	rdfs:comment "Each agency that maintains a system of records shall in any disclosure, containing information about which the individual has filed a statement of disagreement, occurring after the filing of the statement under paragraph (3) of this subsection, clearly note any portion of the record which is disputed and provide copies of the statement and, if the agency deems it appropriate, copies of a concise statement of the reasons of the agency for not making the amendments requested, to persons or other agencies to whom the disputed record has been disclosed";
+	air:if {
+		@forSome :EVENT12.
+		:EVENT12 a pri:Share;
+			pri:data :INFO;
+			pri:by :S.
+		};
+	air:then[
+		air:description (:S " has shared information about which a statement of disagreement has been filed.");
+		air:rule :d4_subrule];
+	air:else[
+		air:description (:S "has not shared information about which a statement of disagreement has been filed.");
+		air:assert[ air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_d4.}]].
+:d4_subrule a air:Belief-rule;
+	air:if {
+		@forSome :EVENT13, :EVENT14, :REC.
+		:EVENT13 a pri:Share;
+			pri:data :INFO;
+			pri:by :S;
+			pri:to :REC.
+		:EVENT14 a pri:Share;
+			pri:data :STATEMENT1;
+			pri:by :S;
+			pri:to :REC. 
+		};
+	air:then[
+		air:description (:S " may share " :INFO " provided they also share " :STATEMENT " noting the disputed portions and possibly containing an explanation of why the record was not amended in accordance with the dispute.");
+		air:assert[ air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_d4.}]];
+	air:else[
+		air:description (:S " may only share " :INFO " if it is accompanied by " :STATEMENT " with the disputed parts noted and accompanied by a description of why the disputed sections of the record were not amended.");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_d4.}]].
+
+:The_Privacy_Act_of_1974_552a_e a air:Policy;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)";
+	rdfs:comment "Each agency that maintains a system of records shall--";
+	air:rule :init_e.
+:init_e a air:Belief-rule;
+	air:if {
+		:S a pri:US_Federal_Agency;
+			pri:maintains :SR.
+		:SR a pri:System_of_Records.
+		:INFO a pri:PII;
+			pri:contained_in :SR;
+			pri:about :P.
+		:P a pri:Person.
+		};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_e1].
+:The_Privacy_Act_of_1974_552a_e1 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(1)";
+	rdfs:comment "maintain in its records only such information about an individual as is relevant and necessary to accomplish a purpose of the agency required to be accomplished by statute or by Executive order of the President.";
+	air:if {
+		:INFO pri:purpose [a pri:relevant_to_agency].
+		};
+	air:then[
+		air:description (:S " can retain " :INFO " in its System of Records to accomplish a purpose of the agency.");
+		air:rule :The_Privacy_Act_of_1974_552a_e2];
+	air:else[
+		air:description (:S " cannot retain " :INFO " in its System of Records since it does not serve to accomplish a goal of the agency.");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_e1.}]].
+:The_Privacy_Act_of_1974_552a_e2 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(2)";
+	rdfs:comment "collect information to the greatest extent practicable directly from the subject individual when the information may result in adverse determinations about an individual's rights, benefits, and privileges under Federal programs";
+	air:if {
+##########PROBABLY NEEDS TO BE CHANGED, DIFFICULT TO HANDLE AN OPINION/SUBJECTIVE ISSUE LIKE THIS##
+##########POTENTIALLY A POPUP BOX OR SOMETHING IF THIS PATTERN IS TRIGGERED?#######################
+##########although determining how to trigger this pattern may be difficult enough#################
+		:INFO pri:purpose [a pri:adverse_determination].
+		};
+	air:then [
+		air:description (:S " must collect information, to the greatest extent practicable directly from the subject individual.");
+		air:rule :The_Privacy_Act_of_1974_552a_e3];
+	air:else [
+		air:rule :The_Privacy_Act_of_1974_552a_e3].
+:The_Privacy_Act_of_1974_552a_e3 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(3)";
+	rdfs:comment "inform each individual whom it asks to supply information, on the form which it uses to collect the information or on a separate form that can be retained by the individual";
+	air:if {
+		:P a pri:Person.
+		:INFO pri:source :P.
+		};
+	air:then [
+		air:description (:INFO " was collected from a person and therefore is subject to rule (e)(3).");
+		air:rule :The_Privacy_Act_of_1974_552a_e3ABCD];
+	air:else [
+		air:description (:INFO " was not collected from a person and therefore is not subject to rule (e)(3).");
+		air:rule :The_Privacy_Act_of_1974_552a_e4].
+:The_Privacy_Act_of_1974_552a_e3ABCD a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(3)(A)-(D)";
+	rdfs:comment "the authority (whether granted by statute, or by Executive order of the President) which authorizes the solicitation of the information and whether disclosure of such information is mandatory or voluntary, the principal purpose or purposes for which the information is intended to be used, the routine uses which may be made of the information, as published pursuant to paragraph (4)(D) of this subsection, and the effects on him, if any, of not providing all or any part of the requested information";
+	air:if {
+		@forSome :INFOREQUEST.
+		:INFOREQUEST a pri:Info_Request;
+			pri:data :INFO;
+			pri:to :P;
+			pri:by :S;
+			pri:contains [a pri:authority], [a pri:intended_purpose], [a pri:routine_uses], [a pri:effects].
+		};
+	air:then [
+		air:description (:P " has been properly informed about the information he/she is giving to " :S);
+		air:rule :The_Privacy_Act_of_1974_552a_e4];
+	air:else [
+		air:description (:P " has not been properly informed about the information he/she is giving to " :S);
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_e3.}]].
+:The_Privacy_Act_of_1974_552a_e4 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(4)";
+	rdfs:comment "subject to the provisions of paragraph (11) of this subsection, publish in the Federal Register upon establishment or revision a notice of the existence and character of the system of records, which notice shall include--";
+	air:if {
+		@forSome :REVEST.
+		:REVEST a pri:Revision_or_Establish;
+			pri:data :SR.
+		};
+	air:then [
+		air:description ("the System of Records has been established or revised.");
+		air:rule :The_Privacy_Act_of_1974_552a_e4A];
+	air:else [
+		air:rule :The_Privacy_Act_of_1974_552a_e5].
+:The_Privacy_Act_of_1974_552a_e4A a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(4)(A)";
+	rdfs:comment "the name and location of the system";
+	air:if {
+		@forSome :PUBFR1.
+		:PUBFR1 a pri:Share;
+			pri:by :S;
+			pri:to [a pri:US_Federal_Register];
+			pri:contains [a pri:name];
+			pri:contains [a pri:location].
+		};
+	air:then[
+		air:description ("The Name and Location of the System of Records have been published in the Federal Register.");
+		air:rule :The_Privacy_Act_of_1974_552a_e4B];
+	air:else[
+		air:description ("The Name and Location of the System of Records have not been published in the Federal Register.");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_e4A.}]].
+:The_Privacy_Act_of_1974_552a_e4B a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(4)(B)";
+	rdfs:comment "the categories of individuals on whom records are maintained in the system";
+	air:if {
+		:PUBFR1 pri:contains [a pri:category_of_individuals].
+		};
+	air:then[
+		air:description ("The Categories of individuals whose records are maintained in the System of Records have been published in the Federal Register.");
+		air:rule :The_Privacy_Act_of_1974_552a_e4C];
+	air:else[
+		air:description ("The Categories of individuals whose records are maintained in the System of Records have not been published in the Federal Register.");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_e4B.}]].
+:The_Privacy_Act_of_1974_552a_e4C a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(4)(C)";
+	rdfs:comment "the categories of records maintained in the system";
+	air:if {
+		:PUBFR1 pri:contains [a pri:category_of_records].
+		};
+	air:then[
+		air:description ("The Categories of the records which are maintained in the System of Records have been published in the Federal Register.");
+		air:rule :The_Privacy_Act_of_1974_552a_e4D];
+	air:else[
+		air:description ("The Categories of the records which are maintained in the System of Records have not been published in the Federal Register.");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_e4C.}]].
+:The_Privacy_Act_of_1974_552a_e4D a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(4)(D)";
+	rdfs:comment "each routine use of the records contained in the system, including the categories of users and the purpose of such use";
+	air:if {
+		:PUBFR1 pri:contains [a pri:routine_uses].
+		};
+	air:then[
+		air:description ("The routine uses of the records which are maintained in the System of Records have been published in the Federal Register.");
+		air:rule :The_Privacy_Act_of_1974_552a_e4E];
+	air:else[
+		air:description ("The routine uses of the records which are maintained in the System of Records have not been published in the Federal Register.");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_e4D.}]].
+:The_Privacy_Act_of_1974_552a_e4E a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(4)(E)";
+	rdfs:comment "the policies and practices of the agency regarding storage, retrievability, access controls, retention, and disposal of the records";
+	air:if {
+		:PUBFR1 pri:contains [a pri:policies_and_practices].
+		};
+	air:then[
+		air:description ("The policies and practices of the agency which maintains the System of Records have been published in the Federal Register.");
+		air:rule :The_Privacy_Act_of_1974_552a_e4F];
+	air:else[
+		air:description ("The policies and practices of the agency which maintains the System of Records have not been published in the Federal Register.");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_e4E.}]].
+:The_Privacy_Act_of_1974_552a_e4F a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(4)(F)";
+	rdfs:comment "the title and business address of the agency official who is responsible for the system of records";
+	air:if {
+		:PUBFR1 pri:contains [a pri:title_and_address].
+		};
+	air:then[
+		air:description ("The title and address of the official responsible for the System of Records have been published in the Federal Register.");
+		air:rule :The_Privacy_Act_of_1974_552a_e4G];
+	air:else[
+		air:description ("The title and address of the official responsible for the System of Records have not been published in the Federal Register.");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_e4F.}]].
+:The_Privacy_Act_of_1974_552a_e4G a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(4)(G)";
+	rdfs:comment "the agency procedures whereby an individual can be notified at his request if the system of records contains a record pertaining to him";
+	air:if {
+		:PUBFR1 pri:contains [a pri:notify_procedures].
+		};
+	air:then[
+		air:description ("The agency procedures for notifying individuals in the System of Records have been published in the Federal Register.");
+		air:rule :The_Privacy_Act_of_1974_552a_e4H];
+	air:else[
+		air:description ("The agency procedures for notifying individuals in the System of Records have not been published in the Federal Register.");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_e4G.}]].
+:The_Privacy_Act_of_1974_552a_e4H a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(4)(H)";
+	rdfs:comment "the agency procedures whereby an individual can be notified at his request how he can gain access to any record pertaining to him contained in the system of records, and how he can contest its content";
+	air:if {
+		:PUBFR1 pri:contains [a pri:access_procedures].
+		};
+	air:then[
+		air:description ("The agency procedures for notifying individuals in the System of Records how to access their records have been published in the Federal Register.");
+		air:rule :The_Privacy_Act_of_1974_552a_e4I];
+	air:else[
+		air:description ("The agency procedures for notifying individuals in the System of Records how to access their records have not been published in the Federal Register.");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_e4H.}]].
+:The_Privacy_Act_of_1974_552a_e4I a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(4)(I)";
+	rdfs:comment "the categories of sources of records in the system";
+	air:if {
+		:PUBFR1 pri:contains [a pri:category_of_source].
+		};
+	air:then[
+		air:description ("The categories of sources in the System of Records have been published in the Federal Register.");
+		air:rule :The_Privacy_Act_of_1974_552a_e5];
+	air:else[
+		air:description ("The categories of sources in the System of Records have not been published in the Federal Register.");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_e4I.}]].
+:The_Privacy_Act_of_1974_552a_e5 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(5)";
+	rdfs:comment "maintain all records which are used by the agency in making any determination about any individual with such accuracy, relevance, timeliness, and completeness as is reasonably necessary to assure fairness to the individual in the determination";
+########SUBJECTIVE#########
+###########################
+	air:if {
+		:INFO pri:fair_to :P.
+		};
+	air:then [
+		air:description (:INFO " contained in the System of Records is maintained fairly with respect to any determination made about " :P " using " :INFO);
+		air:rule :The_Privacy_Act_of_1974_552a_e6_c01];
+	air:else [
+		air:description (:INFO " contained in the System of Records is not maintained in such a way that determinations made about " :P " based on " :INFO " are assured to be fair");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_e5.}]].
+:The_Privacy_Act_of_1974_552a_e6_c01 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(6) clause 1";
+	rdfs:comment "unless the dissemination is made pursuant to subsection (b)(2) of this section";
+	air:if{
+		:S air:compliant-with :The_Privacy_Act_of_1974_552a_b2.
+		};
+	air:then[
+		air:description (:S " is compliant with (b)(2) of this section and therefore (e)(6) does not apply");
+		air:rule :The_Privacy_Act_of_1974_552a_e7_c01];
+	air:else[
+		air:rule :The_Privacy_Act_of_1974_552a_e6_c02].
+:The_Privacy_Act_of_1974_552a_e6_c02 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(6) clause 2";
+	rdfs:comment "prior to disseminating any record about an individual to any person other than an agency make reasonable efforts to assure that such records are accurate, complete, timely, and relevant for agency purposes";
+	air:if {
+#########DEAL WITH ASSURING INFORMATION HANDLED POROPERLY SOMEHOW IE DIALOG BOX##
+#####################
+		@forSome :GIVEINFO.
+		:GIVEINFO a pri:Share;
+			pri:data :INFO;
+			pri:by :S.
+		};
+	air:then[
+		air:description (:S " has shared " :INFO " and must make reasonable efforts to to assure that such records are accurate, complete, timely, and relevant for agency purposes.");
+		air:rule :The_Privacy_Act_of_1974_552a_e7_c01];
+	air:else[
+		air:description (:S " has not shared " :INFO);
+		air:rule :The_Privacy_Act_of_1974_552a_e7_c01].
+:The_Privacy_Act_of_1974_552a_e7_c01 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(7) clause 1";
+	rdfs:comment "maintain no record describing how any individual exercises rights guaranteed by the First Amendment";
+	air:if {
+		:INFO pri:about [a pri:First_Amendment_Rights].
+		};
+	air:then[
+		air:description (:INFO " describes how " :P " exercises first amendment rights.");
+		air:rule :The_Privacy_Act_of_1974_552a_e7_c02];
+	air:else[
+		air:description (:INFO " does not describe the use of first Amendment rights.");
+		air:rule :The_Privacy_Act_of_1974_552a_e8].
+:The_Privacy_Act_of_1974_552a_e7_c02 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(7) clause 2";
+	rdfs:comment "unless expressly authorized by statute or by the individual about whom the record is maintained or unless pertinent to and within the scope of an authorized law enforcement activity";
+	air:if {
+		:INFO pri:authorized [a pri:First_Amendment_Rights].
+		};
+	air:then[
+		air:description ("Description of use of First Amendment Rights has been authorized.");
+		air:rule :The_Privacy_Act_of_1974_552a_e8];
+	air:else[
+		air:description ("Description of the use of First Amendment rights has not been authorized.");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_e7_c02.}]].
+:The_Privacy_Act_of_1974_552a_e8 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(8)";
+	rdfs:comment "make reasonable efforts to serve notice on an individual when any record on such individual is made available to any person under compulsory legal process when such process becomes a matter of public record";
+	air:if {
+		##SUBJECTIVE AGAIN NEED DIALOG##
+		@forSome :GIVEINFO1.
+		:GIVEINFO1 a pri:Share;
+			pri:data :INFO;
+			pri:to [a pri:Person];
+			pri:purpose [a pri:compulsory_legal_process];
+			pri:by :S.
+		};
+	air:then [
+		air:description (:S " must make reasonable efforts to serve notice on an individual when any record on such individual is made available to any person under compulsory legal process when such process becomes a matter of public record");
+		air:rule :The_Privacy_Act_of_1974_552a_e9];
+	air:else [
+		air:description (:INFO " was not made available under compulsory legal process");
+		air:rule :The_Privacy_Act_of_1974_552a_e9].
+:The_Privacy_Act_of_1974_552a_e9 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(9)";
+	rdfs:comment "establish rules of conduct for persons involved in the design, development, operation, or maintenance of any system of records, or in maintaining any record, and instruct each such person with respect to such rules and the requirements of this section, including any other rules and procedures adopted pursuant to this section and the penalties for noncompliance";
+	air:if {
+		##MANAGE: POLICY##
+		};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_e10].
+:The_Privacy_Act_of_1974_552a_e10 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(10)";
+	rdfs:comment "establish appropriate administrative, technical and physical safeguards to insure the security and confidentiality of records and to protect against any anticipated threats or hazards to their security or integrity which could result in substantial harm, embarrassment, inconvenience, or unfairness to any individual on whom information is maintained";
+	air:if {
+		##MANAGE: POLICY##
+		};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_e11].
+:The_Privacy_Act_of_1974_552a_e11 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(11)";
+	rdfs:comment "at least 30 days prior to publication of information under paragraph (4)(D) of this subsection, publish in the Federal Register notice of any new use or intended use of the information in the system, and provide an opportunity for interested persons to submit written data, views, or arguments to the agency";
+################################
+##TIME##
+################################
+	air:if {
+		@forSome :PUBFR0.
+		:PUBFR0 a pri:Share;
+			pri:by :S;
+			pri:to [a pri:US_Federal_Register];
+			pri:contains [a pri:routine_uses].
+		};
+	air:then[
+		air:description ("30 Days Prior to the publication of this information under paragraph (4)(D), " :S " must publish in the Federal Register a notice of any new use or intended use of the information in the system, providing an opportunity for people to submit data, views, or arguments to the agency");
+		air:rule :The_Privacy_Act_of_1974_552a_e12];
+	air:else[
+		air:description (:S "does not intend to publish anything under (4)(D)");
+		air:rule :The_Privacy_Act_of_1974_552a_e12].
+:The_Privacy_Act_of_1974_552a_e12 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (e)(12)";
+	rdfs:comment "if such agency is a recipient agency or a source agency in a matching program with a non-Federal agency, with respect to any establishment or revision of a matching program, at least 30 days prior to conducting such program, publish in the Federal Register notice of such establishment or revision";
+###############################
+##TIME##
+###############################
+	air:if {
+		@forSome :REVEST1.
+		:S pri:matching_program :R.
+		:REVEST1 a pri:Revision_or_Establish;
+			pri:by :S;
+			pri:contains [a pri:MatchingAgreement].
+		};
+	air:then[
+		air:description (:S " is a participant in a matching program");
+		air:rule :e12_subrule];
+	air:else[
+		air:description (:S " is not a participant in a matching program");
+		air:assert[ air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_e.}]].
+:e12_subrule a air:Belief-rule;
+	air:if{
+		<http://dig.csail.mit.edu/2009/DHS-fusion/PrivacyAct/log.n3>.log:semantics log:notIncludes { :R a pri:US_Federal_Agency. }.
+		};
+	air:then[
+		air:description (:S " is a participant in a matching program with a non-federal agency");
+		air:rule :e12_subrule1];
+	air:else[
+		air:description (:S " is not a participant in a matching program with a non federal agency");
+		air:assert[ air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_e.}]].
+:e12_subrule1 a air:Belief-rule;
+	air:if {
+		@forSome :PUBFR11.
+		:PUBFR11 a pri:Share;
+			pri:antecedent :REVEST1;
+			pri:by :S;
+			pri:to [a pri:US_Federal_Register];
+			pri:data :REVEST1.
+		};
+	air:then[
+		air:description (:S " is compliant with (e)(12) as long as the publication of the revision or establishment is made 30 days prior to conducting the program");
+		air:assert[ air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_e.}]];
+	air:else[
+		air:description (:S " must publish notice of the establishment or revision in the federal register 30 days before conducting the program");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_e12.}]].
+
+:The_Privacy_Act_of_1974_552a_f a air:Policy;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (f)";
+	air:rule :The_Privacy_Act_of_1974_552a_f_c01.
+:The_Privacy_Act_of_1974_552a_f_c01 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (f) clause 1";
+	rdfs:comment "In order to carry out the provisions of this section, each agency that maintains a system of records shall promulgate rules, in accordance with the requirements (including general notice) of section 553 of this title, which shall--";
+	air:if {
+		##MANAGE: POLICY##
+		##TYPE 3##
+		};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_f1].
+:The_Privacy_Act_of_1974_552a_f1 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (f)(1)";
+	rdfs:comment "establish procedures whereby an individual can be notified in response to his request if any system of records named by the individual contains a record pertaining to him";
+	air:if {
+		##MANAGE: POLICY##
+		##TYPE 4##
+		};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_f2].
+:The_Privacy_Act_of_1974_552a_f2 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (f)(2)";
+	rdfs:comment "define reasonable times, places, and requirements for identifying an individual who requests his record or information pertaining to him before the agency shall make the record or information available to the individual";
+	air:if {
+		##MANAGE: POLICY##
+		##TYPE 4##
+		};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_f3].
+:The_Privacy_Act_of_1974_552a_f3 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (f)(3)";
+	rdfs:comment "establish procedures for the disclosure to an individual upon his request of his record or information pertaining to him, including special procedure, if deemed necessary, for the disclosure to an individual of medical records, including psychological records, pertaining to him";
+	air:if {
+		##MANAGE: POLICY##
+		##TYPE 4##
+		};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_f4].
+:The_Privacy_Act_of_1974_552a_f4 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (f)(4)";
+	rdfs:comment "establish procedures for reviewing a request from an individual concerning the amendment of any record or information pertaining to the individual, for making a determination on the request, for an appeal within the agency of an initial adverse agency determination, and for whatever additional means may be necessary for each individual to be able to exercise fully his rights under this section";
+	air:if {
+		##MANAGE: POLICY##
+		##TYPE 4##
+		};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_f5].
+:The_Privacy_Act_of_1974_552a_f5 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (f)(5)";
+	rdfs:comment "establish fees to be charged, if any, to any individual for making copies of his record, excluding the cost of any search for and review of the record";
+	air:if {
+		##MANAGE: POLICY##
+		##TYPE 3##
+		};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_f_c02].
+:The_Privacy_Act_of_1974_552a_f_c02 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (f) clause 2"; 
+	rdfs:comment "The Office of the Federal Register shall biennially compile and publish the rules promulgated under this subsection and agency notices published under subsection (e)(4) of this section in a form available to the public at low cost";
+	air:if {
+		##MANAGE: POLICY##
+		##TYPE 3##
+		}.
+
+:The_Privacy_Act_of_1974_552a_j a air:Policy;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (j)";
+	rdfs:comment "The head of any agency may promulgate rules, in accordance with the requirements (including general notice) of sections 553(b)(1), (2), and (3), (c), and (e) of this title, to exempt any system of records within the agency from any part of this section except subsections (b), (c)(1) and (2), (e)(4)(A) through (F), (e)(6), (7), (9), (10), and (11), and (i) if the system of records is--";
+	rdfs:comment "At the time rules are adopted under this subsection, the agency shall include in the statement required under section 553(c) of this title, the reasons why the system of records is to be exempted from a provision of this section.";
+	air:rule :The_Privacy_Act_of_1974_552a_j1.
+:The_Privacy_Act_of_1974_552a_j1 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (j)(1)";
+	rdfs:comment "maintained by the Central Intelligence Agency";
+	air:if {
+		##MANAGE POLICY##
+		##TYPE 4##
+		};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_j2].
+:The_Privacy_Act_of_1974_552a_j2 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (j)(2)";
+	rdfs:comment "maintained by an agency or component thereof which performs as its principal function any activity pertaining to the enforcement of criminal laws, including police efforts to prevent, control, or reduce crime or to apprehend criminals, and the activities of prosecutors, courts, correctional, probation, pardon, or parole authorities, and which consists of (A) information compiled for the purpose of identifying individual criminal offenders and alleged offenders and consisting only of identifying data and notations of arrests, the nature and disposition of criminal charges, sentencing, confinement, release, and parole and probation status; (B) information compiled for the purpose of a criminal investigation, including reports of informants and investigators, and associated with an identifiable individual; or (C) reports identifiable to an individual compiled at any stage of the process of enforcement of the criminal laws from arrest or indictment through release from supervision.";
+	air:if {
+		##MANAGE POLICY##
+		##TYPE 4##
+		}.
+
+:The_Privacy_Act_of_1974_552a_k a air:Policy;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (k)";
+	rdfs:comment "The head of any agency may promulgate rules, in accordance with the requirements (including general notice) of sections 553(b)(1), (2), and (3), (c), and (e) of this title, to exempt any system of records within the agency from subsections (c)(3), (d), (e)(1), (e)(4)(G), (H), and (I) and (f) of this section if the system of records is";
+	air:rule :init_k.
+:init_k a air:Belief-rule;
+	air:if {
+		:S a pri:US_Federal_Agency.
+		##make sure this rule never fires##
+		:S a pri:Nothing.
+		
+	};
+	air:then[ 
+		air:rule :The_Privacy_Act_of_1974_552a_k1].
+:The_Privacy_Act_of_1974_552a_k1 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (k)(1)";
+	rdfs:comment "subject to the provisions of section 552(b)(1) of this title";
+	air:if {
+		##MANAGE POLICY##
+		##TYPE 5##
+		};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_k2_c01].
+:The_Privacy_Act_of_1974_552a_k2_c01 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (k)(2) clause 1";
+	rdfs:comment "investigatory material compiled for law enforcement purposes, other than material within the scope of subsection (j)(2) of this section: Provided, however, That if any individual is denied any right, privilege, or benefit that he would otherwise be entitled by Federal law, or for which he would otherwise be eligible, as a result of the maintenance of such material, such material shall be provided to such individual, except to the extent that the disclosure of such material would reveal the identity of a source who furnished information to the Government under an express promise that the identity of the source would be held in confidence, or, prior to the effective date of this section, under an implied promise that the identity of the source would be held in confidence";
+	air:if {
+		##MANAGE POLICY##
+		##TYPE 5##
+		};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_k2_c02].
+:The_Privacy_Act_of_1974_552a_k2_c02 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (k)(2) clause 2";
+	rdfs:comment "investigatory material compiled for law enforcement purposes, other than material within the scope of subsection (j)(2) of this section: Provided, however, That if any individual is denied any right, privilege, or benefit that he would otherwise be entitled by Federal law, or for which he would otherwise be eligible, as a result of the maintenance of such material, such material shall be provided to such individual, except to the extent that the disclosure of such material would reveal the identity of a source who furnished information to the Government under an express promise that the identity of the source would be held in confidence, or, prior to the effective date of this section, under an implied promise that the identity of the source would be held in confidence";
+	air:if {
+		##MANAGE POLICY##
+		##TYPE 5##
+		};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_k2_c03].
+:The_Privacy_Act_of_1974_552a_k2_c03 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (k)(2) clause 3";
+	rdfs:comment "investigatory material compiled for law enforcement purposes, other than material within the scope of subsection (j)(2) of this section: Provided, however, That if any individual is denied any right, privilege, or benefit that he would otherwise be entitled by Federal law, or for which he would otherwise be eligible, as a result of the maintenance of such material, such material shall be provided to such individual, except to the extent that the disclosure of such material would reveal the identity of a source who furnished information to the Government under an express promise that the identity of the source would be held in confidence, or, prior to the effective date of this section, under an implied promise that the identity of the source would be held in confidence";
+	air:if {
+		##MANAGE POLICY##
+		##TYPE 5##
+		};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_k3].
+:The_Privacy_Act_of_1974_552a_k3 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (k)(3)";
+	rdfs:comment "maintained in connection with providing protective services to the President of the United States or other individuals pursuant to section 3056 of Title 18";
+	air:if {
+		##MANAGE POLICY##
+		##TYPE 5##
+		};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_k4].
+:The_Privacy_Act_of_1974_552a_k4 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (k)(4)";
+	rdfs:comment "required by statute to be maintained and used solely as statistical records";
+	air:if {
+		##MANAGE POLICY##
+		##TYPE 5##
+		};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_k5_c01].
+:The_Privacy_Act_of_1974_552a_k5_c01 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (k)(5) clause 1";
+	rdfs:comment "investigatory material compiled solely for the purpose of determining suitability, eligibility, or qualifications for Federal civilian employment, military service, Federal contracts, or access to classified information, but only to the extent that the disclosure of such material would reveal the identity of a source who furnished information to the Government under an express promise that the identity of the source would be held in confidence, or, prior to the effective date of this section, under an implied promise that the identity of the source would be held in confidence";
+	air:if {
+		##MANAGE POLICY##
+		##TYPE 5##
+		};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_k5_c02].
+:The_Privacy_Act_of_1974_552a_k5_c02 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (k)(5) clause 2";
+	rdfs:comment "investigatory material compiled solely for the purpose of determining suitability, eligibility, or qualifications for Federal civilian employment, military service, Federal contracts, or access to classified information, but only to the extent that the disclosure of such material would reveal the identity of a source who furnished information to the Government under an express promise that the identity of the source would be held in confidence, or, prior to the effective date of this section, under an implied promise that the identity of the source would be held in confidence";
+	air:if {
+		##MANAGE POLICY##
+		##TYPE 5##
+		};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_k6].
+:The_Privacy_Act_of_1974_552a_k6 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (k)(6)";
+	rdfs:comment "testing or examination material used solely to determine individual qualifications for appointment or promotion in the Federal service the disclosure of which would compromise the objectivity or fairness of the testing or examination process";
+	air:if {
+		##MANAGE POLICY##
+		##TYPE 5##
+		};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_k7_c01].
+:The_Privacy_Act_of_1974_552a_k7_c01 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (k)(7) clause 1";
+	rdfs:comment "evaluation material used to determine potential for promotion in the armed services, but only to the extent that the disclosure of such material would reveal the identity of a source who furnished information to the Government under an express promise that the identity of the source would be held in confidence, or, prior to the effective date of this section, under an implied promise that the identity of the source would be held in confidence"; 
+	air:if {
+		##MANAGE POLICY##
+		##TYPE 5##
+		};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_k7_c02].
+:The_Privacy_Act_of_1974_552a_k7_c02 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (k)(7) clause 2";
+	rdfs:comment "evaluation material used to determine potential for promotion in the armed services, but only to the extent that the disclosure of such material would reveal the identity of a source who furnished information to the Government under an express promise that the identity of the source would be held in confidence, or, prior to the effective date of this section, under an implied promise that the identity of the source would be held in confidence"; 
+	air:if {
+		##MANAGE POLICY##
+		##TYPE 5##
+		};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_k].
+:The_Privacy_Act_of_1974_552a_k a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (k)";
+	rdfs:comment "At the time rules are adopted under this subsection, the agency shall include in the statement required under section 553(c) of this title, the reasons why the system of records is to be exempted from a provision of this section.";
+	air:if {
+		@forSome :PUBLIC.
+		:PUBLIC a pri:MakePublic;
+			pri:by :S;
+			pri:contains [a pri:Reasons_for_Exemption].
+	};
+	air:then[
+		air:description ("");
+		air:assert[ air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_k.}]];
+	air:else[
+		air:description ("");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_k.}]].
+
+:The_Privacy_Act_of_1974_552a_l a air:Policy;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (l)";
+	rdfs:comment "Archival records";
+	air:rule :init_l.
+:init_l a air:Belief-rule;
+	air:if{
+		:S a pri:National_Archives_Records_Admin.
+		:EVENT a pri:Share;
+			pri:data :INFO;
+			pri:by :S.
+	};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_l2or3].
+:The_Privacy_Act_of_1974_552a_l2or3 a air:Belief-rule;
+	air:if {
+#################################
+#####after 1974##################
+#################################
+		};
+	air:then[
+		air:description (:INFO " accepted by the NARA after 12/31/1974.");
+		air:rule :The_Privacy_Act_of_1974_552a_l3];
+	air:else[
+		air:description (:INFO " accepted by the NARA before 12/31/1974.");
+		air:rule :The_Privacy_Act_of_1974_552a_l2].
+:The_Privacy_Act_of_1974_552a_l2 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (l)(2)";
+	rdfs:comment "Each agency record pertaining to an identifiable individual which was transferred to the National Archives of the United States as a record which has sufficient historical or other value to warrant its continued preservation by the United States Government, prior to the effective date of this section, shall, for the purposes of this section, be considered to be maintained by the National Archives and shall not be subject to the provisions of this section, except that a statement generally describing such records (modeled after the requirements relating to records subject to subsections (e)(4)(A) through (G) of this section) shall be published in the Federal Register";
+	air:if {
+		:SR a pri:System_of_Records.
+		:S pri:maintains :SR.
+		:INFO pri:contained_in :SR;
+			a pri:PII;
+			pri:purpose [a pri:Historical_Record].
+		};
+	air:then[
+		air:description (:S " can share " :INFO " if a statement generally describing such records (modeled after the requirements relating to records subject to subsections (e)(4)(A) through (G) of this section) shall be published in the Federal Register");
+		air:assert[ air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_l.}]];
+	air:else[
+		air:description (:INFO " is not considered to be maintained by the National Archives");
+		air:rule :The_Privacy_Act_of_1974_552a_l1_c01].
+:The_Privacy_Act_of_1974_552a_l3 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (l)(3)";
+	rdfs:comment "Each agency record pertaining to an identifiable individual which is transferred to the National Archives of the United States as a record which has sufficient historical or other value to warrant its continued preservation by the United States Government, on or after the effective date of this section, shall, for the purposes of this section, be considered to be maintained by the National Archives and shall be exempt from the requirements of this section except subsections (e)(4)(A) through (G) and (e)(9) of this section";
+	air:if {
+		:SR a pri:System_of_Records.
+		:S pri:maintains :SR.
+		:INFO pri:contained_in :SR;
+			a pri:PII;
+			pri:purpose [a pri:Historical_Record].
+		};
+	air:then[
+		air:description (:S " can share " :INFO " if  a publication is made in the federal register in accordance with (e)(4)(A) through (G) and (e)(9) of this section");
+		air:assert[ air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_l.}]];
+	air:else[
+		air:description (:INFO " is not considered to be maintained by the National Archives");
+		air:rule :The_Privacy_Act_of_1974_552a_l1_c01].
+:The_Privacy_Act_of_1974_552a_l1_c01 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (l)(1) clause 1";
+	rdfs:comment "Each agency record which is accepted by the Archivist of the United States for storage, processing, and servicing in accordance with section 3103 of Title 44 shall, for the purposes of this section, be considered to be maintained by the agency which deposited the record and shall be subject to the provisions of this section. The Archivist of the United States shall not disclose the record except to the agency which maintains the record, or under rules established by that agency which are not inconsistent with the provisions of this section";
+	air:if {
+		:INFO pri:purpose [a pri:44_USC_3103].
+		};
+	air:then[
+		air:description (:S " cannot share " :INFO " since it was accepted under 44 U.S.C. 3103");
+		air:rule :The_Privacy_Act_of_1974_552a_l1_c02];
+	air:else[
+		air:description (:S " is allowed to share " :INFO " as long as it is not forbidden by another rule in this section");
+		air:assert[ air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_l.}]].
+:The_Privacy_Act_of_1974_552a_l1_c02 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (l)(1) clause 2";
+	rdfs:comment "Each agency record which is accepted by the Archivist of the United States for storage, processing, and servicing in accordance with section 3103 of Title 44 shall, for the purposes of this section, be considered to be maintained by the agency which deposited the record and shall be subject to the provisions of this section. The Archivist of the United States shall not disclose the record except to the agency which maintains the record, or under rules established by that agency which are not inconsistent with the provisions of this section";
+	air:if {
+		:EVENT pri:to :R.
+		:INFO pri:contained_in :SR.
+		:R pri:maintains :SR.
+		};
+	air:then[
+		air:description(:S " can share " :INFO " with " :R " since " :R " maintains the system of records that " :INFO " is stored in");
+		air:assert[ air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_l.}]];
+	air:else[
+		air:description(:S " cannot share " :INFO " since it was accepted under 44 U.S.C. 3103");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_l.}]].
+:The_Privacy_Act_of_1974_552a_l1_c03 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (l)(1) clause 3";
+	rdfs:comment "Each agency record which is accepted by the Archivist of the United States for storage, processing, and servicing in accordance with section 3103 of Title 44 shall, for the purposes of this section, be considered to be maintained by the agency which deposited the record and shall be subject to the provisions of this section. The Archivist of the United States shall not disclose the record except to the agency which maintains the record, or under rules established by that agency which are not inconsistent with the provisions of this section";
+	air:if {
+		##Depends on policy created by :R##
+		}.
+:The_Privacy_Act_of_1974_552a_l1_c04 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (l)(1) clause 4";
+	rdfs:comment "Each agency record which is accepted by the Archivist of the United States for storage, processing, and servicing in accordance with section 3103 of Title 44 shall, for the purposes of this section, be considered to be maintained by the agency which deposited the record and shall be subject to the provisions of this section. The Archivist of the United States shall not disclose the record except to the agency which maintains the record, or under rules established by that agency which are not inconsistent with the provisions of this section";
+	air:if {
+		##MANAGE POLICY##
+		##TYPE 2##
+		}.
+
+:The_Privacy_Act_of_1974_552a_m a air:Policy;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (m)";
+	rdfs:comment "Government contractors";
+	air:rule :The_Privacy_Act_of_1974_552a_m1_c01.
+:The_Privacy_Act_of_1974_552a_m1_c01 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (m)(1) clause 1";
+	rdfs:comment "When an agency provides by a contract for the operation by or on behalf of the agency of a system of records to accomplish an agency function, the agency shall, consistent with its authority, cause the requirements of this section to be applied to such system. For purposes of subsection (i) of this section any such contractor and any employee of such contractor, if such contract is agreed to on or after the effective date of this section, shall be considered to be an employee of an agency";
+	air:if{
+	###MANGAGE POLICY###
+	###TYPE 1###
+	};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_m1_c02].
+:The_Privacy_Act_of_1974_552a_m1_c02 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (m)(1) clause 2";
+	rdfs:comment "When an agency provides by a contract for the operation by or on behalf of the agency of a system of records to accomplish an agency function, the agency shall, consistent with its authority, cause the requirements of this section to be applied to such system. For purposes of subsection (i) of this section any such contractor and any employee of such contractor, if such contract is agreed to on or after the effective date of this section, shall be considered to be an employee of an agency";
+	air:if{
+	###DEFINITION###
+	};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_m2].
+:The_Privacy_Act_of_1974_552a_m2 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (m)(1) clause 1";
+	rdfs:comment "A consumer reporting agency to which a record is disclosed under section 3711(e) of Title 31 shall not be considered a contractor for the purposes of this section";
+	air:if{
+	###DEFINITION###
+	}.
+	
+:The_Privacy_Act_of_1974_552a_n a air:Policy;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (n)";
+	rdfs:comment "Mailing lists";
+	air:rule :init_n.
+:init_n a air:Belief-rule;
+	air:if {
+		:S a pri:US_Federal_Agency.
+		:EVENT a pri:RentSell;
+			pri:by :S;
+			pri:data :INFO.
+		:INFO pri:about :P.
+		:P a pri:Person.
+	};
+	air:then[
+		air:rule :The_Privacy_Act_of_1974_552a_n_c01].
+:The_Privacy_Act_of_1974_552a_n_c01 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (n) clause 1";
+	rdfs:comment "An individual's name and address may not be sold or rented by an agency unless such action is specifically authorized by law. This provision shall not be construed to require the withholding of names and addresses otherwise permitted to be made public";
+	air:if {
+		:EVENT pri:contains [a pri:name];
+			pri:contains [a pri:address].
+	};
+	air:then [
+		air:description (:S " can't sell " :INFO " because it contains an individual's name and address.");
+		air:rule :The_Privacy_Act_of_1974_552a_n_c02];
+	air:else [
+		air:description (:S " can sell " :INFO " because it doesn't contain an individual's name and address.");
+		air:assert[ air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_n.}]].
+:The_Privacy_Act_of_1974_552a_n_c02 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (n) clause 2";
+	rdfs:comment "An individual's name and address may not be sold or rented by an agency unless such action is specifically authorized by law. This provision shall not be construed to require the withholding of names and addresses otherwise permitted to be made public";
+	air:if {
+		:EVENT pri:specifically_authorized [].
+	};
+	air:then [
+		air:description (:S " can sell " :INFO " because it is specially authorized by law");
+		air:assert[ air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_n.}]];
+	air:else [
+		air:description (:S " can't sell " :INFO " because it isn't specially authorized by law");
+		air:rule :The_Privacy_Act_of_1974_552a_n_c03].
+:The_Privacy_Act_of_1974_552a_n_c03 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (n) clause 3";
+	rdfs:comment "An individual's name and address may not be sold or rented by an agency unless such action is specifically authorized by law. This provision shall not be construed to require the withholding of names and addresses otherwise permitted to be made public";
+	air:if {
+		:EVENT pri:authorized [a pri:MakePublic].
+	};
+	air:then [
+		air:description (:S " can sell " :INFO " because it is otherwise permitted to be made public");
+		air:assert[ air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_n.}]];
+	air:else [
+		air:description (:S " can't sell " :INFO " because it isn't otherwise permitted to be made public");
+		air:assert[ air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_n.}]].
+:The_Privacy_Act_of_1974_552a_o a air:Policy;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (o)";
+	rdfs:comment "Matching Programs";
+	air:rule :init_o.
+:init_o a air:Belief-rule;
+	air:if {
+		:S pri:matching_program :R.
+		:S a pri:Federal_Agency;
+		};
+	air:then [
+		air:rule :The_Privacy_Act_of_1974_552a_o1].
+:The_Privacy_Act_of_1974_552a_o1 a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (o)(1)";
+	rdfs:comment "No record which is contained in a system of records may be disclosed to a recipient agency or non-Federal agency for use in a computer matching program except pursuant to a written agreement between the source agency and the recipient agency or non-Federal agency specifying";
+	air:if {
+		:EVENT a pri:Share;
+			pri:by :S;
+			pri:to :R;
+			pri:purpose [a pri:MatchingAgreement];
+			pri:data :INFO.
+		:INFO a pri:PII;
+			pri:about :P;
+			pri:contained_in [a pri:System_of_Records].
+		:P a pri:US_Person.
+	};
+	air:then [
+		air:description ("The matching program must be implemented by a written agreement between the source agency and the recipient agency or non-Federal agency");
+		air:rule :The_Privacy_Act_of_1974_552a_o1A];
+	air:else[
+		air:rule :The_Privacy_Act_of_1974_552a_o1A].
+:The_Privacy_Act_of_1974_552a_o1A a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (o)(1)(A)";
+	rdfs:comment "the purpose and legal authority for conducting the program";
+	air:if {
+	#######MANAGE POLICY###########
+	};
+	air:then [
+		air:rule :The_Privacy_Act_of_1974_552a_o1B].
+:The_Privacy_Act_of_1974_552a_o1B a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (o)(1)(B)";
+	rdfs:comment "the justification for the program and the anticipated results, including a specific estimate of any savings";
+	air:if {
+	#######MANAGE POLICY###########
+	};
+	air:then [
+		air:rule :The_Privacy_Act_of_1974_552a_o1C].
+:The_Privacy_Act_of_1974_552a_o1C a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (o)(1)(C)";
+	rdfs:comment "a description of the records that will be matched, including each data element that will be used, the approximate number of records that will be matched, and the projected starting and completion dates of the matching program";
+	air:if {
+	#######MANAGE POLICY###########
+	};
+	air:then [
+		air:rule :The_Privacy_Act_of_1974_552a_o1D].
+:The_Privacy_Act_of_1974_552a_o1D a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (o)(1)(D)";
+	rdfs:comment "procedures for providing individualized notice at the time of application, and notice periodically thereafter as directed by the Data Integrity Board of such agency (subject to guidance provided by the Director of the Office of Management and Budget pursuant to subsection (v)), to-- (i) applicants for and recipients of financial assistance or payments under Federal benefit programs, and (ii) applicants for and holders of positions as Federal personnel, that any information provided by such applicants, recipients, holders, and individuals may be subject to verification through matching programs";
+	air:if {
+	#######MANAGE POLICY###########
+	};
+	air:then [
+		air:rule :The_Privacy_Act_of_1974_552a_o1E].
+:The_Privacy_Act_of_1974_552a_o1E a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (o)(1)(E)";
+	rdfs:comment "procedures for verifying information produced in such matching program as required by subsection (p)";
+	air:if {
+	#######MANAGE POLICY###########
+	};
+	air:then [
+		air:rule :The_Privacy_Act_of_1974_552a_o1F].
+:The_Privacy_Act_of_1974_552a_o1F a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (o)(1)(F)";
+	rdfs:comment "procedures for the retention and timely destruction of identifiable records created by a recipient agency or non-Federal agency in such matching program";
+	air:if {
+	#######MANAGE POLICY###########
+	};
+	air:then [
+		air:rule :The_Privacy_Act_of_1974_552a_o1G].
+:The_Privacy_Act_of_1974_552a_o1G a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (o)(1)(G)";
+	rdfs:comment "procedures for ensuring the administrative, technical, and physical security of the records matched and the results of such programs";
+	air:if {
+	#######MANAGE POLICY###########
+	};
+	air:then [
+		air:rule :The_Privacy_Act_of_1974_552a_o1H].
+:The_Privacy_Act_of_1974_552a_o1H a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (o)(1)(H)";
+	rdfs:comment "prohibitions on duplication and redisclosure of records provided by the source agency within or outside the recipient agency or the non-Federal agency, except where required by law or essential to the conduct of the matching program";
+	air:if {
+	#######MANAGE POLICY###########
+	};
+	air:then [
+		air:rule :The_Privacy_Act_of_1974_552a_o1I].
+:The_Privacy_Act_of_1974_552a_o1I a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (o)(1)(I)";
+	rdfs:comment "procedures governing the use by a recipient agency or non-Federal agency of records provided in a matching program by a source agency, including procedures governing return of the records to the source agency or destruction of records used in such program";
+	air:if {
+	#######MANAGE POLICY###########
+	};
+	air:then [
+		air:rule :The_Privacy_Act_of_1974_552a_o1J].
+:The_Privacy_Act_of_1974_552a_o1J a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (o)(1)(J)";
+	rdfs:comment "information on assessments that have been made on the accuracy of the records that will be used in such matching program";
+	air:if {
+	#######MANAGE POLICY###########
+	};
+	air:then [
+		air:rule :The_Privacy_Act_of_1974_552a_o1K].
+:The_Privacy_Act_of_1974_552a_o1K a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (o)(1)(K)";
+	rdfs:comment "that the Comptroller General may have access to all records of a recipient agency or a non-Federal agency that the Comptroller General deems necessary in order to monitor or verify compliance with the agreement";
+	air:if {
+	#######MANAGE POLICY###########
+	};
+	air:then [
+		air:rule :The_Privacy_Act_of_1974_552a_o2Ai].
+:The_Privacy_Act_of_1974_552a_o2Ai a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (o)(2)(A)(i)";
+	rdfs:comment "A copy of each agreement entered into pursuant to paragraph (1) shall be transmitted to the Committee on Governmental Affairs of the Senate and the Committee on Government Operations of the House of Representatives";
+	air:if {
+		@forSome :E1, :E2.
+		:E1 a pri:Share;
+			pri:data [a pri:MatchingAgreement];
+			pri:by :S;
+			pri:to [a pri:Committee_on_Governmental_Affairs].
+		:E1 a pri:Share;
+			pri:data [a pri:MatchingAgreement];
+			pri:by :S;
+			pri:to [a pri:Committee_on_Government_Operations].
+	};
+	air:then [
+		air:description (:S " has transmitted a copy of the agreement to the proper legislative committees.");
+		air:rule :The_Privacy_Act_of_1974_552a_o2Aii];
+	air:else [
+		air:description (:S " must transmit a copy of the matching agreement to both the Committee on Governmental Affairs in the Senate and the Committee on Government Operations in the House");
+		air:assert [air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_o2Ai.}]].
+:The_Privacy_Act_of_1974_552a_o2Aii a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (o)(2)(A)(ii)";
+	rdfs:comment "be available upon request to the public";
+	air:if {
+		@forSome :E3.
+		:E3 a pri:MakePublic;
+			pri:by :S;
+			pri:data [a pri:MatchingAgreement].
+	};
+	air:then [
+		air:description (:S " has made a copy of the agreement public.");
+		air:rule :The_Privacy_Act_of_1974_552a_o2B];
+	air:else [
+		air:description (:S " must make a copy of the matching agreement available to the public");
+		air:assert [air:statement {:S air:non-compliant-with :The_Privacy_Act_of_1974_552a_o2Aii.}]].
+:The_Privacy_Act_of_1974_552a_o2B a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (o)(2)(B)";
+	rdfs:comment "No such agreement shall be effective until 30 days after the date on which such a copy is transmitted pursuant to subparagraph (A)(i)";
+	air:if {
+	####MANAGE POLICY#####
+	};
+	air:then [
+		air:rule :The_Privacy_Act_of_1974_552a_o2C].
+:The_Privacy_Act_of_1974_552a_o2C a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (o)(2)(C)";
+	rdfs:comment "Such an agreement shall remain in effect only for such period, not to exceed 18 months, as the Data Integrity Board of the agency determines is appropriate in light of the purposes, and length of time necessary for the conduct, of the matching program";
+	air:if {
+	####MANAGE POLICY#####
+	};
+	air:then [
+		air:rule :The_Privacy_Act_of_1974_552a_o2D].
+:The_Privacy_Act_of_1974_552a_o2D a air:Belief-rule;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (o)(2)(D)";
+	rdfs:comment "Within 3 months prior to the expiration of such an agreement pursuant to subparagraph (C), the Data Integrity Board of the agency may, without additional review, renew the matching agreement for a current, on-going matching program for not more than one additional year if-- (i) such program will be conducted without any change; and (ii) each party to the agreement certifies to the Board in writing that the program has been conducted in compliance with the agreement.";
+	air:if {
+	####MANAGE POLICY#####
+	};
+	air:then [
+		air:assert [air:statement {:S air:compliant-with :The_Privacy_Act_of_1974_552a_o.}]].
+:The_Privacy_Act_of_1974_552a_p a air:Policy;
+	rdfs:label "1.2a Federal Statute The Privacy Act of 1974, 5 U.S.C. 552a (p)";
+	rdfs:comment "Verification and opportunity to contest findings";
+	air:rule :init_p.
+:init_p a air:Belief-rule;
+	air:if {
+	}.
+
+
+
+

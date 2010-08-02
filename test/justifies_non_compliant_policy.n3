@@ -1,0 +1,13 @@
+# Believe this hides everything inside.  It appears to.
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+
+:nested_non_compliant_policy a air:Policy;
+	air:rule :Rule1 .
+
+:Rule1 a air:Belief-rule ;
+       air:label "Rule 1";
+       air:if { :d :e :f . };
+       air:then [ air:assert { :nested_log air:compliant-with :nested_non_compliant_policy } ] ;
+       air:else [ air:assert { :nested_log air:non-compliant-with :nested_non_compliant_policy . } ] .

@@ -1,0 +1,32 @@
+rules =  [Generic Rule with vars frozenset([]), [pattern={abr:P rdf:type owl:TransitiveProperty}] with vars frozenset([abr:P, abr:C, abr:N4, abr:C1, abr:S, abr:O, abr:P2, abr:N3, abr:N2, abr:P1, abr:N1, abr:N, abr:C2]), [pattern={abr:P rdf:type owl:SymmetricProperty}] with vars frozenset([abr:P, abr:C, abr:N4, abr:C1, abr:S, abr:O, abr:P2, abr:N3, abr:N2, abr:P1, abr:N1, abr:N, abr:C2]), [pattern={abr:C1 rdfs:subClassOf abr:C2}] with vars frozenset([abr:P, abr:C, abr:N4, abr:C1, abr:S, abr:O, abr:P2, abr:N3, abr:N2, abr:P1, abr:N1, abr:N, abr:C2]), [pattern={abr:P1 rdfs:subPropertyOf abr:P2}] with vars frozenset([abr:P, abr:C, abr:N4, abr:C1, abr:S, abr:O, abr:P2, abr:N3, abr:N2, abr:P1, abr:N1, abr:N, abr:C2]), [pattern={abr:N1 owl:sameAs abr:N2}] with vars frozenset([abr:P, abr:C, abr:N4, abr:C1, abr:S, abr:O, abr:P2, abr:N3, abr:N2, abr:P1, abr:N1, abr:N, abr:C2]), [pattern={abr:P rdfs:domain abr:C}] with vars frozenset([abr:P, abr:C, abr:N4, abr:C1, abr:S, abr:O, abr:P2, abr:N3, abr:N2, abr:P1, abr:N1, abr:N, abr:C2]), [pattern={abr:P rdfs:range abr:C}] with vars frozenset([abr:P, abr:C, abr:N4, abr:C1, abr:S, abr:O, abr:P2, abr:N3, abr:N2, abr:P1, abr:N1, abr:N, abr:C2])]
+goal rules =  []
+defaultdict(<type 'int'>, {'rule': 8, 'fact': 17})
+time reasoning took= 0.830878973007
+  of which 0.715635061264 was after loading, and 0.70304608345 was actual reasoning
+I can prove the following compliance statements:
+n3 = (someValue, a, b, None) [premise]
+n21 = Generic Rule with vars frozenset([]) [premise]
+n31 = (someValue, air:compliant-with, SomePolicy, None) <= file:///home/pipian/Documents/Projects/cwmrete-old/airtest/syntactic_sugar_rules2.n3#_g_L7C11(n3 = (someValue, a, b, None), n21 = Generic Rule with vars frozenset([]))
+     @prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+    @prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+    @prefix tms: <http://dig.csail.mit.edu/TAMI/2007/amord/tms#> .
+    
+    :someValue     air:compliant-with :SomePolicy .
+    
+    <#_g0>     tms:justification tms:premise .
+    {
+        :someValue     air:compliant-with :SomePolicy .
+        
+        }     tms:justification  [
+             tms:antecedent-expr  [
+                 a tms:And-justification;
+                 tms:sub-expr <#_g0>,
+                        {:someValue     :a :b .
+                } ];
+             tms:rule-name <#_g0> ] .
+    {
+        :someValue     :a :b .
+        
+        }     tms:justification tms:premise .
+    
+

@@ -1,0 +1,127 @@
+# $Date: 2008-11-04 15:21:25 -0500 (Tue, 04 Nov 2008) $
+# $Revision: 25081 $
+# $Author: jacobi $
+
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#>.
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+
+@prefix pur: <http://dig.csail.mit.edu/TAMI/2006/s4/purposes#> .
+
+@prefix mit: <http://dig.csail.mit.edu/TAMI/2007/s0/university#> .
+
+@prefix tlog: <http://dig.csail.mit.edu/TAMI/2007/s0/log#> .
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/s0/log#> .
+
+# 1. Prox Card data can only be used for criminal investigations
+# 2. adverse consequence: being called in for a disciplinary hearing
+# 3. This particular CoD hearing is not criminal investigation
+
+# Student Sam asks TA Ted for extension due to illness.
+
+# TA Ted looked at Prox Card data to figure out that Sam was in CSAIL
+# at 9:45am Monday, 5th floor.
+
+# TA Ted infers that Student Sam was faking illness.
+
+# TA Ted tells Professor Pam about Sam faking illness to get an
+# extension.
+
+# Professor Pam files complaint with CoD about Student Sam faking
+# illness to get an extension, providing prox card data as evidence.
+
+# Student Sam is called in for a disciplinary hearing by CoD based on
+# the complaint.
+
+# AIR is trying to figure out if CoD calling Student Sam in for a
+# hearing violates MIT Privacy policies.
+
+# Prohibited to commit AcademicFraud sanction "you will be charged
+# with AcademicFraud by CoD".
+
+# Rule: If you are FakingIllnessForExtension then you will be charged
+# with AcademicFraud.
+
+:Pam a mit:Professor;
+	mit:teaches :Course1.
+
+:Ted a mit:TA;
+	mit:helpsTeach :Course1.
+
+:Sam a mit:Student;
+	mit:hasCard :Card1;
+	mit:registeredFor :Course1.
+
+:req-1 a air:Event;
+	a :ExtensionForPaper;
+	air:actor :Sam;
+	air:to :Ted;
+	:course :Course1;
+	:reason :Illness.
+
+:grant-1 a air:Event;	
+	a :GrantedExtensionForPaper;
+	air:actor :Ted;
+	air:to :Sam;
+	:course :Course1;
+	:antecedent :req-1.
+
+:accessPCdata-1 a air:AccessEvent;
+	air:actor :Ted;
+	air:data :proxcarddata-1;
+	:antecedent :grant-1.
+	
+:proxcarddata-1 a mit:ProxCardEvent;
+	mit:usedDateTime "2007-07-01T10:30:00-5:00";
+	mit:location :CSAIL;
+	mit:card :Card1.
+
+# not possible to capture Ted's thoughts :) 
+# just added to workthru scenario
+# :inferSamFaking-1 a air:Event;
+#	by :Ted;
+#	:about { :Sam :fakedIllness :forExtension };
+#	:antecendent :accessPCData-1.
+
+:informAboutSam-1 a air:Event;
+	a :InformProfEvent;
+	air:actor :Ted;
+	air:to :Pam;
+	air:data { :Sam :fakedIllness :forExtension };
+	:antecendent :inferSamFaking-1.
+
+:complaintFiled-1 a air:Event;
+	a :ComplaintFiledEvent;
+	air:actor :Pam;
+	air:to :CoD;
+	:complaint :complaint-1;
+	:antecedent :informAboutSam-1.
+
+# this is meta data that was extracted from the complaint document
+
+:complaint-1 a mit:CoDAllegation;
+	mit:filedBy :Pam;
+	mit:against :Sam;
+	mit:for :FakingIllnessForExtension;
+	mit:evidence :proxcarddata-1.
+
+	
+:Samchargedwithacademicfraud a :ChargeEvent;
+	:student :Sam;
+	:chargedWith :AcademicFraud;
+	air:actor :CoD;
+	:complaint :complaint-1;
+	:antecedent :complaintFiled-1.
+
+mit:TA rdfs:subClassOf mit:Student.
+
+:ChargeEvent rdfs:subClassOf air:UseEvent.
+
+## see http://www.w3.org/TR/rdf-schema/#ch_subpropertyof
+:chargedWith rdfs:subPropertyOf air:purpose.
+mit:evidence rdfs:subPropertyOf air:data.
+:complaint rdfs:subPropertyOf air:data.
+
+mit:filedBy rdfs:subPropertyOf air:actor.
+
+#ends

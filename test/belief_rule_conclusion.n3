@@ -1,0 +1,50 @@
+     @prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+    @prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+    @prefix tms: <http://dig.csail.mit.edu/TAMI/2007/amord/tms#> .
+    
+    :Rule1     tms:justification tms:premise .
+    
+    :Rule2     tms:justification  [
+             tms:antecedent-expr  [
+                 a tms:And-justification;
+                 tms:sub-expr :Rule1,
+                        {:someValue     :a :b .
+                } ];
+             tms:rule-name :Rule1 ] .
+    
+    :Rule3     tms:justification  [
+             tms:antecedent-expr  [
+                 a tms:And-justification;
+                 tms:sub-expr :Rule2,
+                        {:someValue     :c :d .
+                } ];
+             tms:rule-name :Rule2 ] .
+    
+    :Rule4     tms:justification  [
+             tms:antecedent-expr  [
+                 a tms:And-justification;
+                 tms:sub-expr :Rule3,
+                        {:someValue     :e :f .
+                } ];
+             tms:rule-name :Rule3 ] .
+    
+    :someValue     air:compliant-with :HiddenRulePolicy .
+    {
+        :someValue     air:compliant-with :HiddenRulePolicy .
+        
+        }     tms:justification  [
+             tms:antecedent-expr  [
+                 a tms:And-justification;
+                 tms:sub-expr :Rule4,
+                        {:someValue     :g :h .
+                } ];
+             tms:rule-name :Rule4 ] .
+    {
+        :someValue     :a :b;
+             :c :d;
+             :e :f;
+             :g :h .
+        
+        }     tms:justification tms:premise .
+    
+

@@ -1,0 +1,89 @@
+# Believe this hides everything inside.  It appears to.
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+@prefix log: <http://www.w3.org/2000/10/swap/log#> .
+@prefix math: <http://www.w3.org/2000/10/swap/math#> .
+
+:JustifiesRulePolicy a air:Policy;
+	air:rule :Rule1 , :Rule2 , :Rule3 , :Rule4 , :Rule5, :Rule6, :Rule7, :Rule8 .
+
+:Rule1 a air:Belief-rule ;
+       air:label "air:justifies with compliant policy";
+       air:if { @forSome :LOG, :RULE.
+                <./justifies_nested_log.n3> log:semantics :LOG .
+                <./justifies_compliant_policy.n3> log:semantics :RULE .
+                ((:LOG) (:RULE)) air:justifies { :nested_log air:compliant-with :nested_compliant_policy . } };
+#       air:if { (1 2) math:sum 3 };
+       air:then [ air:assert { :QComply air:compliant-with :JustifiesRulePolicy . } ] ;
+       air:else [ air:assert { :QComply air:non-compliant-with :JustifiesRulePolicy . } ] .
+
+:Rule2 a air:Belief-rule ;
+       air:label "air:justifies with non-compliant policy";
+       air:if { @forSome :LOG, :RULE.
+                <./justifies_nested_log.n3> log:semantics :LOG .
+                <./justifies_non_compliant_policy.n3> log:semantics :RULE .
+                ((:LOG) (:RULE)) air:justifies { :nested_log air:non-compliant-with :nested_non_compliant_policy . } };
+#       air:if { (1 2) math:sum 3 };
+       air:then [ air:assert { :QNonComply air:compliant-with :JustifiesRulePolicy . } ] ;
+       air:else [ air:assert { :QNonComply air:non-compliant-with :JustifiesRulePolicy . } ] .
+
+:Rule3 a air:Belief-rule ;
+       air:label "air:justifies negative matching of compliant policy";
+       air:if { @forSome :LOG, :RULE.
+                <./justifies_nested_log.n3> log:semantics :LOG .
+                <./justifies_compliant_policy.n3> log:semantics :RULE .
+                ((:LOG) (:RULE)) air:justifies { :nested_log air:non-compliant-with :nested_compliant_policy . } };
+#       air:if { (1 2) math:sum 3 };
+       air:then [ air:assert { :QFailComply air:non-compliant-with :JustifiesRulePolicy . } ] ;
+       air:else [ air:assert { :QFailComply air:compliant-with :JustifiesRulePolicy . } ] .
+
+:Rule4 a air:Belief-rule ;
+       air:label "air:justifies negative matching of non-complaint policy";
+       air:if { @forSome :LOG, :RULE.
+                <./justifies_nested_log.n3> log:semantics :LOG .
+                <./justifies_non_compliant_policy.n3> log:semantics :RULE .
+                ((:LOG) (:RULE)) air:justifies { :nested_log air:compliant-with :nested_non_compliant_policy . } };
+#       air:if { (1 2) math:sum 3 };
+       air:then [ air:assert { :QFailNonComply air:non-compliant-with :JustifiesRulePolicy . } ] ;
+       air:else [ air:assert { :QFailNonComply air:compliant-with :JustifiesRulePolicy . } ] .
+
+:Rule5 a air:Belief-rule ;
+       air:label "air:justifies will match any property";
+       air:if { @forSome :LOG, :RULE.
+                <./justifies_nested_log.n3> log:semantics :LOG .
+                <./justifies_filtered_compliant_policy.n3> log:semantics :RULE .
+                ((:LOG) (:RULE)) air:justifies { :nested_log :matches :nested_filtered_compliant_policy . } };
+#       air:if { (1 2) math:sum 3 };
+       air:then [ air:assert { :QFilteredComply air:compliant-with :JustifiesRulePolicy . } ] ;
+       air:else [ air:assert { :QFilteredComply air:non-compliant-with :JustifiesRulePolicy . } ] .
+
+:Rule6 a air:Belief-rule ;
+       air:label "air:justifies will match any else properties";
+       air:if { @forSome :LOG, :RULE.
+                <./justifies_nested_log.n3> log:semantics :LOG .
+                <./justifies_filtered_non_compliant_policy.n3> log:semantics :RULE .
+                ((:LOG) (:RULE)) air:justifies { :nested_log :not-matches :nested_filtered_non_compliant_policy . } };
+#       air:if { (1 2) math:sum 3 };
+       air:then [ air:assert { :QFilteredNonComply air:compliant-with :JustifiesRulePolicy . } ] ;
+       air:else [ air:assert { :QFilteredNonComply air:non-compliant-with :JustifiesRulePolicy . } ] .
+
+:Rule7 a air:Belief-rule ;
+       air:label "air:justifies will negatively match any property";
+       air:if { @forSome :LOG, :RULE.
+                <./justifies_nested_log.n3> log:semantics :LOG .
+                <./justifies_filtered_compliant_policy.n3> log:semantics :RULE .
+                ((:LOG) (:RULE)) air:justifies { :nested_log :not-matches :nested_filtered_compliant_policy . } };
+#       air:if { (1 2) math:sum 3 };
+       air:then [ air:assert { :QFailFilteredComply air:non-compliant-with :JustifiesRulePolicy . } ] ;
+       air:else [ air:assert { :QFailFilteredComply air:compliant-with :JustifiesRulePolicy . } ] .
+
+:Rule8 a air:Belief-rule ;
+       air:label "air:justifies will negatively match any else properties";
+       air:if { @forSome :LOG, :RULE.
+                <./justifies_nested_log.n3> log:semantics :LOG .
+                <./justifies_filtered_non_compliant_policy.n3> log:semantics :RULE .
+                ((:LOG) (:RULE)) air:justifies { :nested_log :matches :nested_filtered_non_compliant_policy . } };
+#       air:if { (1 2) math:sum 3 };
+       air:then [ air:assert { :QFailFilteredNonComply air:non-compliant-with :JustifiesRulePolicy . } ] ;
+       air:else [ air:assert { :QFailFilteredNonComply air:compliant-with :JustifiesRulePolicy . } ] .

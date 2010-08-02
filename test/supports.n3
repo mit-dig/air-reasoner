@@ -1,0 +1,23 @@
+# Believe this hides everything inside.  It appears to.
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+@prefix log: <http://www.w3.org/2000/10/swap/log#> .
+@prefix math: <http://www.w3.org/2000/10/swap/math#> .
+
+:SupportsRulePolicy a air:Policy;
+	air:rule :Rule1 .
+
+:Rule1 a air:Belief-rule ;
+       air:label "Rule 1";
+       air:if { {:a :b :c . :r :e :g . {:a :b :c} => {:d :e :f} } log:supports {:a :b :c. :d :e :f} };
+#       air:if { (1 2) math:sum 3 };
+       air:then [ air:assert [ air:statement { :Q air:compliant-with :SupportsRulePolicy . } ] ] ;
+       air:else [ air:assert [ air:statement { :Q air:non-compliant-with :SupportsRulePolicy . } ] ] .
+
+:Rule2 a air:Belief-rule ;
+       air:label "Rule 1";
+       air:if { {:a :b :c . :r :e :g . } log:supports {:a :b :c. :d :e :f} };
+#       air:if { (1 2) math:sum 3 };
+       air:then [ air:assert [ air:statement { :Q air:compliant-with :SupportsRulePolicy . } ] ] ;
+       air:else [ air:assert [ air:statement { :Q air:non-compliant-with :SupportsRulePolicy . } ] ] .

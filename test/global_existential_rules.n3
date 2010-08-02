@@ -1,0 +1,12 @@
+# Testing policies with global existential quantification.  This
+# should assert nothing.
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+@forSome :x .
+
+:PolicyWithGlobalExistential a air:Policy;
+	air:rule [
+		air:label "Global Existential Rule";
+		air:pattern { :x :a :b . };
+		air:assert { :x air:compliant-with :PolicyWithGlobalExistential . } ] .

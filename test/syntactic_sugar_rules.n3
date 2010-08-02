@@ -1,0 +1,28 @@
+# We have two assertions here.  How do they behave?
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+@prefix tms: <http://dig.csail.mit.edu/TAMI/2007/amord/tms#> .
+
+:SugarPolicy a air:Policy;
+	air:rule [
+		air:label "Rule with Syntactic Sugar";
+		air:pattern { :someValue :a :b . };
+		air:assert { :someValue air:compliant-with :SugarPolicy . } ] .
+
+:NoSugarPolicy a air:Policy;
+	air:rule :NoSugarRule.
+
+:NoSugarRule a air:BeliefRule;
+	air:label "Rule with Syntactic Sugar";
+	air:pattern { :someValue :a :b . };
+	air:matched-graph :G1;
+	air:assertion [
+		air:statement {
+			:someValue air:compliant-with :NoSugarPolicy .
+		};
+		air:justification [
+			air:rule-id _:dummy;
+			air:antecedent :G1, _:dummy ] ] .
+
+_:dummy tms:justification tms:premise .

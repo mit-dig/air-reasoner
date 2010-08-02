@@ -1,0 +1,12 @@
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .	
+@prefix tami: <http://tw.rpi.edu/proj/tami/Special:URIResolver/> .
+@prefix tamic: <http://tw.rpi.edu/proj/tami/Special:URIResolver/Category-3A> .
+@prefix tamip: <http://tw.rpi.edu/proj/tami/Special:URIResolver/Property-3A> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix :  <http://tw.rpi.edu/proj/tami/Special:URIResolver/> .
+
+:George tamip:Lives_in_city :Boston .
+:Boston tamip:Has_state :MA .
+:NY tamip:Neighbor_state :MA .
+tamip:Neighbor_state a owl:SymmetricProperty .

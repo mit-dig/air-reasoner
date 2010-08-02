@@ -1,0 +1,14 @@
+# Testing policies with global universal quantification.  This should
+# assert (with global_universal_facts.n3):
+#
+# :someValue air:compliant-with :PolicyWithGlobalUniversal .
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+@forAll :x .
+
+:PolicyWithGlobalUniversal a air:Policy;
+	air:rule [
+		air:label "Global Universal Rule";
+		air:pattern { :x :a :b . };
+		air:assert { :x air:compliant-with :PolicyWithGlobalUniversal . } ] .

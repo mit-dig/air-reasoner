@@ -1,0 +1,11 @@
+# Testing an air:rule that should balk when loaded.
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+#@forAll :x .
+
+:EmptyPatternPolicy a air:Policy;
+	air:rule [
+		air:label "Inline Rule With No Pattern";
+		air:if { };
+		air:then [ air:assert [ air:statement { :x air:compliant-with :InlineRuleWithNoPatternPolicy . } ] ] ] .

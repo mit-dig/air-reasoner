@@ -1,0 +1,16 @@
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+
+@forAll :PERSON, :CITY.
+
+:ny_state_residency_policy a air:Policy;
+      air:rule :state-residency-rule.
+
+:state-residency-rule a air:Belief-rule;
+    air:if {
+       :PERSON :Lives_in_city :CITY.
+       :CITY :Has_state :NY.
+    };     
+    air:then 
+       [ air:description(:PERSON "lives in the NY state city -" :CITY);   
+         air:assert [air:statement {:PERSON air:compliant-with :ny_state_residency_policy.}]].
