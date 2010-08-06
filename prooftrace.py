@@ -148,8 +148,8 @@ def simpleTraceOutput(tmsNodes, reasons, premises):
 def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
     formula = store.newFormula()
     t = formula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/tms')
-    air = formula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
-    airj = formula.newSymbol('http://www.example.com/airj')
+    air = formula.newSymbol('http://dig.csail.mit.edu/2009/AIR/air')
+    airj = formula.newSymbol('http://dig.csail.mit.edu/2009/AIR/airjustification')
     pmll = formula.newSymbol('http://www.example.com/pmllite')
     done = set()
     termsFor = {}
@@ -272,11 +272,10 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                             # Generate any needed extraction events,
                             # or find the corresponding one.
                             
-                            log = formula.any(subj=term, pred=store.semantics)
-                            if log:
-                                event = formula.any(pred=pmll['outputdata'],
-                                                    obj=log)
-                                if event:
+                            event = formula.any(pred=airj['source'], obj=term)
+                            if event:
+                                log = formula.any(subj=event, pred=airj['outputdata'])
+                                if log:
                                     newTermsFor[term] = (event, log)
                             if term not in newTermsFor:
 #                                event = mintEventFragment()
@@ -285,10 +284,10 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
 #                                    log = mintDataID()
                                     log = store.newSymbol(store.genId())
                                 newTermsFor[term] = (event, log)
-                                formula.add(term, store.semantics, log)
+                                formula.add(event, airj['source'], term)
                                 formula.add(event, store.type,
-                                            airj['Extraction'])
-                                formula.add(event, pmll['outputdata'], log)
+                                            airj['Dereference'])
+                                formula.add(event, airj['outputdata'], log)
                             formula.add(newNode, pmll['flowDependency'],
                                         event)
                             formula.add(newNode, pmll['dataDependency'],
@@ -317,10 +316,10 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                 # We need to generate extraction events.
                 if self.extractedFrom is not None:
                     symb = store.newSymbol(self.extractedFrom)
-                    log = formula.any(subj=symb, pred=store.semantics)
-                    if log:
-                        event = formula.any(pred=pmll['outputdata'], obj=log)
-                        if event:
+                    event = formula.any(pred=airj['source'], obj=symb)
+                    if event:
+                        log = formula.any(subj=event, pred=airj['outputdata'])
+                        if log:
                             newTermsFor[self] = (event, log)
                     if self in newTermsFor:
                         (self.dataEvent, self.dataID) = newTermsFor[self]
@@ -331,11 +330,11 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                         self.dataID = store.newSymbol(store.genId())
                         newTermsFor[self] = (self.dataEvent, self.dataID)
                         
-                    formula.add(store.newSymbol(self.extractedFrom),
-                                store.semantics,
-                                self.dataID)
-                    formula.add(self.dataEvent, store.type, airj['Extraction'])
-                    formula.add(self.dataEvent, pmll['outputdata'], self.dataID)
+                    formula.add(self.dataEvent, airj['source'],
+                                store.newSymbol(self.extractedFrom))
+                    formula.add(self.dataEvent, store.type,
+                                airj['Dereference'])
+                    formula.add(self.dataEvent, airj['outputdata'], self.dataID)
             elif self.assumed():
                 retVal = True
                 formula.add(termsFor[self], t['justification'], t['premise'])
@@ -352,7 +351,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                 self.fireEvent = store.newSymbol(store.genId())
                 formula.add(self.fireEvent, store.type, airj['RuleApplication'])
                 if isinstance(selfTerm, Formula):
-                    formula.add(self.fireEvent, pmll['outputdata'], selfTerm)
+                    formula.add(self.fireEvent, airj['outputdata'], selfTerm)
                 booleanExpressionToNewRDF(expressions[self], self.fireEvent)
                 
                 # Back to the old-school stuff.
