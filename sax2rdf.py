@@ -241,13 +241,15 @@ class RDFHandler(xml.sax.ContentHandler):
         
         for name, value in attrs.items():
             ns, ln = name
-            if ns:
-                if string.find("ID about aboutEachPrefix bagID type", ln)>0:
-                    if ns != RDF_NS_URI:
-                        print ("# Warning -- %s attribute in %s namespace not RDF NS." %
-                               name, ln)
-                        ns = RDF_NS_URI  # Allowed as per dajobe: ID, bagID, about, resource, parseType or type
-                uri = (ns + ln)
+# The following section was a kludge to work with presumably old bad RDF
+# files while RDF was being defined way back when.
+#            if ns:              # Removed 2010 as this is a kludge which creaks with sioc:about - timbl 2010-07-19
+#                if string.find("ID about aboutEachPrefix bagID type", ln)>0:
+#                    if ns != RDF_NS_URI:
+#                        print ("# Warning -- %s attribute in %s namespace not RDF NS." %
+#                                name, ln)
+#                        ns = RDF_NS_URI  # Allowed as per dajobe: ID, bagID, about, resource, parseType or type
+            uri = (ns + ln)
             if ns == RDF_NS_URI or ns == None:   # Opinions vary sometimes none but RDF_NS is common :-(
                 if ln == "ID":
                     if not isXML.isName(value):
