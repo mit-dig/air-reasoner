@@ -13,12 +13,15 @@ from py25 import *
 
 
 class TMS(object):
+    """A (singleton) class used to control how signalling and
+    contradictions are handled within the nodes in the TMS."""
     def __init__(self, name, event_handler):
         self.name = name
         self.event_handler = event_handler
         self.contradiction = Node(self, "contradiction")
 
 class Node(object):
+    """A node in a TMS tree."""
     nodeCount = 0
     
     def __init__(self, tms, datum=None):
@@ -57,18 +60,23 @@ class Node(object):
         return self is self.tms.contradiction
 
     def premise(self):
+        """Return the premise of this node, if any."""
         try:
             return [x for x in self.justifications if isinstance(x, Premise)][0]
         except IndexError:
             return None
 
     def assumed(self):
+        """Return true if this node has been assumed (it has a premise which
+        is supported???)"""
         just = self.premise()
         if just is None:
             return False
         return just.supported
 
     def assume(self):
+        """Assume this node by marking its premise as supported (or using
+        itself as a premise)"""
         just = self.premise()
         if just is not None:
             just.supported = True
@@ -78,11 +86,14 @@ class Node(object):
         
     # The following four are for the new ontology working.
     def assumeByExtraction(self, uri):
+        """Assume this node and mark the URI from which the particular
+        assumption is based."""
         # Like assume(), but adds the fact that it was extracted from uri.
         self.assume()
         self.setExtractedFrom(uri)
     
     def setExtractedFrom(self, uri):
+        """Set the URI from which this node was extracted."""
         # Sets the extractedFrom value recursively.
         self.extractedFrom = uri
         for just in self.consequents:
@@ -90,18 +101,23 @@ class Node(object):
             
     def assumeByClosingWorld(self, assumedPolicies, assumedURIs, assumedStrings,
                              assumedCWAs):
+        """Assume this node in a closing the world operation by marking the
+        URIs currently being assumed in this closed world."""
         # Like assume(), but adds the assumedURIs. (Anything else???)
         self.assume()
         self.setAssumedURIs(assumedURIs)
     
     def setAssumedURIs(self, assumedURIs):
+        """Sets the URIs currently being assumed."""
         self.assumedURIs = assumedURIs
 
     def support(self, justification):
+        """Support this TMS node and any consequents."""
         if self.supported:
             return
         self.supported = True
         self.signal(justification)
+        # Recursively support any consequents as long as their support is well-founded.
         for just in self.consequents:
             if just.supported:
                 just.consequent.support(just)
@@ -112,6 +128,7 @@ class Node(object):
                     reSupportNodes(just.consequent.propagateRetractions())
 
     def retract(self):
+        """Retract the assumption of a TMS node."""
         premise = self.premise()
         if premise is None:
             raise RetractionError('Cannot retract a node that was not assumed in the first place, %s' % self)
@@ -125,6 +142,7 @@ class Node(object):
                 just.consequent.support(just)
 
     def propagateRetractions(self):
+        """Generate the consequents of this particular node recursively."""
         for just in self.consequents:
             if not just.supported:
                 for x in just.propagateRetractions():
@@ -162,6 +180,7 @@ class Node(object):
         return False
 
     def supportTree(self):
+        """Return the tree of support for this node (see walkNode)"""
 
         def walkNode(node, seen, hypotheses):
             if node in seen:
@@ -214,6 +233,7 @@ class Node(object):
     ##### printing stuff
 
     def why(self, port=None):
+        """Print the justification for this node."""
         def f(consequent, just, antecedents, support): 
             writeComment("""(%s) <== (%s %s) | support = %s """ % (consequent.name,
                                                                                   just.rule or just,
@@ -223,6 +243,8 @@ class Node(object):
         self.walkSupport(f)
 
     def walkSupport(self, procedure):
+        """Walk the support tree (breadth-first), executing procedure on each
+        node."""
         nTree = self.supportTree()
         assert nTree, 'Bad range argument to %s.walkSupport(), got back %s' % (self, nTree)
         queue = Queue.Queue()  #should I use this? (overkill)
@@ -246,12 +268,16 @@ class Node(object):
 
 import sys
 def writeComment(obj, port=None):
+    """Writes a comment."""
     if port is None:
         port = sys.stdout
         port.write('# %s \n' % obj)
 
 
 def reSupportNodes(retracted):
+    """Sends a false (retraction) signal to any nodes in retracted which
+    are no longer (recursively) supported by justifications marked as
+    such."""
     newSupport = True
     while newSupport:
         newSupport = False

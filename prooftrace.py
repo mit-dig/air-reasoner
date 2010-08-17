@@ -10,10 +10,13 @@ from formula import Formula, StoredStatement
 from term import List, Env, Symbol, Fragment, Literal
 
 def supportTrace(tmsNodes):
+    """Construct a list of reasons and premises for a set of tmsNodes???"""
     pending = set()
     reasons = {}
     premises = set()
     def nf(self):
+        """Recursively populate reasons by seeing if this is a premise, or if
+        a justification can be given a reason???"""
 #            print 'running nf(%s), %s, %s' % (self, self.__class__, self.justifications)
         if self in reasons:
             return True
@@ -33,6 +36,7 @@ def supportTrace(tmsNodes):
     return reasons, premises
 
 def removeFormulae(reasons, premises):
+    """Remove formulae from the lists of reasons, given a set of premises???"""
     newReasons = {}
     premises = premises.copy()
     for node, reason in reasons.items():
@@ -53,6 +57,8 @@ def removeFormulae(reasons, premises):
     return newReasons, premises
 
 def removeBaseRules(reasons, premises, baseRules):
+    """Remove from the reasons anything that is based on a rule in the set
+    of baseRules."""
     newExpressions = dict((node, reasons[node].expression)
                           for node in reasons
                           if node not in premises)
@@ -64,6 +70,7 @@ def removeBaseRules(reasons, premises, baseRules):
     doneNewExpressions = {}
 
     def expressionSubstitutionFunc(expression, bindings):
+        """Return the expression with bindings substituted."""
         nodes = []
         for node in expression.args:
             if isinstance(node, tms.BooleanExpression):
@@ -77,6 +84,7 @@ def removeBaseRules(reasons, premises, baseRules):
 
     mem = {}
     def expressionSubstitution(expression, bindings):
+        """Memoized expressionSubstitutionFunc."""
         bindingsVal = frozenset(bindings.items())
         try:
             return mem[(expression, bindingsVal)]
@@ -84,6 +92,7 @@ def removeBaseRules(reasons, premises, baseRules):
             mem[(expression, bindingsVal)] = expressionSubstitutionFunc(expression, bindings)
             return mem[(expression, bindingsVal)]
     
+    # Breadth-first traversal.
     while newExpressions:
         for node in list(newExpressions.keys()):
             expression = newExpressions[node]

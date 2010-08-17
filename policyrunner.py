@@ -359,6 +359,9 @@ class RuleFire(object):
         triplesTMS = []
         goals = []
         unSupported = []
+        # Iterate through each triple of this RuleFire event, and
+        # classify it as supported (triplesTMS), a goal triple
+        # (goals), or unsupported (unSupported)
         for triple in triples:
             t = self.tms.getTriple(*triple.spo())
             if t.supported:
@@ -377,6 +380,7 @@ class RuleFire(object):
         if goals and unSupported:
             raise RuntimeError(goals, unSupported) #This will never do!
         elif goals:
+            # Goal-rule stuff below.
             if not self.goal:
                 raise RuntimeError('how did I get here?\nI matched %s, which are goals, but I don\'t want goals' % goals)
 #                print 'we goal succeeded! %s, %s' % (triples, result)
@@ -415,6 +419,8 @@ class RuleFire(object):
                 return
 #                print 'we succeeded! %s, %s' % (triples, result)
             if alt:
+                # Close the world over what we've currently assumed if
+                # this RuleFire event is an alternate one (else)
 #                closedWorld = self.tms.getThing(('closedWorld', self.tms.workingContext.newList(list(self.tms.premises))))
                 closedWorld = self.tms.getThing(('closedWorld',
                                                  self.tms.workingContext.newList(self.tms.assumedPolicies +
@@ -444,6 +450,8 @@ class RuleFire(object):
                 ruleId = r12.rule
                 assert isinstance(r2, Rule) or not r2.occurringIn(self.vars), (r2, env, penalty, self.label)
 #            print '   ...... so about to assert %s' % r2
+                # Justify r2's TMS node with the triples in
+                # triplesTMS, and us as a rule (and any closed world)
                 r2TMS = self.tms.getThing(r2)
                 if support is None:
                     r2TMS.justify(RuleName(self.sourceNode, desc), triplesTMS + [self.tms.getThing(self)] + altSupport)
@@ -913,6 +921,9 @@ def nameRules(pf, uriBase):
 class EventLoop(object):
     """The eventloop (there should only be one)
 is a FIFO of thunks to be called.
+
+Note that this eventloop support altevents (for else clauses) which
+fire only when there are no events to fire.
 """
     def __init__(self):
         self.events = deque()

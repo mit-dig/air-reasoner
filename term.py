@@ -29,7 +29,7 @@ from set_importer import Set, ImmutableSet
 
 
 import uripath # DanC's tested and correct one
-import md5, binascii  # for building md5 URIs
+import hashlib, binascii  # for building md5 URIs
 
 from uripath import refTo
 from RDFSink import runNamespace
@@ -1452,7 +1452,7 @@ class Literal(Term):
         Hmm... encoding... assuming utf8? @@test this.
         Hmm... for a class of literals including this one,
         strictly speaking."""
-        x=md5.new()
+        x=hashlib.md5()
         x.update(self.string)
         d=x.digest()
         b16=binascii.hexlify(d)

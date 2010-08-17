@@ -71,6 +71,7 @@ def numeric(s):
        isinstance(s,Decimal): return s
     if not isinstance(s, (Literal, str, unicode)):
         raise ArgumentNotLiteral(s)
+    s = s.strip()
     if s.find('.') < 0 and s.find('e') < 0 : return long(s)
     if 'e' not in s and 'E' not in s: return Decimal(s)
     return float(s)

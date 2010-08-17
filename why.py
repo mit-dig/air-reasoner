@@ -27,7 +27,6 @@ from set_importer import Set, sorted
 
 import urllib # for hasContent
 import uripath # DanC's tested and correct one
-import md5, binascii  # for building md5 URIs
 
 from uripath import refTo
 from myStore  import Namespace
@@ -135,6 +134,7 @@ def _giveTerm(x, ko):
     from formula import Formula
     if isinstance(x, Formula):
         b = ko.newBlankNode(why=dontAsk)
+        x = x.close() # per timbl Tue, 15 Dec 2009 08:53:04 -0500
         ko.add(subj=x, pred=ko.store.sameAs, obj=b,
                         why=dontAsk)
         return b
