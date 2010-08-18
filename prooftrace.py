@@ -212,15 +212,15 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                 
                 # For now, shim in our dataDependency and air:rule.
                 # TODO: outputVariableMappingList
-                # TODO: clean up flow/dataDependency
+                # TODO: clean up nested/dataDependency
                 # TODO: built-in functions???
                 # TODO: hidden/ellipsed rules
                 if arg.fireEvent is not None:
-                    formula.add(node, airj['flowDependency'], arg.fireEvent)
+                    formula.add(node, airj['nestedDependency'], arg.fireEvent)
                 
                 if arg.dataEvent is not None:
                     formula.add(node, airj['dataDependency'], arg.dataEvent)
-                    formula.add(node, airj['flowDependency'], arg.dataEvent)
+#                    formula.add(node, airj['nestedDependency'], arg.dataEvent)
                 elif isinstance(arg.datum, Rule):
                     formula.add(node, air['rule'], node2)
                 elif isinstance(arg.datum, tuple) and len(arg.datum) == 2 \
