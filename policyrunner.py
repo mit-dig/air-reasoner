@@ -412,13 +412,13 @@ class RuleFire(object):
                 ruleId = r12.rule
                 assert isinstance(r2, Rule) or not r2.occurringIn(self.vars), (r2, env, penalty, self.label)
 #            print '   ...... so about to assert %s' % r2
-                r2TMS = self.tms.getThing(r2)
+                r2TMS = self.tms.getThingWithEnv(r2, env)
                 if support is None:
                     if isinstance(r2, Rule):
-                        r2TMS.justify(self.sourceNode, triplesTMS + [self.tms.getThingWithEnv(self, env)])
+                        r2TMS.justify(self.sourceNode, triplesTMS + [self.tms.getThing(self)])
                     else:
                         # Delay the justification of assertions in else clauses.
-                        eventLoop.addAssertion(lambda: r2TMS.justify(self.sourceNode, triplesTMS + [self.tms.getThingWithEnv(self, env)]))
+                        eventLoop.addAssertion(lambda: r2TMS.justify(self.sourceNode, triplesTMS + [self.tms.getThing(self)]))
                 else:
                     supportTMS = reduce(frozenset.union, support, frozenset())
                     if isinstance(r2, Rule):
@@ -469,13 +469,13 @@ class RuleFire(object):
 #            print '   ...... so about to assert %s' % r2
                 # Justify r2's TMS node with the triples in
                 # triplesTMS, and us as a rule (and any closed world)
-                r2TMS = self.tms.getThing(r2)
+                r2TMS = self.tms.getThingWithEnv(r2, env)
                 if support is None:
                     if isinstance(r2, Rule):
-                        r2TMS.justify(RuleName(self.sourceNode, desc), triplesTMS + [self.tms.getThingWithEnv(self, env)] + altSupport)
+                        r2TMS.justify(RuleName(self.sourceNode, desc), triplesTMS + [self.tms.getThing(self)] + altSupport)
                     else:
                         # Delay the justification of assertions in else clauses.
-                        eventLoop.addAssertion(lambda: r2TMS.justify(RuleName(self.sourceNode, desc), triplesTMS + [self.tms.getThingWithEnv(self, env)] + altSupport))
+                        eventLoop.addAssertion(lambda: r2TMS.justify(RuleName(self.sourceNode, desc), triplesTMS + [self.tms.getThing(self)] + altSupport))
                 else:
                     supportTMS = reduce(frozenset.union, support, frozenset()).union(altSupport)
                     if isinstance(r2, Rule):

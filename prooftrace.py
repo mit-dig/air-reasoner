@@ -249,6 +249,17 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                 # TODO: Fully fix nested elided rules
                 if arg.fireEvent is not None:
                     formula.add(node, airj['nestedDependency'], arg.fireEvent)
+                    if arg.datum in envs and len(envs[arg.datum]) > 0:
+                        # Create the outputVariableMappingList.
+                        env = envs[arg.datum]
+                        mappings = []
+                        for var in env:
+                            mapping = store.newSymbol(store.genId())
+                            formula.add(mapping, store.type, pmlj['Mapping'])
+                            formula.add(mapping, airj['mappingFrom'], var)
+                            formula.add(mapping, airj['mappingTo'], env[var])
+                            mappings.append(mapping)
+                        formula.add(arg.fireEvent, airj['outputVariableMappingList'], store.newList(mappings))
                 
                 if arg.dataEvent is not None and not hideThisNode:
                     formula.add(node, airj['dataDependency'], arg.dataEvent)
@@ -260,18 +271,6 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                     formula.add(node, airj['dataDependency'], node2)
                     formula.add(node, airj['flowDependency'], node2)
                     hasCWA = True
-                
-                if arg.datum in envs and len(envs[arg.datum]) > 0:
-                    # Create the outputVariableMappingList.
-                    env = envs[arg.datum]
-                    mappings = []
-                    for var in env:
-                        mapping = store.newSymbol(store.genId())
-                        formula.add(mapping, store.type, pmlj['Mapping'])
-                        formula.add(mapping, airj['mappingFrom'], var)
-                        formula.add(mapping, airj['mappingTo'], env[var])
-                        mappings.append(mapping)
-                    formula.add(node, airj['outputVariableMappingList'], store.newList(mappings))
             if hasCWA and not hideThisNode:
                 formula.add(node, airj['branch'], air['else'])
             elif not hideThisNode:
