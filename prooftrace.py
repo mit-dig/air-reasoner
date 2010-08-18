@@ -163,6 +163,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
     done = set()
     termsFor = {}
     newTermsFor = {}
+    print Rule, Rule.baseRules
     expressions = removeBaseRules(reasons, premises, Rule.baseRules)
 ##    expressions = dict((node, reasons[node].expression)
 ##                       for node in reasons
@@ -209,6 +210,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                     # Okay, we have the rule then.  Get us the parent.
                     ruleNode = booleanExpressionToNewRDF(arg)
                     node = None
+                    print expr, arg.datum
                     if arg.datum.isBase or (arg.datum.isElided and not hasHiddenAncestor):
                         if arg.datum.isBase:
                             hasHiddenAncestor = True

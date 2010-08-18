@@ -515,7 +515,7 @@ much how the rule was represented in the rdf network
         self.generated = generated
         self.isBase = base
         self.isElided = elided
-        if base or elided:
+        if base:
             self.baseRules.add(sourceNode)
         if debugLevel > 15:        
             print '''just made a rule, with
