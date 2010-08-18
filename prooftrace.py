@@ -7,7 +7,7 @@ Given a tms, generate proof traces
 
 import tms
 from formula import Formula, StoredStatement
-from term import List, Env, Symbol, Fragment, Literal, Existential, OBJ
+from term import List, Env, Symbol, Fragment, Literal, Existential, PRED, OBJ
 
 def supportTrace(tmsNodes):
     """Construct a list of reasons and premises for a set of tmsNodes???"""
@@ -243,7 +243,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                 node2 = booleanExpressionToNewRDF(arg, hasHiddenAncestor)
                 
                 # For now, shim in our dataDependency and air:rule.
-                # TODO: outputVariableMappingList
+                # TODO: outputVariableMappingList (done?)
                 # TODO: clean up nested/dataDependency??
                 # TODO: built-in functions???
                 # TODO: Fully fix nested elided rules
@@ -393,6 +393,23 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                     formula.add(self.dataEvent, store.type,
                                 airj['Dereference'])
                     formula.add(self.dataEvent, airj['outputdata'], self.dataID)
+                elif self.isBuiltIn:
+                    # We also need to generate Built-In events.
+                    
+                    # Extract the predicate from the triple.
+                    s = termsFor[self].statements[0]
+                    p = s[PRED]
+                    
+                    assertion = formula.the(pred=airj['builtin'], obj=p)
+                    if assertion is None:
+                        assertion = store.newSymbol(store.genId())
+                        formula.add(assertion, store.type, airj['BuiltinAssertion'])
+                        formula.add(assertion, airj['builtin'], p)
+                    
+                    self.dataEvent = store.newSymbol(store.genId())
+                    formula.add(self.dataEvent, store.type, airj['BuiltinExtraction'])
+                    formula.add(self.dataEvent, airj['dataDependency'], assertion)
+                    formula.add(self.dataEvent, airj['outputdata'], termsFor[self])
             elif self.assumed():
                 retVal = True
                 formula.add(termsFor[self], t['justification'], t['premise'])

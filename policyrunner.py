@@ -572,10 +572,14 @@ much how the rule was represented in the rdf network
                     (s, p, o), newVars = canonicalizeVariables(triple, self.vars)
                     self.eventLoop.add(AuxTripleJustifier(self.tms, GOAL, s, p, o, newVars, self.sourceNode, [self.tms.getThing(self)]))
         index = workingContext._index
-        bottomBeta = MM.compilePattern(index, patterns, self.vars, self.contextFormula, buildGoals=False, goalPatterns=self.goal, supportBuiltin=self.addTriple)
+        bottomBeta = MM.compilePattern(index, patterns, self.vars, self.contextFormula, buildGoals=False, goalPatterns=self.goal, supportBuiltin=self.supportBuiltin)
         trueBottom =  MM.ProductionNode(bottomBeta, self.onSuccess, self.onFailure)
         return trueBottom
 
+    def supportBuiltin(self, triple):
+        # Create the TMS node representing this triple's extraction.
+        self.tms.getTriple(*triple.spo()).assumeBuiltin()
+    
     def addTriple(self, triple):
         self.tms.getTriple(*triple.spo()).assume()
     def retractTriple(self, triple):

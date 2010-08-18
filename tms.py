@@ -37,6 +37,7 @@ class Node(object):
         self.dataEvent = None
         self.assumedURIs = []
         self.fireEvent = None
+        self.isBuiltIn = False
 
     def justify(self, rule, expression, hypotheses=None):
         if hypotheses is None:
@@ -110,6 +111,11 @@ class Node(object):
     def setAssumedURIs(self, assumedURIs):
         """Sets the URIs currently being assumed."""
         self.assumedURIs = assumedURIs
+    
+    def assumeBuiltin(self):
+        """Assume this node by virtue of its being a built-in."""
+        self.assume()
+        self.isBuiltIn = True
 
     def support(self, justification):
         """Support this TMS node and any consequents."""
