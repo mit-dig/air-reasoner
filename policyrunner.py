@@ -487,7 +487,7 @@ much how the rule was represented in the rdf network
     
     def __init__(self, eventLoop, tms, vars, label,
                  pattern, contextFormula, result, alt, sourceNode,
-                 goal=False, matchName=None, base=False, ellipsis=False,
+                 goal=False, matchName=None, base=False, elided=False,
                  generated=False):
         self.generatedLabel = False
         if label is None or label=='None':
@@ -514,8 +514,8 @@ much how the rule was represented in the rdf network
         self.sourceNode = sourceNode
         self.generated = generated
         self.isBase = base
-        self.isEllipsis = ellipsis
-        if base or ellipsis:
+        self.isElided = elided
+        if base or elided:
             self.baseRules.add(sourceNode)
         if debugLevel > 15:        
             print '''just made a rule, with
@@ -595,7 +595,7 @@ much how the rule was represented in the rdf network
             label = self.label
         return self.__class__(self.eventLoop, self.tms, self.vars,
                               label, pattern, self.contextFormula, result, alt,
-                              self.sourceNode, self.goal, self.matchName, base=self.isBase, ellipsis=self.isEllipsis, generated=True)
+                              self.sourceNode, self.goal, self.matchName, base=self.isBase, elided=self.isElided, generated=True)
 
     @classmethod
     def compileFromTriples(cls, eventLoop, tms, F, ruleNode, goal=False, vars=frozenset(), preboundVars=frozenset(), base=False):
@@ -644,8 +644,8 @@ much how the rule was represented in the rdf network
         
         # Is the rule an air:Hidden-rule?
         base = base or (F.contains(subj=ruleNode, pred=F.store.type, obj=p['Hidden-rule']) == 1)
-        # air:Ellipsed-rule?
-        ellipsis = (F.contains(subj=ruleNode, pred=F.store.type, obj=p['Ellipsed-rule']) == 1)
+        # air:Elided-rule?
+        elided = (F.contains(subj=ruleNode, pred=F.store.type, obj=p['Elided-rule']) == 1)
 #        descriptions = list(F.each(subj=node, pred=p['description']))
 
         # Collect all air:then or air:else actions...
@@ -858,7 +858,7 @@ much how the rule was represented in the rdf network
                    resultList[0],
 #                   descriptions=descriptions,
                    alt=resultList[1],# altDescriptions=altDescriptions,
-                   goal=goal, matchName=matchedGraph, sourceNode=node, base=base, ellipsis=ellipsis)
+                   goal=goal, matchName=matchedGraph, sourceNode=node, base=base, elided=elided)
         return self
 
     @classmethod
@@ -877,7 +877,7 @@ much how the rule was represented in the rdf network
                    matchName=None,
                    sourceNode=pattern,
                    base=True,
-                   ellipsis=False)
+                   elided=False)
         return self
 
 

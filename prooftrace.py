@@ -194,12 +194,36 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                 formula.add(node, t['sub-expr'], booleanExpressionToRDF(arg))
         return node
 
-    def booleanExpressionToNewRDF(expr, node):
+    def booleanExpressionToNewRDF(expr, hasHiddenAncestor=False):
         if expr in termsFor and expr not in newTermsFor:
             return termsFor[expr]
         elif expr in newTermsFor and newTermsFor[expr] is not None:
             return newTermsFor[expr]
+        
+        # Are we generating a named node (Belief-node with no
+        # Hidden-node ancestor?) or an existential node?
+        hideThisNode = False
+        if isinstance(expr, tms.AndExpression):
+            for arg in expr.args:
+                if isinstance(arg.datum, Rule):
+                    # Okay, we have the rule then.  Get us the parent.
+                    ruleNode = booleanExpressionToNewRDF(arg)
+                    node = None
+                    if arg.datum.isBase or arg.datum.isElided and hasHiddenAncestor:
+                        if arg.datum.isBase:
+                            hasHiddenAncestor = True
+                        hideThisNode = True
+                        node = store.newExistential(formula, store.genId())
+                        break
+                    elif not hasHiddenAncestor:
+                        node = store.newSymbol(store.genId())
+                        break
+                    elif hasHiddenAncestor:
+                        # Don't render this node.
+                        return None
+        
         newTermsFor[expr] = node
+        formula.add(node, store.type, airj['RuleApplication'])
 #        formula.add(node, airj['branch'], {tms.NotExpression: air['else'],
 #                                           tms.AndExpression: air['then'],
 #                                           tms.OrExpression: t['Or-justification']}[expr.__class__])
@@ -208,7 +232,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
             newFormula = formula.newFormula()
             hasCWA = False
             for arg in expr.args:
-                node2 = booleanExpressionToNewRDF(arg, store.newSymbol(store.genId()))
+                node2 = booleanExpressionToNewRDF(arg, hasHiddenAncestor)
                 
                 # For now, shim in our dataDependency and air:rule.
                 # TODO: outputVariableMappingList
@@ -218,19 +242,19 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                 if arg.fireEvent is not None:
                     formula.add(node, airj['nestedDependency'], arg.fireEvent)
                 
-                if arg.dataEvent is not None:
+                if arg.dataEvent is not None and not hideThisNode:
                     formula.add(node, airj['dataDependency'], arg.dataEvent)
 #                    formula.add(node, airj['nestedDependency'], arg.dataEvent)
-                elif isinstance(arg.datum, Rule):
+                elif isinstance(arg.datum, Rule) and not hideThisNode:
                     formula.add(node, air['rule'], node2)
                 elif isinstance(arg.datum, tuple) and len(arg.datum) == 2 \
                         and arg.datum[0] == 'closedWorld':
                     formula.add(node, airj['dataDependency'], node2)
                     formula.add(node, airj['flowDependency'], node2)
                     hasCWA = True
-            if hasCWA:
+            if hasCWA and not hideThisNode:
                 formula.add(node, airj['branch'], air['else'])
-            else:
+            elif not hideThisNode:
                 formula.add(node, airj['branch'], air['then'])
         else:
             for arg in expr.args:
@@ -363,11 +387,12 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                 
                 # Generate the event for this particular expression's
                 # RuleApplication event.
-                self.fireEvent = store.newSymbol(store.genId())
-                formula.add(self.fireEvent, store.type, airj['RuleApplication'])
+                
+                # NOTE: This can only be a known symbol if it is a
+                # Belief-rule, and we have no Hidden-rule ancestor.
+                self.fireEvent = booleanExpressionToNewRDF(expressions[self])
                 if isinstance(selfTerm, Formula):
                     formula.add(self.fireEvent, airj['outputdata'], selfTerm)
-                booleanExpressionToNewRDF(expressions[self], self.fireEvent)
                 
                 # Back to the old-school stuff.
                 if hasattr(rule, 'descriptions'):

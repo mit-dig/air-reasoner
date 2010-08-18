@@ -12,7 +12,7 @@
        air:then [ air:rule :Rule2 ] ;
        air:else [ air:assert [ air:statement { :someValue air:non-compliant-with :HiddenRulePolicy . } ] ] .
 
-:Rule2 a air:Ellipsed-rule ;
+:Rule2 a air:Elided-rule ;
        air:label "Rule 2" ;
        air:if { :someValue :c :d . } ;
        air:description ("rule2") ;
