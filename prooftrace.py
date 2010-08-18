@@ -154,12 +154,15 @@ def simpleTraceOutput(tmsNodes, reasons, premises):
 
 #mintDataID = dataIDGenerator().next
 
-def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
+def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
+    # Note that the env dictionary (keyed to the TMS nodes) is passed
+    # ALONGSIDE, and not in the nodes themselves.
     formula = store.newFormula()
     t = formula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/tms')
     air = formula.newSymbol('http://dig.csail.mit.edu/2009/AIR/air')
     airj = formula.newSymbol('http://dig.csail.mit.edu/2009/AIR/airjustification')
-    pmll = formula.newSymbol('http://www.example.com/pmllite')
+    pmll = formula.newSymbol('http://inference-web.org/2.0/pml-lite.owl')
+    pmlj = formula.newSymbol('http://inference-web.org/2.0/pml-justification.owl')
     done = set()
     termsFor = {}
     newTermsFor = {}
@@ -241,9 +244,9 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                 
                 # For now, shim in our dataDependency and air:rule.
                 # TODO: outputVariableMappingList
-                # TODO: clean up nested/dataDependency
+                # TODO: clean up nested/dataDependency??
                 # TODO: built-in functions???
-                # TODO: hidden/ellipsed rules
+                # TODO: Fully fix nested elided rules
                 if arg.fireEvent is not None:
                     formula.add(node, airj['nestedDependency'], arg.fireEvent)
                 
@@ -257,6 +260,18 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                     formula.add(node, airj['dataDependency'], node2)
                     formula.add(node, airj['flowDependency'], node2)
                     hasCWA = True
+                
+                if arg.datum in envs and len(envs[arg.datum]) > 0:
+                    # Create the outputVariableMappingList.
+                    env = envs[arg.datum]
+                    mappings = []
+                    for var in env:
+                        mapping = store.newSymbol(store.genId())
+                        formula.add(mapping, store.type, pmlj['Mapping'])
+                        formula.add(mapping, airj['mappingFrom'], var)
+                        formula.add(mapping, airj['mappingTo'], env[var])
+                        mappings.append(mapping)
+                    formula.add(node, airj['outputVariableMappingList'], store.newList(mappings))
             if hasCWA and not hideThisNode:
                 formula.add(node, airj['branch'], air['else'])
             elif not hideThisNode:
@@ -393,8 +408,6 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                 # Generate the event for this particular expression's
                 # RuleApplication event.
                 
-                # NOTE: This can only be a known symbol if it is a
-                # Belief-rule, and we have no Hidden-rule ancestor.
                 self.fireEvent = booleanExpressionToNewRDF(expressions[self])
                 if isinstance(selfTerm, Formula):
                     formula.add(self.fireEvent, airj['outputdata'], selfTerm)

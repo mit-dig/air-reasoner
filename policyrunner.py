@@ -53,6 +53,7 @@ def baseSub(value, bindings):
         return None
 
 class SubstitutingList(list):
+    """A list that responds to the substitution method"""
     pass
 
 SubstitutingList.substitution = \
@@ -60,6 +61,7 @@ SubstitutingList.substitution = \
         SubstitutingList(map(lambda x: baseSub(x, bindings), self))
 
 class SubstitutingTuple(tuple):
+    """A tuple that responds to the substitution method."""
     pass
 
 SubstitutingTuple.substitution = \
@@ -89,6 +91,8 @@ The job of activating rules also goes on this
         self.assumedStrings = []
         self.assumedClosedWorlds = []
         
+        # Stow some environments associated with things on the side.
+        self.envs = {}
 
     def getAuxTriple(self, auxid, subject, predicate, object, variables):
         """An aux triple is a triple supported for something other than belief
@@ -123,7 +127,12 @@ This is currently only used for goals
             a = tms.Node(self.tms, thing)
             self.nodes[thing] = a
         return self.nodes[thing]
-
+    
+    def getThingWithEnv(self, thing, env):
+        if thing not in self.envs:
+            self.envs[thing] = env
+        return self.getThing(thing)
+    
     def getStatement(self, (subject, predicate, object, variables)):
         return self.workingContext.statementsMatching(subj=subject, pred=predicate, obj=object)[0]
 
@@ -406,10 +415,10 @@ class RuleFire(object):
                 r2TMS = self.tms.getThing(r2)
                 if support is None:
                     if isinstance(r2, Rule):
-                        r2TMS.justify(self.sourceNode, triplesTMS + [self.tms.getThing(self)])
+                        r2TMS.justify(self.sourceNode, triplesTMS + [self.tms.getThingWithEnv(self, env)])
                     else:
                         # Delay the justification of assertions in else clauses.
-                        eventLoop.addAssertion(lambda: r2TMS.justify(self.sourceNode, triplesTMS + [self.tms.getThing(self)]))
+                        eventLoop.addAssertion(lambda: r2TMS.justify(self.sourceNode, triplesTMS + [self.tms.getThingWithEnv(self, env)]))
                 else:
                     supportTMS = reduce(frozenset.union, support, frozenset())
                     if isinstance(r2, Rule):
@@ -463,10 +472,10 @@ class RuleFire(object):
                 r2TMS = self.tms.getThing(r2)
                 if support is None:
                     if isinstance(r2, Rule):
-                        r2TMS.justify(RuleName(self.sourceNode, desc), triplesTMS + [self.tms.getThing(self)] + altSupport)
+                        r2TMS.justify(RuleName(self.sourceNode, desc), triplesTMS + [self.tms.getThingWithEnv(self, env)] + altSupport)
                     else:
                         # Delay the justification of assertions in else clauses.
-                        eventLoop.addAssertion(lambda: r2TMS.justify(RuleName(self.sourceNode, desc), triplesTMS + [self.tms.getThing(self)] + altSupport))
+                        eventLoop.addAssertion(lambda: r2TMS.justify(RuleName(self.sourceNode, desc), triplesTMS + [self.tms.getThingWithEnv(self, env)] + altSupport))
                 else:
                     supportTMS = reduce(frozenset.union, support, frozenset()).union(altSupport)
                     if isinstance(r2, Rule):
@@ -1179,7 +1188,7 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
     reasons, premises = removeFormulae(reasons, premises)
     strings = simpleTraceOutput(tmsNodes, reasons, premises)
     print '\n'.join(strings)
-    f = rdfTraceOutput(store, tmsNodes, reasons, premises, Rule)
+    f = rdfTraceOutput(store, tmsNodes, reasons, premises, formulaTMS.envs, Rule)
 #    import diag
 #    diag.chatty_flag = 1000
     return f, workingContext 
