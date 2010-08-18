@@ -273,10 +273,16 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                     formula.add(newNode, store.type, airj['ClosingTheWorld'])
                     for term in datum[1]:
                         if term in newTermsFor:
-                            formula.add(newNode, pmll['flowDependency'],
-                                        newTermsFor[term])
-                            formula.add(newNode, pmll['dataDependency'],
-                                        newTermsFor[term])
+                            if isinstance(newTermsFor[term], tuple):
+                                formula.add(newNode, pmll['flowDependency'],
+                                            newTermsFor[term][0])
+                                formula.add(newNode, pmll['dataDependency'],
+                                            newTermsFor[term][0])
+                            else:
+                                formula.add(newNode, pmll['flowDependency'],
+                                            newTermsFor[term])
+                                formula.add(newNode, pmll['dataDependency'],
+                                            newTermsFor[term])
                         elif term in self.assumedURIs:
                             # Generate any needed extraction events,
                             # or find the corresponding one.
@@ -288,10 +294,10 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                                     newTermsFor[term] = (event, log)
                             if term not in newTermsFor:
 #                                event = mintEventFragment()
-                                event = store.newSymbol(store.genId())
-                                if not log:
+                                log = store.newSymbol(store.genId())
+                                if not event:
 #                                    log = mintDataID()
-                                    log = store.newSymbol(store.genId())
+                                    event = store.newSymbol(store.genId())
                                 newTermsFor[term] = (event, log)
                                 formula.add(event, airj['source'], term)
                                 formula.add(event, store.type,
