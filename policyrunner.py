@@ -321,7 +321,7 @@ These are then passed to the scheduler
         self.tms = tms
         self.args = args
 
-    def __call__(self):
+    def __call__(self, eventLoop):
         self.tms.justifyAuxTriple(*self.args)
 
 class RuleName(object):
@@ -345,7 +345,7 @@ class RuleFire(object):
         self.rule = rule
         self.args = (triples, env, penalty, result, alt)
 
-    def __call__(self):
+    def __call__(self, eventLoop):
         triples, env, penalty, result, alt = self.args
         self = self.rule
         if alt and self.success: # We fired after all
@@ -405,12 +405,20 @@ class RuleFire(object):
 #            print '   ...... so about to assert %s' % r2
                 r2TMS = self.tms.getThing(r2)
                 if support is None:
-                    r2TMS.justify(self.sourceNode, triplesTMS + [self.tms.getThing(self)])
+                    if isinstance(r2, Rule):
+                        r2TMS.justify(self.sourceNode, triplesTMS + [self.tms.getThing(self)])
+                    else:
+                        # Delay the justification of assertions in else clauses.
+                        eventLoop.addAssertion(lambda: r2TMS.justify(self.sourceNode, triplesTMS + [self.tms.getThing(self)]))
                 else:
                     supportTMS = reduce(frozenset.union, support, frozenset())
-                    r2TMS.justify(ruleId, supportTMS)
-                assert self.tms.getThing(self).supported
-                assert r2TMS.supported                
+                    if isinstance(r2, Rule):
+                        r2TMS.justify(ruleId, supportTMS)
+                    else:
+                        eventLoop.addAssertion(lambda: r2TMS.justify(ruleId, supportTMS))
+                        eventLoop.addAssertion(lambda: r2TMS.justify(RuleName(ruleId, desc), supportTMS))
+#                assert self.tms.getThing(self).supported
+#                assert r2TMS.supported                
 #                raise NotImplementedError(goals) #todo: handle goals
         elif unSupported:
             raise RuntimeError(triple, self) # We should never get unsupported triples
@@ -454,12 +462,19 @@ class RuleFire(object):
                 # triplesTMS, and us as a rule (and any closed world)
                 r2TMS = self.tms.getThing(r2)
                 if support is None:
-                    r2TMS.justify(RuleName(self.sourceNode, desc), triplesTMS + [self.tms.getThing(self)] + altSupport)
+                    if isinstance(r2, Rule):
+                        r2TMS.justify(RuleName(self.sourceNode, desc), triplesTMS + [self.tms.getThing(self)] + altSupport)
+                    else:
+                        # Delay the justification of assertions in else clauses.
+                        eventLoop.addAssertion(lambda: r2TMS.justify(RuleName(self.sourceNode, desc), triplesTMS + [self.tms.getThing(self)] + altSupport))
                 else:
                     supportTMS = reduce(frozenset.union, support, frozenset()).union(altSupport)
-                    r2TMS.justify(RuleName(ruleId, desc), supportTMS)
-                assert self.tms.getThing(self).supported
-                assert r2TMS.supported
+                    if isinstance(r2, Rule):
+                        r2TMS.justify(RuleName(ruleId, desc), supportTMS)
+                    else:
+                        eventLoop.addAssertion(lambda: r2TMS.justify(RuleName(ruleId, desc), supportTMS))
+#                assert self.tms.getThing(self).supported
+#                assert r2TMS.supported
 
 
 class Rule(object):
@@ -928,20 +943,43 @@ fire only when there are no events to fire.
     def __init__(self):
         self.events = deque()
         self.alternateEvents = deque()
+        self.closed = False
+        self.assertionEvents = deque()
 
     def add(self, event):
+#        if hasattr(event, 'rule'):
+#            print "add", event.rule
         self.events.appendleft(event)
 
     def addAlternate(self, event):
+#        print "addAlternate", event.rule
         self.alternateEvents.appendleft(event)
+    
+    def addAssertion(self, event):
+#        print "addAssertion", event
+        if self.closed:
+            self.assertionEvents.appendleft(event)
+        else:
+            event()
 
     def next(self):
-        if self.events:
-            return self.events.pop()()
-        return self.alternateEvents.pop()()
+        if not self.closed and self.events:
+            return self.events.pop()(self)
+        elif self.alternateEvents:
+#            print "close!"
+            self.closed = True
+            return self.alternateEvents.pop()(self)
+        elif self.assertionEvents:
+            return self.assertionEvents.pop()()
+        elif self.events:
+#            print "open!"
+            self.closed = False
+            return self.events.pop()(self)
+        else:
+            return None
 
     def __len__(self):
-        return len(self.events) + len(self.alternateEvents)
+        return len(self.events) + len(self.alternateEvents) + len(self.assertionEvents)
 
 
             
