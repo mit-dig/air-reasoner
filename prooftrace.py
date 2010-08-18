@@ -7,7 +7,7 @@ Given a tms, generate proof traces
 
 import tms
 from formula import Formula, StoredStatement
-from term import List, Env, Symbol, Fragment, Literal
+from term import List, Env, Symbol, Fragment, Literal, Existential, OBJ
 
 def supportTrace(tmsNodes):
     """Construct a list of reasons and premises for a set of tmsNodes???"""
@@ -163,7 +163,6 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
     done = set()
     termsFor = {}
     newTermsFor = {}
-    print Rule, Rule.baseRules
     expressions = removeBaseRules(reasons, premises, Rule.baseRules)
 ##    expressions = dict((node, reasons[node].expression)
 ##                       for node in reasons
@@ -195,7 +194,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                 formula.add(node, t['sub-expr'], booleanExpressionToRDF(arg))
         return node
 
-    def booleanExpressionToNewRDF(expr, hasHiddenAncestor=False):
+    def booleanExpressionToNewRDF(expr, hasHiddenAncestor=False, elidedParent=None):
         if expr in termsFor and expr not in newTermsFor:
             return termsFor[expr]
         elif expr in newTermsFor and newTermsFor[expr] is not None:
@@ -210,12 +209,16 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                     # Okay, we have the rule then.  Get us the parent.
                     ruleNode = booleanExpressionToNewRDF(arg)
                     node = None
-                    print expr, arg.datum
-                    if arg.datum.isBase or (arg.datum.isElided and not hasHiddenAncestor):
+                    if arg.datum.isBase or (arg.datum.isElided and not hasHiddenAncestor and elidedParent is None):
                         if arg.datum.isBase:
                             hasHiddenAncestor = True
                         hideThisNode = True
                         node = store.newExistential(formula, store.genId())
+                        break
+                    elif arg.datum.isElided and not hasHiddenAncestor and elidedParent is not None:
+                        print "node = elidedParent"
+                        node = elidedParent
+                        hideThisNode = True
                         break
                     elif not hasHiddenAncestor:
                         node = store.newSymbol(store.genId())
@@ -423,6 +426,49 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
     for tmsNode in tmsNodes:
         nf2(tmsNode)
         formula.add(*tmsNode.datum[:3])
+    
+    # Clean-up neighboring elided nodes.
+    
+    # Would be nicer to do this internally (since then I'm not
+    # removing statements), but uh, I guess I can do it here.  Doing
+    # it here has the (unfortunate) side-effect that the
+    # quantification is still hanging around, but whatever.
+    hiddenNodes = set([x for x in formula.each(pred=store.type, obj=airj['RuleApplication']) if x in formula.existentials()])
+    nodesToMerge = {}
+    for node in frozenset(hiddenNodes):
+        if node not in hiddenNodes:
+            continue
+        mergeSet = set()
+        firstNode = node
+        lastNode = node
+        relatedNodes = formula.each(subj=node, pred=airj['nestedDependency']) + formula.each(pred=airj['nestedDependency'], obj=node)
+        while len(relatedNodes) > 0:
+            relatedNode = relatedNodes.pop()
+            if relatedNode in hiddenNodes:
+                if formula.contains(subj=firstNode, pred=airj['nestedDependency'], obj=relatedNode):
+                    firstNode = relatedNode
+                if formula.contains(subj=relatedNode, pred=airj['nestedDependency'], obj=lastNode):
+                    lastNode = relatedNode
+                mergeSet.add(relatedNode)
+                hiddenNodes.remove(relatedNode)
+                relatedNodes.extend(formula.each(subj=relatedNode, pred=airj['nestedDependency']))
+                relatedNodes.extend(formula.each(pred=airj['nestedDependency'], obj=relatedNode))
+        if firstNode != lastNode:
+            nodesToMerge[(firstNode, lastNode)] = mergeSet
+    
+    for nodePair in nodesToMerge:
+        firstNode, lastNode = nodePair
+        for node in nodesToMerge[nodePair]:
+            if node != firstNode and node != lastNode:
+                for s in formula.statementsMatching(subj=node):
+                    formula.removeStatement(s)
+        for s in formula.statementsMatching(subj=lastNode, pred=airj['nestedDependency']):
+            formula.removeStatement(s)
+        for s in formula.statementsMatching(subj=firstNode, pred=airj['nestedDependency']):
+            formula.add(subj=lastNode, pred=airj['nestedDependency'], obj=s[OBJ])
+            formula.removeStatement(s)
+        for s in formula.statementsMatching(subj=firstNode):
+            formula.removeStatement(s)
 
     formula.add(premiseFormula.close(), t['justification'], t['premise'])
     return formula.close()
