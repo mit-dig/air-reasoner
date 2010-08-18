@@ -209,7 +209,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, Rule):
                     # Okay, we have the rule then.  Get us the parent.
                     ruleNode = booleanExpressionToNewRDF(arg)
                     node = None
-                    if arg.datum.isBase or arg.datum.isElided and hasHiddenAncestor:
+                    if arg.datum.isBase or (arg.datum.isElided and not hasHiddenAncestor):
                         if arg.datum.isBase:
                             hasHiddenAncestor = True
                         hideThisNode = True
