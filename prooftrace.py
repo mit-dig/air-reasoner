@@ -441,6 +441,8 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                     rule = rule.name
                     for d in desc:
                         formula.add(selfTerm, t['description'], d)
+                        # But also some new stuff.
+                        formula.add(self.fireEvent, airj['description'], d)
                 formula.add(selfTerm, t['justification'], justTerm)
                 formula.add(justTerm, t['rule-name'], rule)
                 assert formula.contains(subj=justTerm, pred=t['rule-name'], obj=rule)
