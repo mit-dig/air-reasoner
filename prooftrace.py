@@ -251,7 +251,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                 # TODO: Fully fix nested elided rules
                 
                 # These todos seem to not be done
-                # TODO: dataDependency on a RuleApplication with outputdata.
+                # TODO: dataDependency on a RuleApplication with outputdata. (done?)
                 if arg.fireEvent is not None:
                     formula.add(node, airj['nestedDependency'], arg.fireEvent)
                     if arg.datum in envs and len(envs[arg.datum]) > 0:
@@ -433,6 +433,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                 self.fireEvent = booleanExpressionToNewRDF(expressions[self])
                 if isinstance(selfTerm, Formula):
                     formula.add(self.fireEvent, airj['outputdata'], selfTerm)
+                    self.dataEvent = self.fireEvent
                 
                 # Back to the old-school stuff.
                 if hasattr(rule, 'descriptions'):
