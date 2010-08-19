@@ -251,7 +251,6 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                 # TODO: Fully fix nested elided rules
                 
                 # These todos seem to not be done
-                # TODO: Overarching airj:ClosureComputation is needed.
                 # TODO: dataDependency on a RuleApplication with outputdata.
                 # TODO: Stop instantiating rules.
                 if arg.fireEvent is not None:
@@ -459,9 +458,20 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
             retVal = False # it does not matter
         return retVal
     
+    ccFormula = store.newFormula()
     for tmsNode in tmsNodes:
         nf2(tmsNode)
         formula.add(*tmsNode.datum[:3])
+        
+        # Add the node to the ClosureComputation event.
+        ccFormula.add(*tmsNode.datum[:3])
+    ccFormula.close()
+    
+    # Add the ClosureComputation event itself.
+    # TODO: How do we link to the ClosureComputation???
+    ccNode = store.newSymbol(store.genId())
+    formula.add(ccNode, store.type, airj['ClosureComputation'])
+    formula.add(ccNode, pmll['outputdata'], ccFormula)
     
     # Clean-up neighboring elided nodes.
     
