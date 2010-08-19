@@ -252,7 +252,6 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                 
                 # These todos seem to not be done
                 # TODO: dataDependency on a RuleApplication with outputdata.
-                # TODO: Stop instantiating rules.
                 if arg.fireEvent is not None:
                     formula.add(node, airj['nestedDependency'], arg.fireEvent)
                     if arg.datum in envs and len(envs[arg.datum]) > 0:
@@ -304,6 +303,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                 newNode = formula.newBlankNode()
                 formula.add(newNode, air['instanceOf'], datum.sourceNode)
                 termsFor[self] = newNode
+                newTermsFor[self] = datum.sourceNode
             else:
                 termsFor[self] = datum.sourceNode
         elif isinstance(datum, tuple):
