@@ -243,10 +243,17 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                 node2 = booleanExpressionToNewRDF(arg, hasHiddenAncestor)
                 
                 # For now, shim in our dataDependency and air:rule.
+                
+                # These todos seem to be done
                 # TODO: outputVariableMappingList (done?)
                 # TODO: clean up nested/dataDependency??
-                # TODO: built-in functions???
+                # TODO: built-in functions??? (done?)
                 # TODO: Fully fix nested elided rules
+                
+                # These todos seem to not be done
+                # TODO: Overarching airj:ClosureComputation is needed.
+                # TODO: dataDependency on a RuleApplication with outputdata.
+                # TODO: Stop instantiating rules.
                 if arg.fireEvent is not None:
                     formula.add(node, airj['nestedDependency'], arg.fireEvent)
                     if arg.datum in envs and len(envs[arg.datum]) > 0:

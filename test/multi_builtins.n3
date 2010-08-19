@@ -1,0 +1,24 @@
+# Believe this hides everything inside.  It appears to.
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+@prefix math: <http://www.w3.org/2000/10/swap/math#> .
+
+:nested_compliant_policy a air:Policy;
+	air:rule :Rule1, :Rule2 .
+
+:Rule1 a air:Belief-rule ;
+       air:label "Rule 1";
+       air:if { (1 2) math:sum 3 . };
+       air:then [ air:assert { :Rule1 air:compliant-with :nested_compliant_policy } ;
+                  air:description ("1 + 2 = 3!") ] ;
+       air:else [ air:assert { :Rule1 air:non-compliant-with :nested_compliant_policy . } ;
+                  air:description ("1 + 2 != 3!") ] .
+
+:Rule2 a air:Belief-rule ;
+       air:label "Rule 1";
+       air:if { (2 3) math:sum 5 . };
+       air:then [ air:assert { :Rule2 air:compliant-with :nested_compliant_policy } ;
+                  air:description ("2 + 3 = 5!") ] ;
+       air:else [ air:assert { :Rule2 air:non-compliant-with :nested_compliant_policy . } ;
+                  air:description ("2 + 3 != 5!") ] .

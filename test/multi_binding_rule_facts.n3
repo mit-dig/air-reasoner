@@ -1,0 +1,5 @@
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+
+:someValue :a :b .
+:someValue :b :b .
+:someValue :a :c .
