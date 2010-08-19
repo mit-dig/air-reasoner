@@ -466,13 +466,12 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
         
         # Add the node to the ClosureComputation event.
         ccFormula.add(*tmsNode.datum[:3])
-    ccFormula.close()
     
     # Add the ClosureComputation event itself.
     # TODO: How do we link to the ClosureComputation???
     ccNode = store.newSymbol(store.genId())
     formula.add(ccNode, store.type, airj['ClosureComputation'])
-    formula.add(ccNode, pmll['outputdata'], ccFormula)
+    formula.add(ccNode, pmll['outputdata'], ccFormula.close())
     
     # Clean-up neighboring elided nodes.
     
