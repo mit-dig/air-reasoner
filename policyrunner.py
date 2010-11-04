@@ -962,6 +962,7 @@ fire only when there are no events to fire.
         self.alternateEvents = deque()
         self.phase = EventLoop.PHASE_OPEN
         self.assertionEvents = deque()
+        self.newAssertionEvents = deque()
 
     def add(self, event):
 #        if hasattr(event, 'rule'):
@@ -970,7 +971,10 @@ fire only when there are no events to fire.
 
     def addAlternate(self, event):
 #        print "addAlternate", event.rule
-        self.alternateEvents.appendleft(event)
+        if self.phase != EventLoop.PHASE_CLOSED:
+            self.alternateEvents.appendleft(event)
+        else:
+            self.newAlternateEvents.appendleft(event)
     
     def addAssertion(self, event):
 #        print "addAssertion", event
@@ -988,6 +992,9 @@ fire only when there are no events to fire.
             return self.alternateEvents.pop()(self)
         elif self.phase <= EventLoop.PHASE_REOPEN and self.assertionEvents:
             self.phase = EventLoop.PHASE_REOPEN
+            if len(self.newAlternateEvents) > 0:
+                self.alternateEvents = self.newAlternateEvents
+                self.newAlternateEvents = deque()
             return self.assertionEvents.pop()()
         elif self.events:
 #            print "open!"
