@@ -953,10 +953,14 @@ is a FIFO of thunks to be called.
 Note that this eventloop support altevents (for else clauses) which
 fire only when there are no events to fire.
 """
+    PHASE_OPEN = 0
+    PHASE_CLOSED = 1
+    PHASE_REOPEN = 2
+    
     def __init__(self):
         self.events = deque()
         self.alternateEvents = deque()
-        self.closed = False
+        self.phase = EventLoop.PHASE_OPEN
         self.assertionEvents = deque()
 
     def add(self, event):
@@ -970,23 +974,24 @@ fire only when there are no events to fire.
     
     def addAssertion(self, event):
 #        print "addAssertion", event
-        if self.closed:
+        if self.phase != EventLoop.PHASE_OPEN:
             self.assertionEvents.appendleft(event)
         else:
             event()
 
     def next(self):
-        if not self.closed and self.events:
+        if self.phase == EventLoop.PHASE_OPEN and self.events:
             return self.events.pop()(self)
-        elif self.alternateEvents:
+        elif self.phase <= EventLoop.PHASE_CLOSED and self.alternateEvents:
 #            print "close!"
-            self.closed = True
+            self.phase = EventLoop.PHASE_CLOSED
             return self.alternateEvents.pop()(self)
-        elif self.assertionEvents:
+        elif self.phase <= EventLoop.PHASE_REOPEN and self.assertionEvents:
+            self.phase = EventLoop.PHASE_REOPEN
             return self.assertionEvents.pop()()
         elif self.events:
 #            print "open!"
-            self.closed = False
+            self.phase = EventLoop.PHASE_OPEN
             return self.events.pop()(self)
         else:
             return None

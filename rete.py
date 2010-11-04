@@ -15,7 +15,7 @@ WKD = weakref.WeakKeyDictionary
 from collections import deque
 import itertools
 
-from term import unify, Env, BuiltIn, Function, ReverseFunction, MultipleFunction, MultipleReverseFunction, ListBuiltIn, listify, isNonEmptyListTerm
+from term import unify, Env, BuiltIn, Function, ReverseFunction, MultipleFunction, MultipleReverseFunction, ListBuiltIn, listify, isNonEmptyListTerm, Fragment
 from formula import Formula, StoredStatement, WME
 from query import think as cwmThink
 
@@ -101,9 +101,6 @@ def sortPatterns(patterns, vars):
             provides.setdefault(var, set()).add(pattern)
         if pattern.isUnresolvable(vars):
             unresolvables.add(pattern)
-#    print requires
-#    print provides
-#    print unresolvables
 
     def getTopologically():
         """Sort patterns topologically by requires, provides, and
@@ -439,6 +436,11 @@ generates variable bindings
             elif self.pattern.predicate() is self.pattern.context().store.includes:
                 # log:includes references the (Indexed)Formula in the
                 # subject and checks it for a pattern match.
+                if not isinstance(self.pattern.substitution(env).subject(), Formula):
+                    # This match... isn't.
+                    if includeMissing:
+                        return retVal + [TripleWithBinding(BogusTriple(self.pattern), Env())] + builtInMade
+                    return retVal + builtInMade
                 newIndex = self.pattern.substitution(env).subject()._index
                 node = compilePattern(newIndex, self.pattern.object().statements, self.vars, self.context)
                 def onSuccess((triples, environment, penalty)):
