@@ -237,6 +237,7 @@ class BI_queryEndpoint(LightBuiltIn, Function):
         query = sparqlSemantics(StringIO.StringIO(query))
         
         if query.contains(obj=ns['ConstructQuery']):
+            print source
             F = self.store.load(source) # Load it from the SPARQL
                                         # endpoint directly.
             return F.canonicalize()

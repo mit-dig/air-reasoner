@@ -962,7 +962,7 @@ fire only when there are no events to fire.
         self.alternateEvents = deque()
         self.phase = EventLoop.PHASE_OPEN
         self.assertionEvents = deque()
-        self.newAssertionEvents = deque()
+        self.newAlternateEvents = deque()
 
     def add(self, event):
 #        if hasattr(event, 'rule'):
