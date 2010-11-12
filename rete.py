@@ -376,7 +376,7 @@ generates variable bindings
                 knowledgeBase.close()
                 node = compilePattern(knowledgeBase._index, self.pattern.object().statements, self.vars, self.context)
                 def onSuccess((triples, environment, penalty)):
-                    newAssumption = self.pattern.substitution(environment.asDict())
+                    newAssumption = self.pattern.substitution(environment.asDict()).substitution(env)
                     #somebodyPleaseAssertFromBuiltin(self.pattern.predicate(), newAssumption)
                     
                     builtInMade.append(TripleWithBinding(newAssumption, environment))
@@ -402,7 +402,7 @@ generates variable bindings
                 knowledgeBase.close()
                 node = compilePattern(knowledgeBase._index, self.pattern.object().statements, self.vars, self.context)
                 def onSuccess((triples, environment, penalty)):
-                    newAssumption = self.pattern.substitution(environment.asDict())
+                    newAssumption = self.pattern.substitution(environment.asDict()).substitution(env)
                     #somebodyPleaseAssertFromBuiltin(self.pattern.predicate(), newAssumption)
                     
                     builtInMade.append(TripleWithBinding(newAssumption, environment))
@@ -424,7 +424,7 @@ generates variable bindings
                 f, workingContext = airThink([], [], logFormulaObjs=logs, ruleFormulaObjs=rules, filterProperties=filterProperties, store=self.pattern.context().store)
                 node = compilePattern(workingContext._index, self.pattern.object().statements, self.vars, self.context)
                 def onSuccess((triples, environment, penalty)):
-                    newAssumption = self.pattern.substitution(environment.asDict())
+                    newAssumption = self.pattern.substitution(environment.asDict()).substitution(env)
                     #somebodyPleaseAssertFromBuiltin(self.pattern.predicate(), newAssumption)
                     
                     builtInMade.append(TripleWithBinding(newAssumption, environment))
@@ -444,7 +444,7 @@ generates variable bindings
                 newIndex = self.pattern.substitution(env).subject()._index
                 node = compilePattern(newIndex, self.pattern.object().statements, self.vars, self.context)
                 def onSuccess((triples, environment, penalty)):
-                    newAssumption = self.pattern.substitution(environment.asDict())
+                    newAssumption = self.pattern.substitution(environment.asDict()).substitution(env)
                     #somebodyPleaseAssertFromBuiltin(self.pattern.predicate(), newAssumption)
                     
                     builtInMade.append(TripleWithBinding(newAssumption, environment))
@@ -462,7 +462,7 @@ generates variable bindings
                     # Do nothing.
                     pass
                 def onFailure():
-                    newAssumption = self.pattern.substitution(env.asDict())
+                    newAssumption = self.pattern.substitution(env.asDict()).substitution(env)
                     #somebodyPleaseAssertFromBuiltin(self.pattern.predicate(), newAssumption)
                     
                     builtInMade.append(TripleWithBinding(newAssumption, env))
