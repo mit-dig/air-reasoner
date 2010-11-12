@@ -338,7 +338,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                             
                             event = formula.any(pred=airj['source'], obj=term)
                             if event:
-                                log = formula.any(subj=event, pred=airj['outputdata'])
+                                log = formula.any(subj=event, pred=pmll['outputdata'])
                                 if log:
                                     newTermsFor[term] = (event, log)
                             if term not in newTermsFor:
@@ -351,7 +351,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                                 formula.add(event, airj['source'], term)
                                 formula.add(event, store.type,
                                             airj['Dereference'])
-                                formula.add(event, airj['outputdata'], log)
+                                formula.add(event, pmll['outputdata'], log)
                             formula.add(newNode, pmll['flowDependency'],
                                         event)
                             formula.add(newNode, pmll['dataDependency'],
@@ -382,7 +382,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                     symb = store.newSymbol(self.extractedFrom)
                     event = formula.any(pred=airj['source'], obj=symb)
                     if event:
-                        log = formula.any(subj=event, pred=airj['outputdata'])
+                        log = formula.any(subj=event, pred=pmll['outputdata'])
                         if log:
                             newTermsFor[self] = (event, log)
                     if self in newTermsFor:
@@ -398,7 +398,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                                 store.newSymbol(self.extractedFrom))
                     formula.add(self.dataEvent, store.type,
                                 airj['Dereference'])
-                    formula.add(self.dataEvent, airj['outputdata'], self.dataID)
+                    formula.add(self.dataEvent, pmll['outputdata'], self.dataID)
                 elif self.isBuiltIn:
                     # We also need to generate Built-In events.
                     
@@ -415,7 +415,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                     self.dataEvent = store.newSymbol(store.genId())
                     formula.add(self.dataEvent, store.type, airj['BuiltinExtraction'])
                     formula.add(self.dataEvent, airj['dataDependency'], assertion)
-                    formula.add(self.dataEvent, airj['outputdata'], termsFor[self])
+                    formula.add(self.dataEvent, pmll['outputdata'], termsFor[self])
             elif self.assumed():
                 retVal = True
                 formula.add(termsFor[self], t['justification'], t['premise'])
@@ -432,7 +432,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                 
                 self.fireEvent = booleanExpressionToNewRDF(expressions[self])
                 if isinstance(selfTerm, Formula):
-                    formula.add(self.fireEvent, airj['outputdata'], selfTerm)
+                    formula.add(self.fireEvent, pmll['outputdata'], selfTerm)
                     self.dataEvent = self.fireEvent
                 
                 # Back to the old-school stuff.
@@ -462,18 +462,22 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
         return retVal
     
     ccFormula = store.newFormula()
+    ccEvents = []
     for tmsNode in tmsNodes:
         nf2(tmsNode)
         formula.add(*tmsNode.datum[:3])
         
         # Add the node to the ClosureComputation event.
         ccFormula.add(*tmsNode.datum[:3])
+        ccEvents.append(tmsNode.dataEvent)
     
     # Add the ClosureComputation event itself.
     # TODO: How do we link to the ClosureComputation???
     ccNode = store.newSymbol(store.genId())
     formula.add(ccNode, store.type, airj['ClosureComputation'])
     formula.add(ccNode, pmll['outputdata'], ccFormula.close())
+    for event in ccEvents:
+        formula.add(ccNode, airj['dataDependency'], event)
     
     # Clean-up neighboring elided nodes.
     
