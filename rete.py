@@ -31,12 +31,13 @@ fullUnify = False
 OWL_RULES = 'http://dig.csail.mit.edu/TAMI/2007/amord/owl-rules.n3'
 
 def compilePattern(index, patterns, vars, context, buildGoals=False,
-                   goalPatterns=False, supportBuiltin=None):
+                   goalPatterns=False, supportBuiltin=None,
+                   ignoreBuiltins=False):
     """Compile the RETE network for a given set of patterns and return the
     'goal' node."""
     # Start with an empty root node...
     current = EmptyRoot
-    for pattern in sortPatterns(patterns, vars):
+    for pattern in sortPatterns(patterns, vars, ignoreBuiltins):
         # And for each pattern in order, build the alpha filter, join
         # node, and beta memory.
         alpha = AlphaFilter.build(index, pattern, vars, context,
@@ -57,7 +58,7 @@ class CyclicError(ValueError):
     """Thrown when a cyclic dependency is found."""
     pass
 
-def sortPatterns(patterns, vars):
+def sortPatterns(patterns, vars, ignoreBuiltins=False):
     """Sort the given patterns topologically, such that built-ins are
     satisfied as late as possible."""
 
@@ -155,11 +156,14 @@ def sortPatterns(patterns, vars):
                         popnodes.add(node)
                 for node in popnodes:
                     unresolvables.remove(node)
-                        
+        
         if len(inDegrees) != 0 and max(inDegrees.values()) != 0:
             raise CyclicError, "You've got a cyclic dependency in your rule, buddy!"
-
-    return list(getTopologically())
+    
+    if ignoreBuiltins:
+        return list(patterns)
+    else:
+        return list(getTopologically())
 
 ### end builtins
 
@@ -442,7 +446,7 @@ generates variable bindings
                         return retVal + [TripleWithBinding(BogusTriple(self.pattern), Env())] + builtInMade
                     return retVal + builtInMade
                 newIndex = self.pattern.substitution(env).subject()._index
-                node = compilePattern(newIndex, self.pattern.object().statements, self.vars, self.context)
+                node = compilePattern(newIndex, self.pattern.object().statements, self.vars, self.context, ignoreBuiltins=True)
                 def onSuccess((triples, environment, penalty)):
                     newAssumption = self.pattern.substitution(environment.asDict()).substitution(env)
                     #somebodyPleaseAssertFromBuiltin(self.pattern.predicate(), newAssumption)
@@ -457,7 +461,7 @@ generates variable bindings
                 # log:notIncludes references the (Indexed)Formula in the
                 # subject and checks it for a pattern match.
                 newIndex = self.pattern.substitution(env).subject()._index
-                node = compilePattern(newIndex, self.pattern.object().statements, self.vars)
+                node = compilePattern(newIndex, self.pattern.object().statements, self.vars, ignoreBuiltins=True)
                 def onSuccess((triples, environment, penalty)):
                     # Do nothing.
                     pass
