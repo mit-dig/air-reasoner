@@ -427,6 +427,13 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                 selfTerm = termsFor[self]
                 justTerm = termsFor[reasons[self]]
                 
+                hasMatchedGraph = False
+                matchedGraph = store.newFormula()
+                for node in antecedents:
+                    if isinstance(node.datum, tuple) and len(node.datum) > 3:
+                        matchedGraph.add(*node.datum[:3])
+                        hasMatchedGraph = True
+                
                 # Generate the event for this particular expression's
                 # RuleApplication event.
                 
@@ -434,6 +441,8 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                 if isinstance(selfTerm, Formula):
                     formula.add(self.fireEvent, pmll['outputdata'], selfTerm)
                     self.dataEvent = self.fireEvent
+                if hasMatchedGraph:
+                    formula.add(self.fireEvent, pmll['inputdata'], matchedGraph.close())
                 
                 # Back to the old-school stuff.
                 if hasattr(rule, 'descriptions'):
