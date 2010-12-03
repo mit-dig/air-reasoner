@@ -253,7 +253,12 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                 # These todos seem to not be done
                 # TODO: dataDependency on a RuleApplication with outputdata. (done?)
                 if arg.fireEvent is not None:
-                    formula.add(node, airj['nestedDependency'], arg.fireEvent)
+                    # HORRIBLE KLUDGE: In rare cases, we see identical
+                    # data and fire events.  We consider these only to
+                    # be dataDependencies (when they could in fact be
+                    # both)
+                    if  arg.dataEvent is not arg.fireEvent:
+                        formula.add(node, airj['nestedDependency'], arg.fireEvent)
                     if arg.datum in envs and len(envs[arg.datum]) > 0:
                         # Create the outputVariableMappingList.
                         env = envs[arg.datum]
