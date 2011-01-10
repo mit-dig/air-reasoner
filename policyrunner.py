@@ -1067,7 +1067,7 @@ def loadFactN3(formulaTMS, string, closureMode=""):
     f = store.newFormula()
     f.setClosureMode(closureMode)    
     f = parseN3(store, f, string)
-    formulaTMS.getThing(f).assume()
+    formulaTMS.getThing(f).assumeByParsingN3(f)
     formulaTMS.assumedStrings.append(formulaTMS.workingContext.newLiteral(string, dt=n3NS))
     return f    
 

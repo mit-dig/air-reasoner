@@ -38,6 +38,7 @@ class Node(object):
         self.assumedURIs = []
         self.fireEvent = None
         self.isBuiltIn = False
+        self.parsedFrom = None
 
     def justify(self, rule, expression, hypotheses=None):
         if hypotheses is None:
@@ -116,7 +117,19 @@ class Node(object):
         """Assume this node by virtue of its being a built-in."""
         self.assume()
         self.isBuiltIn = True
+    
+    def assumeByParsingN3(self, formula):
+        """Assume this node by virtue of parsing a given formula from N3."""
+        self.assume()
+        self.setParsedFrom(formula)
 
+    def setParsedFrom(self, formula):
+        """Set the formula from which this node was parsed."""
+        # Sets the parsedFrom value recursively.
+        self.parsedFrom = formula
+        for just in self.consequents:
+            just.consequent.setParsedFrom(formula)
+            
     def support(self, justification):
         """Support this TMS node and any consequents."""
         if self.supported:

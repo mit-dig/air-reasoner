@@ -361,6 +361,22 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                                         event)
                             formula.add(newNode, pmll['dataDependency'],
                                         event)
+                        elif isinstance(term, Formula):
+                            # It's a formula.  Generate a ParseN3String event.
+                            
+                            event = formula.any(pred=pmll['outputdata'], obj=term)
+                            if event:
+                                newTermsFor[term] = (event, term)
+                            if term not in newTermsFor:
+                                if not event:
+                                    event = store.newSymbol(store.genId())
+                                newTermsFor[term] = (event, term)
+                                formula.add(event, store.type, airj['ParseN3Data'])
+                                formula.add(event, pmll['outputdata'], term)
+                            formula.add(newNode, pmll['flowDependency'],
+                                        event)
+                            formula.add(newNode, pmll['dataDependency'],
+                                        event)
                     newTermsFor[self] = newNode
                 else:
                     raise RuntimeError(self)
@@ -421,6 +437,22 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                     formula.add(self.dataEvent, store.type, airj['BuiltinExtraction'])
                     formula.add(self.dataEvent, airj['dataDependency'], assertion)
                     formula.add(self.dataEvent, pmll['outputdata'], termsFor[self])
+                elif self.parsedFrom is not None:
+                    event = formula.any(pred=pmll['outputdata'], obj=self.parsedFrom)
+                    if event:
+                        newTermsFor[self] = (event, self.parsedFrom)
+                    if self in newTermsFor:
+                        (self.dataEvent, self.dataID) = newTermsFor[self]
+                    else:
+#                        self.dataEvent = mintEventFragment()
+                        self.dataEvent = store.newSymbol(store.genId())
+#                        self.dataID = mintDataID()
+                        self.dataID = self.parsedFrom #store.newSymbol(store.genId())
+                        newTermsFor[self] = (self.dataEvent, self.dataID)
+                        
+                    formula.add(self.dataEvent, store.type,
+                                airj['ParseN3Data'])
+                    formula.add(self.dataEvent, pmll['outputdata'], self.dataID)
             elif self.assumed():
                 retVal = True
                 formula.add(termsFor[self], t['justification'], t['premise'])
