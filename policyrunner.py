@@ -334,11 +334,12 @@ These are then passed to the scheduler
         self.tms.justifyAuxTriple(*self.args)
 
 class RuleName(object):
-    def __init__(self, name, descriptions):
+    def __init__(self, name, descriptions, prompts):
         assert isinstance(name, Term)
         assert all(isinstance(x, Term) for x in descriptions)
         self.name = name
         self.descriptions = descriptions
+        self.prompts = prompts
 
     def __repr__(self):
         return 'R(%s)' % (self.name,)
@@ -404,6 +405,7 @@ class RuleFire(object):
                 # Do any substitution and then extract the description
                 # and r12 from the particular r's tuple.
                 r12 = r.substitution(env.asDict())
+                prompt = r12[2]
                 desc = r12[1]
                 r12 = r12[0]
                 
@@ -425,7 +427,7 @@ class RuleFire(object):
                         r2TMS.justify(ruleId, supportTMS)
                     else:
                         eventLoop.addAssertion(lambda: r2TMS.justify(ruleId, supportTMS))
-                        eventLoop.addAssertion(lambda: r2TMS.justify(RuleName(ruleId, desc), supportTMS))
+                        eventLoop.addAssertion(lambda: r2TMS.justify(RuleName(ruleId, desc, prompt), supportTMS))
 #                assert self.tms.getThing(self).supported
 #                assert r2TMS.supported                
 #                raise NotImplementedError(goals) #todo: handle goals
@@ -459,6 +461,7 @@ class RuleFire(object):
                 # Do any substitution and then extract the description
                 # and r12 from the particular r's tuple.
                 r12 = r.substitution(env.asDict())
+                prompt = r12[2]
                 desc = r12[1]
                 r12 = r12[0]
                 
@@ -472,16 +475,16 @@ class RuleFire(object):
                 r2TMS = self.tms.getThingWithEnv(r2, env)
                 if support is None:
                     if isinstance(r2, Rule):
-                        r2TMS.justify(RuleName(self.sourceNode, desc), triplesTMS + [self.tms.getThing(self)] + altSupport)
+                        r2TMS.justify(RuleName(self.sourceNode, desc, prompt), triplesTMS + [self.tms.getThing(self)] + altSupport)
                     else:
                         # Delay the justification of assertions in else clauses.
-                        eventLoop.addAssertion(lambda: r2TMS.justify(RuleName(self.sourceNode, desc), triplesTMS + [self.tms.getThing(self)] + altSupport))
+                        eventLoop.addAssertion(lambda: r2TMS.justify(RuleName(self.sourceNode, desc, prompt), triplesTMS + [self.tms.getThing(self)] + altSupport))
                 else:
                     supportTMS = reduce(frozenset.union, support, frozenset()).union(altSupport)
                     if isinstance(r2, Rule):
-                        r2TMS.justify(RuleName(ruleId, desc), supportTMS)
+                        r2TMS.justify(RuleName(ruleId, desc, prompt), supportTMS)
                     else:
-                        eventLoop.addAssertion(lambda: r2TMS.justify(RuleName(ruleId, desc), supportTMS))
+                        eventLoop.addAssertion(lambda: r2TMS.justify(RuleName(ruleId, desc, prompt), supportTMS))
 #                assert self.tms.getThing(self).supported
 #                assert r2TMS.supported
 
@@ -682,6 +685,15 @@ much how the rule was represented in the rdf network
             except AssertionError:
                 raise ValueError('%s has too many descriptions in an air:then, being all of %s'
                                  % (ruleNode, F.each(subj=node, pred=p['description'])))
+            try:
+                prompt = F.the(subj=node, pred=p['prompt'])
+                if prompt == None:
+                    prompt = SubstitutingList()
+                else:
+                    prompt = SubstitutingList([prompt])
+            except AssertionError:
+                raise ValueError('%s has too many prompts in an air:then, being all of %s'
+                                 % (ruleNode, F.each(subj=node, pred=p['prompt'])))
             
             # Get any subrule...
             subrule = None
@@ -693,7 +705,7 @@ much how the rule was represented in the rdf network
                 raise ValueError('%s has too many rules in an air:then, being all of %s'
                                  % (ruleNode, F.each(subj=node, pred=p['rule'])))
             if subrule is not None:
-                subrules.append(SubstitutingTuple((subrule, description)))
+                subrules.append(SubstitutingTuple((subrule, description, prompt)))
                 actions.append(subrule)
             
             # Get any goal-subrule...
@@ -707,7 +719,7 @@ much how the rule was represented in the rdf network
                                  % (ruleNode, F.each(subj=node, pred=p['goal-rule'])))
             if goal_subrule is not None:
                 goal_subrules.append(
-                    SubstitutingTuple((goal_subrule, description)))
+                    SubstitutingTuple((goal_subrule, description, prompt)))
                 actions.append(goal_subrule)
             
             # Get any assertion...
@@ -717,7 +729,7 @@ much how the rule was represented in the rdf network
                 raise ValueError('%s has too many assertions in an air:then, being all of %s'
                                  % (ruleNode, F.each(subj=node, pred=p['assert'])))
             if assertion is not None:
-                assertions.append(SubstitutingTuple((assertion, description)))
+                assertions.append(SubstitutingTuple((assertion, description, prompt)))
                 actions.append(assertion)
             
             # Get any goal-assertion...
@@ -728,7 +740,7 @@ much how the rule was represented in the rdf network
                                  % (ruleNode, F.each(subj=node, pred=p['assert-goal'])))
             if goal_assertion is not None:
                 goal_assertions.append(
-                    SubstitutingTuple((goal_assertion, description)))
+                    SubstitutingTuple((goal_assertion, description, prompt)))
                 actions.append(goal_assertion)
             
             # Make sure there was exactly one of the above.
@@ -739,6 +751,7 @@ much how the rule was represented in the rdf network
         # Get the data from the assertions.
         assertionObjs = []
         for assertion in assertions + goal_assertions:
+            prompt = assertion[2]
             description = assertion[1]
             statement = assertion[0]
             if F.any(subj=statement, pred=p['statement']) is not None:
@@ -759,7 +772,8 @@ much how the rule was represented in the rdf network
 #            else:
             assertionObjs.append(SubstitutingTuple(
                     (Assertion(statement),
-                     description)))
+                     description,
+                     prompt)))
         resultList.append(subrules + assertionObjs + goal_subrules)
         
         # Now do what we did to collect the assertions and such for
@@ -781,6 +795,15 @@ much how the rule was represented in the rdf network
             except AssertionError:
                 raise ValueError('%s has too many descriptions in an air:else, being all of %s'
                                  % (ruleNode, F.each(subj=node, pred=p['description'])))
+            try:
+                prompt = F.the(subj=node, pred=p['prompt'])
+                if prompt == None:
+                    prompt = SubstitutingList()
+                else:
+                    prompt = SubstitutingList([prompt])
+            except AssertionError:
+                raise ValueError('%s has too many prompts in an air:else, being all of %s'
+                                 % (ruleNode, F.each(subj=node, pred=p['prompt'])))
 
             # Get any subrule...
             subrule = None
@@ -792,7 +815,7 @@ much how the rule was represented in the rdf network
                 raise ValueError('%s has too many rules in an air:else, being all of %s'
                                  % (ruleNode, F.each(subj=node, pred=p['rule'])))
             if subrule is not None:
-                subrules.append(SubstitutingTuple((subrule, description)))
+                subrules.append(SubstitutingTuple((subrule, description, prompt)))
                 actions.append(subrule)
             
             # Get any goal-subrule...
@@ -806,7 +829,7 @@ much how the rule was represented in the rdf network
                                  % (ruleNode, F.each(subj=node, pred=p['goal-rule'])))
             if goal_subrule is not None:
                 goal_subrules.append(
-                    SubstitutingTuple((goal_subrule, description)))
+                    SubstitutingTuple((goal_subrule, description, prompt)))
                 actions.append(goal_subrule)
             
             # Get any assertion...
@@ -816,7 +839,7 @@ much how the rule was represented in the rdf network
                 raise ValueError('%s has too many assertions in an air:else, being all of %s'
                                  % (ruleNode, F.each(subj=node, pred=p['assert'])))
             if assertion is not None:
-                assertions.append(SubstitutingTuple((assertion, description)))
+                assertions.append(SubstitutingTuple((assertion, description, prompt)))
                 actions.append(assertion)
             
             # Get any goal-assertion...
@@ -827,7 +850,7 @@ much how the rule was represented in the rdf network
                                  % (ruleNode, F.each(subj=node, pred=p['assert-goal'])))
             if goal_assertion is not None:
                 goal_assertions.append(
-                    SubstitutingTuple((goal_assertion, description)))
+                    SubstitutingTuple((goal_assertion, description, prompt)))
                 actions.append(goal_assertion)
             
             # Make sure there was exactly one of the above.
@@ -838,6 +861,7 @@ much how the rule was represented in the rdf network
         # Get the data from the assertions.
         assertionObjs = []
         for assertion in assertions + goal_assertions:
+            prompt = assertion[2]
             description = assertion[1]
             statement = assertion[0]
             if F.any(subj=statement, pred=p['statement']) is not None:
@@ -858,7 +882,8 @@ much how the rule was represented in the rdf network
 #            else:
             assertionObjs.append(SubstitutingTuple(
                     (Assertion(statement),
-                     description)))
+                     description,
+                     prompt)))
         resultList.append(subrules + assertionObjs + goal_subrules)
         
         node = ruleNode
