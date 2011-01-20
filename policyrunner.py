@@ -337,6 +337,7 @@ class RuleName(object):
     def __init__(self, name, descriptions, prompts):
         assert isinstance(name, Term)
         assert all(isinstance(x, Term) for x in descriptions)
+        assert all(isinstance(x, Term) for x in prompts)
         self.name = name
         self.descriptions = descriptions
         self.prompts = prompts

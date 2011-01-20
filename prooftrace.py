@@ -484,7 +484,7 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                 # Back to the old-school stuff.
                 if hasattr(rule, 'descriptions'):
                     desc = rule.descriptions
-                    rule = rule.name
+                    ruleName = rule.name
                     for d in desc:
                         formula.add(selfTerm, t['description'], d)
                         # But also some new stuff.
@@ -492,9 +492,10 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                 # And prompts
                 if hasattr(rule, 'prompts'):
                     prompt = rule.prompts
-                    rule = rule.name
-                    for p in prompts:
+                    ruleName = rule.name
+                    for p in prompt:
                         formula.add(self.fireEvent, airj['prompt'], p)
+                rule = ruleName
                 formula.add(selfTerm, t['justification'], justTerm)
                 formula.add(justTerm, t['rule-name'], rule)
                 assert formula.contains(subj=justTerm, pred=t['rule-name'], obj=rule)
