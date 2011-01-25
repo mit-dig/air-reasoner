@@ -1,0 +1,52 @@
+# $Date: 2010-03-10 16:43:40 -0500 (Wed, 10 Mar 2010) $
+# $Revision: 28569 $
+
+@keywords a, of, is .
+
+@prefix rdf: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix log: <http://www.w3.org/2000/10/swap/log#>.
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix cert: <http://www.w3.org/ns/auth/cert#> .
+@prefix rsa: <http://www.w3.org/ns/auth/rsa#> .
+@prefix wot: <http://xmlns.com/wot/0.1/> .
+@prefix s: <http://dig.csail.mit.edu/2009/IARPA-PIR/sparql#>.
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#>.
+@prefix qpa: <http://dig.csail.mit.edu/2009/IARPA-PIR/dry-run/qpa#> .
+@prefix str: <http://www.w3.org/2000/10/swap/string#> .
+@prefix list: <http://www.w3.org/2000/10/swap/list#>.
+@prefix rel: <http://dig.csail.mit.edu/2009/IARPA-PIR/dry-run/app-relation#> .
+@prefix sparql: <http://www.w3.org/2000/10/swap/sparqlCwm#>.
+@prefix zipcode: <http://app.sst.ll.mit.edu/app/zipcode/>.
+@prefix app: <http://app.sst.ll.mit.edu/app#>.
+@prefix : <http://dig.csail.mit.edu/2009/IARPA-PIR/dry-run/sarah-thompson#> .
+
+@forAll :CITY, :RESULTS .
+
+# sparql:queryEndpoint is compliant with the policy if we can pull out
+# the city that zipcode 12180 is in.
+
+:checksparql a air:Policy ;
+	air:rule :remoteQuery .
+
+:remoteQuery a air:Belief-rule ;
+	air:if { (<http://air.csail.mit.edu:8000/sparql/> """
+
+CONSTRUCT { <http://app.sst.ll.mit.edu/app/zipcode/12180> ?p ?o . }
+WHERE
+{
+    <http://app.sst.ll.mit.edu/app/zipcode/12180> ?p ?o .
+}
+""") sparql:queryEndpoint :RESULTS . } ;
+	air:then [ air:rule :remoteQuery2 ] .
+
+:remoteQuery2 a air:Belief-rule ;
+	air:if { @forSome :CITY .
+                 :RESULTS log:includes { zipcode:12180 app:in :CITY . } . } ;
+	air:then [ air:rule :remoteQuery3 ] ;
+	air:else [ air:assert { sparql:queryEndpoint air:non-compliant-with (:checksparql :remoteQuery2) . } ] .
+
+:remoteQuery3 a air:Belief-rule ;
+	air:if { :RESULTS log:includes { zipcode:12180 app:in :CITY . } . } ;
+	air:then [ air:assert { sparql:queryEndpoint air:compliant-with (:checksparql :CITY) . } ] .
+#ends .

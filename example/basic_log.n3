@@ -1,0 +1,4 @@
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+
+:block-a :left-of :block-b .
+:block-b :left-of :block-c .

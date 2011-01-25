@@ -1,0 +1,18 @@
+# Testing policies with SPARQL queries.
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix sparql: <http://www.w3.org/2000/10/swap/sparqlCwm#> .
+@prefix log: <http://www.w3.org/2000/10/swap/log#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+@forAll :x, :y, :z .
+
+:SPARQLEndpointPolicy a air:Policy;
+	air:rule [
+		air:label "SPARQL Endpoint Rule";
+		air:if {
+			(<http://dbpedia.org/sparql/> """PREFIX dbpedia2: <http://dbpedia.org/property/>
+
+SELECT DISTINCT ?airport WHERE
+{?airport dbpedia2:iata "GS"@en .}""") sparql:queryEndpoint :z . };
+		air:then [ air:assert [ air:statement { <http://dbpedia.org/sparql/> air:compliant-with :z } ] ] ] .
+

@@ -1,0 +1,51 @@
+
+# $Date: 2008-11-04 15:21:25 -0500 (Tue, 04 Nov 2008) $
+# $Revision: 25081 $
+# $Author: jacobi $
+
+# MIT Prox Card Policy: http://web.mit.edu/mitcard/privacy.html
+# We use a simplified policy: prox card data can only be used for
+# criminal investigation.
+
+#### Namespaces ####
+
+# The default namespace is this document.
+@prefix : <#> .
+
+# "prox:" is an alias for ":" to improve printed output.
+@prefix prox: <#> .
+
+# AIR (AMORD in RDF) is the policy language.
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+
+# Purposes are drawn from a predefined set.
+@prefix pur: <http://dig.csail.mit.edu/TAMI/2006/s4/purposes#> .
+
+# The "mit:" namespace defines background terms specific to MIT.
+@prefix mit: <http://dig.csail.mit.edu/TAMI/2007/s0/university#> .
+
+@prefix owl: <http://www.w3.org/2002/07/owl#>.
+
+@prefix math: <http://www.w3.org/2000/10/swap/math#>.
+@prefix log: <http://www.w3.org/2000/10/swap/log#>.
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#>.
+
+#### Policy ####
+
+@forAll :U, :D, :P1.
+
+{(<log.cwm.n3>.log:semantics
+  <base-rules.cwm.n3>.log:semantics
+  <base-assumptions.ttl>.log:semantics
+  <university.n3>.log:semantics
+  <air.ttl>.log:semantics) log:conjunction ?Log .
+  ?Log log:conclusion ?Conclusion .
+  ?Conclusion log:includes
+  {
+    :U a air:UseEvent;
+	air:data :D;
+	air:purpose :P1.
+    :D a mit:ProxCardEvent.
+} } => {
+  { ?Conclusion log:includes { :P1 owl:sameAs pur:criminal-law-enforcement. } } => { :U air:compliant-with :MITProxCardPolicy. }.
+  { ?Conclusion log:notIncludes { :P1 owl:sameAs pur:criminal-law-enforcement. } } => { :U air:non-compliant-with :MITProxCardPolicy. }. }.

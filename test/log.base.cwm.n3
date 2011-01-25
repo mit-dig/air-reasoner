@@ -1,0 +1,19 @@
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#>.
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+
+@prefix pur: <http://dig.csail.mit.edu/TAMI/2006/s4/purposes#> .
+
+@prefix mit: <http://dig.csail.mit.edu/TAMI/2007/s0/university#> .
+
+@prefix tlog: <http://dig.csail.mit.edu/TAMI/2007/s0/log#> .
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/s0/log#> .
+
+@prefix log: <http://www.w3.org/2000/10/swap/log#>.
+
+{(<log.cwm.n3>.log:semantics
+  <base-rules.cwm.n3>.log:semantics
+  <base-assumptions.ttl>.log:semantics
+  <university.n3>.log:semantics
+  <air.ttl>.log:semantics) log:conjunction ?Log .
+ ?Log log:conclusion ?X} => {?X a log:Truth}.

@@ -1,0 +1,45 @@
+
+# $Id: base-assumptions.ttl 8172 2007-12-13 19:01:57Z cph $
+#
+# Copyright (C) 2007 Massachusetts Institute of Technology
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+# 02110-1301, USA.
+
+# AIR base assumptions
+
+@prefix aba: <http://dig.csail.mit.edu/TAMI/2007/amord/base-assumptions#> .
+@prefix abr: <http://dig.csail.mit.edu/TAMI/2007/amord/base-rules#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+rdfs:subClassOf a owl:TransitiveProperty.
+rdfs:subPropertyOf a owl:TransitiveProperty.
+air:data a owl:TransitiveProperty.
+
+owl:sameAs a owl:TransitiveProperty, owl:SymmetricProperty.
+owl:equivalentClass a owl:TransitiveProperty, owl:SymmetricProperty.
+owl:equivalentProperty a owl:TransitiveProperty, owl:SymmetricProperty.
+
+owl:disjointWith a owl:SymmetricProperty.
+owl:complementOf a owl:SymmetricProperty.
+owl:inverseOf a owl:SymmetricProperty.
+
+air:is-identical-to owl:sameAs owl:sameAs.
+air:is-distinct-from owl:sameAs owl:differentFrom.
+air:is-member-of owl:sameAs rdf:type.
+air:is-contained-in owl:sameAs rdfs:subClassOf.

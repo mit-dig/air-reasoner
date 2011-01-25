@@ -1,0 +1,67 @@
+# Believe this hides everything inside.  It appears to.
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+
+:HiddenRulePolicy a air:Policy;
+	air:rule :Rule1 , :Rule3 , :Rule6 .
+
+:Rule1 a air:Belief-rule ;
+       air:label "Rule 1";
+       air:if { :someValue :a :b . };
+       air:then [ air:rule :Rule2 ] ;
+       air:else [ air:assert { :someValue air:non-compliant-with :Rule1 . } ] .
+
+:Rule2 a air:Belief-rule ;
+       air:label "Rule 2" ;
+       air:if { :someValue :c :d . } ;
+       air:description ("rule2") ;
+       air:then [ air:assert { :someValue air:compliant-with :Rule2 . } ] ;
+       air:else [ air:assert { :someValue air:non-compliant-with :Rule2 . } ] .
+
+:Rule3 a air:Belief-rule ;
+       air:label "Rule 3" ;
+       air:description ("rule3") ;
+       air:if { :someValue :a :c . } ;
+       air:then [ air:assert { :someValue air:non-compliant-with :Rule3 . } ] ;
+       air:else [ air:rule :Rule4 ] .
+
+:Rule4 a air:Belief-rule ;
+       air:label "Rule 4" ;
+       air:if { :someValue :a :d . } ;
+       air:then [ air:assert { :someValue air:non-compliant-with :Rule4 . } ] ;
+       air:else [ air:rule :Rule5 ] .
+
+:Rule5 a air:Belief-rule ;
+       air:label "Rule 5" ;
+       air:if { :someValue :a :e . } ;
+       air:then [ air:assert { :someValue air:compliant-with :OldProcessing . } ] ;
+       air:else [ air:assert { :someValue air:non-compliant-with :OldProcessing . } ] .
+
+:Rule6 a air:Belief-rule ;
+       air:label "Rule 6" ;
+       air:description ("rule6") ;
+       air:if { :someValue :a :c . } ;
+       air:then [ air:assert { :someValue air:non-compliant-with :Rule6 . } ] ;
+       air:else [ air:rule :Rule7 ] .
+
+:Rule7 a air:Belief-rule ;
+       air:label "Rule 7" ;
+       air:if { :someValue :c :d . } ;
+       air:description ("rule7") ;
+       air:then [ air:rule :Rule8 ] ;
+       air:then [ air:assert { :someValue :a :e . } ] ;
+       air:else [ air:assert { :someValue air:non-compliant-with :Rule7 . } ] .
+
+:Rule8 a air:Belief-rule ;
+       air:label "Rule 8" ;
+       air:description ("rule8") ;
+       air:if { :someValue :a :d . } ;
+       air:then [ air:assert { :someValue air:non-compliant-with :Rule8 . } ] ;
+       air:else [ air:rule :Rule9 ] .
+
+:Rule9 a air:Belief-rule ;
+       air:label "Rule 9" ;
+       air:if { :someValue :a :e . } ;
+       air:then [ air:assert { :someValue air:compliant-with :Rule9 . } ] ;
+       air:else [ air:assert { :someValue air:non-compliant-with :Rule9 . } ] .

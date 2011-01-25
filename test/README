@@ -1,0 +1,4 @@
+Note: All tests in this directory are (currently) unspec'd, but have
+been used to verify functionality in the past.  Some may be using the
+AIR 1.0 and 2.0 (rather than 2.5) ontologies and may not work until
+ported.

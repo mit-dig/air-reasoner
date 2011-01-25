@@ -1,0 +1,25 @@
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#>.
+@prefix list: <http://www.w3.org/2000/10/swap/list#>.
+@prefix set: <http://www.w3.org/2000/10/swap/set#>.
+@prefix : <http://dig.csail.mit.edu/2009/IARPA-PIR/dry-run/sarah-thompson#> .
+
+@forAll :LIST1, :LIST2, :SET1 , :SET2 .
+
+:checkbuiltins a air:Policy ;
+        air:rule [ air:if {} ;
+                   air:then [ air:assert { :s1 :p1 ("o1" "o2" "o3") . }  ] ]
+               , [ air:if {} ;
+                   air:then [ air:assert { :s2 :p2 ("o1" "o2") . } ] ]
+               , :listmember .
+
+:listmember a air:Belief-rule ;
+        air:if { :s1 :p1 :LIST1 .
+                 :s2 :p2 :LIST2 .
+                 :LIST1 list:members :SET1 .
+                 :LIST2 list:members :SET2 .
+                 (:SET1 :SET2) set:intersection :SET1 .
+                } ;
+        air:then [ air:assert { :s2 air:compliant-with :listmembercheck . } ] #;
+#       air:else [ air:assert { :s2 air:non-compliant-with :listmembercheck . } ]
+.

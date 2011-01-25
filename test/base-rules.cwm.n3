@@ -1,0 +1,70 @@
+
+# $Id: base-rules.ttl 25828 2009-04-13 19:34:24Z jacobi $
+#
+# Copyright (C) 2007 Massachusetts Institute of Technology
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+# 02110-1301, USA.
+
+# AIR base rules
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/amord/base-rules#> .
+@prefix abr: <http://dig.csail.mit.edu/TAMI/2007/amord/base-rules#> .
+
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix log: <http://www.w3.org/2000/10/swap/log#>.
+
+@forAll :P, :N1, :N2, :N3, :N4.
+
+{ :P a owl:TransitiveProperty } => 
+{ { :N1 :P :N2 . :N2 :P :N3 . } => { :N1 :P :N3 . } } .
+
+@forAll :P, :N1, :N2.
+
+{ :P a owl:SymmetricProperty } =>
+{ { :N1 :P :N2 . } => { :N2 :P :N1 . } } .
+
+@forAll :C1, :C2, :N.
+
+{ :C1 rdfs:subClassOf :C2 } =>
+{ { :N a :C1 . } => { :N a :C2 . } } .
+
+@forAll :P1, :P2, :N1, :N2.
+
+{ :P1 rdfs:subPropertyOf :P2 } =>
+{ { :N1 :P1 :N2 . } => { :N1 :P2 :N2 . } } .
+
+@forAll :N1, :N2, :P, :O, :S.
+
+
+{ :N1 owl:sameAs :N2 } =>
+{ { :N1 :P :O . } => { :N2 :P :O . } .
+  { :N2 :P :O . } => { :N1 :P :O . } .
+  { :S :N1 :O . } => { :S :N2 :O . } .
+  { :S :N2 :O . } => { :S :N1 :O . } .
+  { :S :P :N1 . } => { :S :P :N2 . } .
+  { :S :P :N2 . } => { :S :P :N1 . } } .
+
+@forAll :P, :C, :N1, :N2.
+
+{ :P rdfs:domain :C } =>
+{ { :N1 :P :N2 . } => { :N1 a :C . } } .
+
+@forAll :P, :C, :N1, :N2.
+
+{ :P rdfs:range :C } =>
+{ { :N1 :P :N2 . } => { :N2 a :C . } } .

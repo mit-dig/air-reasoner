@@ -1,0 +1,34 @@
+# Believe this hides everything inside.  It appears to.
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+
+:HiddenRulePolicy a air:Policy;
+	air:rule :Rule1 .
+
+:Rule1 a air:Belief-rule ;
+       air:label "Rule 1";
+       air:if { :someValue :a :b . };
+       air:then [ air:rule :Rule2 ] ;
+       air:else [ air:assert [ air:statement { :someValue air:non-compliant-with :HiddenRulePolicy . } ] ] .
+
+:Rule2 a air:Elided-rule ;
+       air:label "Rule 2" ;
+       air:if { :someValue :c :d . } ;
+       air:description ("rule2") ;
+       air:then [ air:justification [
+	              air:rule-id :non-rule ;
+	              air:antecedent :antecedent ] ;
+                  air:rule :Rule3 ] .
+
+:Rule3 a air:Belief-rule ;
+       air:label "Rule 3" ;
+       air:description ("rule3") ;
+       air:if { :someValue :e :f . } ;
+       air:then [ air:rule :Rule4 ] .
+
+:Rule4 a air:Belief-rule ;
+       air:label "Rule 4" ;
+       air:if { :someValue :g :h . } ;
+       air:then [ air:assert [ air:statement { :someValue air:compliant-with :HiddenRulePolicy . } ] ] .
+

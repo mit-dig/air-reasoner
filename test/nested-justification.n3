@@ -1,0 +1,37 @@
+# Believe this hides everything inside.  It appears to.
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+@prefix log: <http://www.w3.org/2000/10/swap/log#> .
+@prefix math: <http://www.w3.org/2000/10/swap/math#> .
+@prefix tms: <http://dig.csail.mit.edu/TAMI/2007/amord/tms#> .
+
+:NestedJustificationRulePolicy a air:Policy;
+	air:rule :SimpleJustifiesRule , :ExtractDescriptionRule .
+
+:SimpleJustifiesRule a air:Belief-rule ;
+       air:label "Simple air:justifies rule";
+       air:if { @forSome :LOG, :RULE.
+                <./justifies_nested_log.n3> log:semantics :LOG .
+                <./justifies_compliant_policy.n3> log:semantics :RULE .
+                ((:LOG) (:RULE)) air:justifies { :nested_log air:compliant-with :nested_compliant_policy . } };
+#       air:if { (1 2) math:sum 3 };
+       air:then [ air:assert { :QComply air:compliant-with :JustifiesRulePolicy . } ;
+                  air:description (:SimpleJustifiesRule " matched due to the nested rule matching")] ;
+       air:else [ air:assert { :QComply air:non-compliant-with :JustifiesRulePolicy . } ;
+                  air:description (:SimpleJustifiesRule " failed to match due to the nested rule not matching") ] .
+
+# Fix this.  It's claiming there's a cyclic dependency, though we can
+# bind LOG, RULE, and THEN bind DESCRIPTION.
+@forAll :DESCRIPTION .
+:ExtractDescriptionRule a air:Belief-rule ;
+       air:label "air:justifies rule extracting description";
+       air:if { @forSome :LOG, :RULE.
+                <./justifies_nested_log.n3> log:semantics :LOG .
+                <./justifies_compliant_policy.n3> log:semantics :RULE .
+                ((:LOG) (:RULE)) air:justifies { :nested_log air:compliant-with :nested_compliant_policy . { :nested_log air:compliant-with :nested_compliant_policy . } tms:description :DESCRIPTION . } };
+#       air:if { (1 2) math:sum 3 };
+       air:then [ air:assert { :QComply air:compliant-with :JustifiesRulePolicy . } ;
+                  air:description (:DESCRIPTION)] ;
+       air:else [ air:assert { :QComply air:non-compliant-with :JustifiesRulePolicy . } ;
+                  air:description (:SimpleJustifiesRule " failed to match due to the nested rule not matching") ] .

@@ -1,0 +1,58 @@
+# $Date: 2009-06-16 19:51:32 -0400 (Tue, 16 Jun 2009) $
+# $Revision: 26360 $
+# $Author: lkagal $
+
+#  The user may not query specifically for people living in New England.
+
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+@prefix math: <http://www.w3.org/2000/10/swap/math#> .
+@prefix log: <http://www.w3.org/2000/10/swap/log#> .
+@prefix list: <http://www.w3.org/2000/10/swap/list#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+@prefix db: <http//dig.csail.mit.edu/db#> .
+@prefix s: <http://dig.csail.mit.edu/2009/IARPA-PIR/sparql#> .
+@prefix : <http://dig.csail.mit.edu/2009/IARPA-PIR/ssn-policy#> .
+
+@forAll :Q, :P, :W, :V, :T, :F, :S.
+@forAll :X, :Y, :Z, :A, :B, :O, :L.
+
+:NE_Policy a air:Policy;
+    air:label "New England policy for IARPA PIR project";
+    air:rule :NE_RULE1.
+
+:NE_RULE1 a air:BeliefRule;
+       air:label "NE policy rule1";
+       air:pattern {
+               :Q a s:Select;
+        	  s:POSList :P;
+           	  s:WhereClause :W.
+       };
+        air:description (:Q " is a SPARQL query");
+        air:rule :NE_RULE2.
+ 	#air:assert { :Q air:non-compliant-with :NE_Policy }.
+
+:NE_RULE2 a air:BeliefRule;
+       air:label "NE policy rule2";
+       air:pattern {
+             :P s:variable :V.
+             :W s:TriplePattern :T.
+             :T log:includes { :X :L :Y }.
+             :L list:in db:lives-attributes.
+        };
+        air:description (:Q " contains lives-in attribute " :L);
+ 	air:assert { :Q air:non-compliant-with :NE_Policy }.
+
+#ends
+
+
+# meta-data
+db:lives-attributes a rdf:List;
+	rdf:first db:city;
+	rdf:rest
+            ( db:state
+	      db:zipcode
+             ).
+#ends

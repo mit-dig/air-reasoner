@@ -1,0 +1,18 @@
+# Testing policies with existential quantification in the body.  This
+# should assert:
+#
+# [ air:compliant-with :PolicyWithExistentialInBody ] .
+#
+# BUT it throws an error.
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+
+:PolicyWithExistentialInBody a air:Policy;
+	air:rule [
+		air:label "Existential In Body Rule";
+		air:pattern { :someValue :a :b . };
+		air:assert {
+			@forSome :x .
+			:x air:compliant-with :PolicyWithExistentialInBody .
+		} ] .

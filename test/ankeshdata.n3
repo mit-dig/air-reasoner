@@ -1,0 +1,5 @@
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+
+:a :Lives_in_city :b .
+:b :Has_state :NY .

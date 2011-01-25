@@ -1,0 +1,19 @@
+# Testing policies with universal quantification in the body.  This
+# should assert:
+#
+# @forAll :z .
+# :z air:compliant-with :PolicyWithUniversalInBody .
+#
+# BUT it throws an error.
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+
+:PolicyWithUniversalInBody a air:Policy;
+	air:rule [
+		air:label "Universal In Body Rule";
+		air:pattern { :someValue :a :b . };
+		air:assert {
+			@forAll :x .
+			:x air:compliant-with :PolicyWithUniversalInBody .
+		} ] .

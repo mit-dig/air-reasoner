@@ -1,0 +1,16 @@
+# Testing policies with SPARQL queries.
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix sparql: <http://www.w3.org/2000/10/swap/sparqlCwm#> .
+@prefix log: <http://www.w3.org/2000/10/swap/log#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+@forAll :x, :y, :z .
+
+:SPARQLPolicy a air:Policy;
+	air:rule [
+		air:label "SPARQL Rule";
+		air:if {
+			<sparql_data.n3> log:semantics :x .
+			<sparql_example.rq> sparql:semantics :y .
+			(:x :y) sparql:query :z . };
+		air:then [ air:assert [ air:statement { <sparql_data.n3> air:compliant-with :z } ] ] ] .

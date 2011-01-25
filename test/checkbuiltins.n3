@@ -1,0 +1,45 @@
+# $Date: 2010-03-10 16:43:40 -0500 (Wed, 10 Mar 2010) $
+# $Revision: 28569 $
+
+@keywords a, of, is .
+
+@prefix rdf: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix log: <http://www.w3.org/2000/10/swap/log#>.
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix cert: <http://www.w3.org/ns/auth/cert#> .
+@prefix rsa: <http://www.w3.org/ns/auth/rsa#> .
+@prefix wot: <http://xmlns.com/wot/0.1/> .
+@prefix s: <http://dig.csail.mit.edu/2009/IARPA-PIR/sparql#>.
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#>.
+@prefix qpa: <http://dig.csail.mit.edu/2009/IARPA-PIR/dry-run/qpa#> .
+@prefix str: <http://www.w3.org/2000/10/swap/string#> .
+@prefix list: <http://www.w3.org/2000/10/swap/list#>.
+@prefix rel: <http://dig.csail.mit.edu/2009/IARPA-PIR/dry-run/app-relation#> .
+@prefix : <http://dig.csail.mit.edu/2009/IARPA-PIR/dry-run/sarah-thompson#> .
+
+# The user may not retrieve both firstName and lastName.
+
+@forAll :OBJ2 .
+
+:checkbuiltins a air:Policy ;
+	air:rule [ air:if {} ;
+		   air:then [ air:assert { :s1 :p1 "o1" . } ] ]
+		, [ air:if {} ;
+		    air:then [ air:assert { :s2 :p2 ("o1" "o2") . } ] ] 
+		, :listin
+		, [ air:if { :s1 :p1 :OBJ2 } ;
+		    air:then [ air:rule :listin-2 ] ] .
+
+:listin a air:Belief-rule ;
+	air:if { @forSome :OBJ1 .
+		 :s1 :p1 :OBJ1 .
+		 :OBJ1 list:in ("o1" "o2") . } ;
+	air:then [ air:assert { :s1 air:compliant-with :listincheck . } ] ;
+	air:else [ air:assert { :s1 air:non-compliant-with :listincheck . } ] .
+
+:listin-2 a air:Belief-rule ;
+	air:if { :OBJ1 list:in ("o1" "o2") . } ;
+	air:then [ air:assert { :s1 air:compliant-with :listincheck-2 . } ] ;
+	air:else [ air:assert { :s1 air:non-compliant-with :listincheck-2 . } ] .
+#ends .

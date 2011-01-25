@@ -1,0 +1,12 @@
+@forSome :inputLog .
+
+:inputLog is log:semantics of <quantification_facts.n3> .
+
+:getDataLog a airj:Extraction ;
+    pmll:outputdata :inputLog.
+
+:Event a airj:RuleApplication;
+    air:rule _:SomeRule ;
+    pmll:outputdata { :SomeEvent air:compliant-with :SomePolicy . } ;
+    airj:dataDependency :getDataLog ;
+    airj:branch air:then .

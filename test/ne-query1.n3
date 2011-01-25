@@ -1,0 +1,39 @@
+# $Date: 2009-06-16 19:51:32 -0400 (Tue, 16 Jun 2009) $
+# $Revision: 26360 $
+# $Author: lkagal $
+
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#>.
+
+@prefix db: <http//dig.csail.mit.edu/db#> .
+@prefix s: <http://dig.csail.mit.edu/2009/IARPA-PIR/sparql#> .
+@prefix : <http://dig.csail.mit.edu/2009/IARPA-PIR/query1#> .
+
+#An n3 serialization of the following SPARQL query
+#PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+#PREFIX db: <http//dig.csail.mit.edu/db#>
+#PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+#SELECT ?s ?id ?n WHERE {
+#  ?s db:city db:Boston.
+#  ?s foaf:age ?a.
+#  ?s foaf:openid ?id.
+#  FILTER (?a > 18)
+#}
+
+:Query-1 a s:Select;
+    s:cardinality :ALL;
+    s:POSList [
+       s:variable :S;
+       s:variable :ID;
+       s:variable :N;
+     ];
+    s:WhereClause  :WHERE.
+
+    :WHERE a s:DefaultGraphPattern;
+ s:TriplePattern  { :S <http//dig.csail.mit.edu/db#city> <http//dig.csail.mit.edu/db#Boston> };
+         s:TriplePattern  { :S <http://xmlns.com/foaf/0.1/age> :A };
+         s:TriplePattern  { :S <http://xmlns.com/foaf/0.1/openid> :ID };
+         s:Filter [
+	         a s:ComparatorExpression;
+             s:TriplePattern { :A s:BooleanGT "18"^^xsd:integer }
+         ].

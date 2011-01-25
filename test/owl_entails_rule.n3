@@ -1,0 +1,31 @@
+# This rule should return compliant with all policies.
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix log: <http://www.w3.org/2000/10/swap/log#> .
+
+:OwlEntailsRulePolicy a air:Policy;
+	              air:rule :owlSameAsRule, :rdfsSubClassOfRule .
+
+# This doesn't thoroughly check ALL things owlEntails should do...
+# Just two common use-cases (rdfs:subClassOf and owl:sameAs)
+
+:owlSameAsRule a air:Belief-rule ;
+       air:label "owl:sameAs Rule";
+       air:if { @forSome :ONTOLOGY, :CONJUNCTION, :ENTAILMENT .
+       	        <owl_entails_ontology.n3> log:semantics :ONTOLOGY .
+                (:ONTOLOGY {:someValue :a :b.}) log:conjunction :CONJUNCTION .
+                :CONJUNCTION air:owlEntails { :someValue :a :c . } . };
+       air:then [ air:assert [ air:statement { owl:sameAs air:compliant-with :OwlEntailsRulePolicy . } ] ] ;
+       air:else [ air:assert [ air:statement { owl:sameAs air:non-compliant-with :OwlEntailsRulePolicy . } ] ] .
+
+:rdfsSubClassOfRule a air:Belief-rule ;
+       air:label "rdfs:subClassOf Rule" ;
+       air:if { @forSome :ONTOLOGY, :CONJUNCTION, :ENTAILMENT .
+       	        <owl_entails_ontology.n3> log:semantics :ONTOLOGY .
+                (:ONTOLOGY {:someValue a :d.}) log:conjunction :CONJUNCTION .
+                :CONJUNCTION air:owlEntails { :someValue a :e . } . };
+       air:then [ air:assert [ air:statement { rdfs:subClassOf air:compliant-with :OwlEntailsRulePolicy . } ] ] ;
+       air:else [ air:assert [ air:statement { rdfs:subClassOf air:non-compliant-with :OwlEntailsRulePolicy . } ] ] .
