@@ -13,7 +13,7 @@ from formula import Formula
 import diag
 from why import BecauseOfData
 
-from cwm_sparql import SPARQL_NS
+from cwm.cwm_sparql import SPARQL_NS
 
 knownFunctions = {}
 

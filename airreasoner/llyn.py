@@ -1501,7 +1501,7 @@ class RDFStore(RDFSink) :
 
 # List stuff - beware of namespace changes! :-(
 
-        from cwm_list import BI_first, BI_rest
+        from cwm.cwm_list import BI_first, BI_rest
         rdf = self.symbol(List_NS[:-1])
         self.first = rdf.internFrag("first", BI_first)
         self.rest = rdf.internFrag("rest", BI_rest)
@@ -1515,28 +1515,28 @@ class RDFStore(RDFSink) :
         self.airJustifies = air.internFrag("justifies", BI_airJustifies)
         self.owlEntails = air.internFrag("owlEntails", BI_owlEntails)
 
-        import cwm_string  # String builtins
-        import cwm_os      # OS builtins
-        import cwm_time    # time and date builtins
-        import cwm_math    # Mathematics
-        import cwm_trigo   # Trignometry
-        import cwm_times    # time and date builtins
-        import cwm_maths   # Mathematics, perl/string style
-        import cwm_list    # List handling operations
-        import cwm_set     # Set operations
-        import cwm_sparql  # builtins for sparql
-        import cwm_xml     # XML Document Object Model operations
-        cwm_string.register(self)
-        cwm_math.register(self)
-        cwm_trigo.register(self)
-        cwm_maths.register(self)
-        cwm_os.register(self)
-        cwm_time.register(self)
-        cwm_times.register(self)
-        cwm_list.register(self)
-        cwm_set.register(self)
-        cwm_sparql.register(self)
-        cwm_xml.register(self)
+        import cwm.cwm_string  # String builtins
+        import cwm.cwm_os      # OS builtins
+        import cwm.cwm_time    # time and date builtins
+        import cwm.cwm_math    # Mathematics
+        import cwm.cwm_trigo   # Trignometry
+        import cwm.cwm_times    # time and date builtins
+        import cwm.cwm_maths   # Mathematics, perl/string style
+        import cwm.cwm_list    # List handling operations
+        import cwm.cwm_set     # Set operations
+        import cwm.cwm_sparql  # builtins for sparql
+        import cwm.cwm_xml     # XML Document Object Model operations
+        cwm.cwm_string.register(self)
+        cwm.cwm_math.register(self)
+        cwm.cwm_trigo.register(self)
+        cwm.cwm_maths.register(self)
+        cwm.cwm_os.register(self)
+        cwm.cwm_time.register(self)
+        cwm.cwm_times.register(self)
+        cwm.cwm_list.register(self)
+        cwm.cwm_set.register(self)
+        cwm.cwm_sparql.register(self)
+        cwm.cwm_xml.register(self)
         if crypto:
             import cwm_crypto  # Cryptography
             if cwm_crypto.USE_PKC == 0:
