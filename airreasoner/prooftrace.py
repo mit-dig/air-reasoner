@@ -328,14 +328,14 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                     for term in datum[1]:
                         if term in newTermsFor:
                             if isinstance(newTermsFor[term], tuple):
-                                formula.add(newNode, pmll['flowDependency'],
+                                formula.add(newNode, airj['flowDependency'],
                                             newTermsFor[term][0])
-                                formula.add(newNode, pmll['dataDependency'],
+                                formula.add(newNode, airj['dataDependency'],
                                             newTermsFor[term][0])
                             else:
-                                formula.add(newNode, pmll['flowDependency'],
+                                formula.add(newNode, airj['flowDependency'],
                                             newTermsFor[term])
-                                formula.add(newNode, pmll['dataDependency'],
+                                formula.add(newNode, airj['dataDependency'],
                                             newTermsFor[term])
                         elif term in self.assumedURIs:
                             # Generate any needed extraction events,
@@ -357,9 +357,9 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                                 formula.add(event, store.type,
                                             airj['Dereference'])
                                 formula.add(event, pmll['outputdata'], log)
-                            formula.add(newNode, pmll['flowDependency'],
+                            formula.add(newNode, airj['flowDependency'],
                                         event)
-                            formula.add(newNode, pmll['dataDependency'],
+                            formula.add(newNode, airj['dataDependency'],
                                         event)
                         elif isinstance(term, Formula):
                             # It's a formula.  Generate a ParseN3String event.
@@ -373,9 +373,9 @@ def rdfTraceOutput(store, tmsNodes, reasons, premises, envs, Rule):
                                 newTermsFor[term] = (event, term)
                                 formula.add(event, store.type, airj['ParseN3Data'])
                                 formula.add(event, pmll['outputdata'], term)
-                            formula.add(newNode, pmll['flowDependency'],
+                            formula.add(newNode, airj['flowDependency'],
                                         event)
-                            formula.add(newNode, pmll['dataDependency'],
+                            formula.add(newNode, airj['dataDependency'],
                                         event)
                     newTermsFor[self] = newNode
                 else:
