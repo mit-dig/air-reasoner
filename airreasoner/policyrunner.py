@@ -1111,11 +1111,11 @@ store = llyn.RDFStore()
 
 n3NS = store.newSymbol('http://www.w3.org/2000/10/swap/grammar/n3#n3')
 
-def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with']):
-    trace, result = runPolicy(logURIs, policyURIs, logFormula=logFormula, ruleFormula=ruleFormula, filterProperties=filterProperties)
+def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with'], verbose=False):
+    trace, result = runPolicy(logURIs, policyURIs, logFormula=logFormula, ruleFormula=ruleFormula, filterProperties=filterProperties, verbose=verbose)
     return trace.n3String()
 
-def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with'], logFormulaObjs=[], ruleFormulaObjs=[], store=store):
+def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with'], logFormulaObjs=[], ruleFormulaObjs=[], store=store, verbose=False):
     global baseFactsURI, baseRulesURI
     if OFFLINE[0]:
         baseFactsURI = uripath.join(uripath.base(),
@@ -1193,8 +1193,9 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
         allRules += rules
         allRules += cwm_rules
         allGoalRules += goal_rules
-    print 'rules = ', allRules
-    print 'goal rules = ', goal_rules
+    if verbose:
+        print 'rules = ', allRules
+        print 'goal rules = ', goal_rules
     ruleAssumptions = []
     for rule in rdfsRules + allRules + allGoalRules:
         a  = formulaTMS.getThing(rule)
@@ -1207,29 +1208,33 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
     while eventLoop:
         eventLoop.next()
     Formula._isReasoning = False
-    print workcount
+    if verbose:
+        print workcount
 
 # See how long it took (minus output)
     now = time.time()
     totalTime = now - startTime
-    print 'time reasoning took=', totalTime
-    print '  of which %s was after loading, and %s was actual reasoning' % (now-compileStartTime, now-eventStartTime)
+    if verbose:
+        print 'time reasoning took=', totalTime
+        print '  of which %s was after loading, and %s was actual reasoning' % (now-compileStartTime, now-eventStartTime)
 
 #    rete.printRete()
     if len(filterProperties) > 0:
         triples = list(reduce(lambda x, y: x + y, [workingContext.statementsMatching(pred=workingContext.newSymbol(property)) for property in filterProperties]))
     else:
         triples = workingContext.statements
-    if triples:
-        print 'I can prove the following compliance statements:'
-    else:
-        print 'There is nothing to prove'
+    if verbose:
+        if triples:
+            print 'I can prove the following compliance statements:'
+        else:
+            print 'There is nothing to prove'
         
     tmsNodes = [formulaTMS.getTriple(triple.subject(), triple.predicate(), triple.object(), None) for triple in triples]
     reasons, premises = supportTrace(tmsNodes)
     reasons, premises = removeFormulae(reasons, premises)
     strings = simpleTraceOutput(tmsNodes, reasons, premises)
-    print '\n'.join(strings)
+    if verbose:
+        print '\n'.join(strings)
     f = rdfTraceOutput(store, tmsNodes, reasons, premises, formulaTMS.envs, Rule)
 #    import diag
 #    diag.chatty_flag = 1000
@@ -1276,7 +1281,7 @@ knownScenarios = {
     'privacy' : (['http://dig.csail.mit.edu/2009/DHS-fusion/PrivacyAct/log.n3'], ['http://dig.csail.mit.edu/2009/DHS-fusion/PrivacyAct/policy.n3'])
 }
 
-def runScenario(s, others=[]):
+def runScenario(s, others=[], verbose=False):
     if s[-5:] == 'Local':
         OFFLINE[0] = True
     if s == 'test':
@@ -1288,7 +1293,7 @@ def runScenario(s, others=[]):
  #       raise ValueError("I don't know about scenario %s" % s)
     else:
         facts, rules = knownScenarios[s]
-    return testPolicy(facts, rules)
+    return testPolicy(facts, rules, verbose=verbose)
 
 def main():
     global MM
@@ -1326,11 +1331,13 @@ It may even cause the computation to fail, if a URI 404's or is not RDF.
 which seems faster right now. 'treat' is likely more extensible
 for the future, but may still be buggy.
 """)
+    parser.add_option('--verbose', '-v', dest="verbose", action="store_true", default=False,
+                      help="""\"Oh policyrunner, why don't you talk to me the way you used to?\"""")
 
     (options, args) = parser.parse_args()
     if not args:
         args = ['s0']
-    call = lambda : runScenario(args[0], args[1:])
+    call = lambda : runScenario(args[0], args[1:], options.verbose)
     MM = eval(options.reasoner)
     if options.lookupOntologies:
         loadFactFormula.pClosureMode = True
@@ -1350,14 +1357,16 @@ for the future, but may still be buggy.
         import hotshot, hotshot.stats
         import tempfile
         fname = tempfile.mkstemp()[1]
-        print fname
+        if options.verbose:
+            print fname
         sys.stdout = null = file('/dev/null', 'w')
         profiler = hotshot.Profile(fname)
         profiler.runcall(call)
         profiler.close()
         sys.stdout = stdout
         null.close()
-        print 'done running. Ready to do stats'
+        if options.verbose:
+            print 'done running. Ready to do stats'
         stats = hotshot.stats.load(fname)
         stats.strip_dirs()
         stats.sort_stats('cumulative', 'time', 'calls')
