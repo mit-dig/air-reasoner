@@ -1025,8 +1025,14 @@ fire only when there are no events to fire.
         elif self.events:
 #            print "open!"
             self.phase = EventLoop.PHASE_OPEN
+            if len(self.newAlternateEvents) > 0:
+                self.alternateEvents = self.newAlternateEvents
+                self.newAlternateEvents = deque()
             return self.events.pop()(self)
         else:
+            if len(self.newAlternateEvents) > 0:
+                self.alternateEvents = self.newAlternateEvents
+                self.newAlternateEvents = deque()
             return None
 
     def __len__(self):
