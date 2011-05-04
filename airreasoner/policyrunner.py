@@ -1118,7 +1118,7 @@ store = llyn.RDFStore()
 n3NS = store.newSymbol('http://www.w3.org/2000/10/swap/grammar/n3#n3')
 
 def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with'], verbose=False, customBaseFactsURI=False, customBaseRulesURI=False):
-    trace, result = runPolicy(logURIs, policyURIs, logFormula=logFormula, ruleFormula=ruleFormula, filterProperties=filterProperties, verbose=verbose, customeBaseFactsURI=customBaseFactsURI, customBaseRulesURI=customBaseRulesURI)
+    trace, result = runPolicy(logURIs, policyURIs, logFormula=logFormula, ruleFormula=ruleFormula, filterProperties=filterProperties, verbose=verbose, customBaseFactsURI=customBaseFactsURI, customBaseRulesURI=customBaseRulesURI)
     return trace.n3String()
 
 def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with'], logFormulaObjs=[], ruleFormulaObjs=[], store=store, verbose=False, customBaseFactsURI=False, customBaseRulesURI=False):
@@ -1342,9 +1342,9 @@ for the future, but may still be buggy.
 """)
     parser.add_option('--verbose', '-v', dest="verbose", action="store_true", default=False,
                       help="""\"Oh policyrunner, why don't you talk to me the way you used to?\"""")
-    parser.add_option('--base-rules', '-r', dest="customBaseRulesURI", action="store", default=False,
+    parser.add_option('--base-rules', '-R', dest="customBaseRulesURI", action="store", default=False,
                       help="""Set the base rules URI.""")
-    parser.add_option('--base-facts', '-r', dest="customBaseFactsURI", action="store", default=False,
+    parser.add_option('--base-facts', '-F', dest="customBaseFactsURI", action="store", default=False,
                       help="""Set the base facts URI.""")
 
     (options, args) = parser.parse_args()
