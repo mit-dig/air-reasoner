@@ -1117,11 +1117,11 @@ store = llyn.RDFStore()
 
 n3NS = store.newSymbol('http://www.w3.org/2000/10/swap/grammar/n3#n3')
 
-def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with'], verbose=False):
-    trace, result = runPolicy(logURIs, policyURIs, logFormula=logFormula, ruleFormula=ruleFormula, filterProperties=filterProperties, verbose=verbose)
+def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with'], verbose=False, customBaseFactsURI=False, customBaseRulesURI=False):
+    trace, result = runPolicy(logURIs, policyURIs, logFormula=logFormula, ruleFormula=ruleFormula, filterProperties=filterProperties, verbose=verbose, customeBaseFactsURI=customBaseFactsURI, customBaseRulesURI=customBaseRulesURI)
     return trace.n3String()
 
-def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with'], logFormulaObjs=[], ruleFormulaObjs=[], store=store, verbose=False):
+def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with'], logFormulaObjs=[], ruleFormulaObjs=[], store=store, verbose=False, customBaseFactsURI=False, customBaseRulesURI=False):
     global baseFactsURI, baseRulesURI
     if OFFLINE[0]:
         baseFactsURI = uripath.join(uripath.base(),
@@ -1132,6 +1132,9 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
                                                            '../../..'))
         logURIs = map(lambda x: uripath.join(uripath.base(), x), logURIs)
         policyURIs = map(lambda x: uripath.join(uripath.base(), x), policyURIs)
+    elif customBaseFactsURI or customBaseRulesURI:
+        baseFactsURI = customBaseFactsURI
+        baseRulesURI = customBaseRulesURI
     import time
     formulaTMS = setupTMS(store)
     workingContext = formulaTMS.workingContext
@@ -1287,7 +1290,7 @@ knownScenarios = {
     'privacy' : (['http://dig.csail.mit.edu/2009/DHS-fusion/PrivacyAct/log.n3'], ['http://dig.csail.mit.edu/2009/DHS-fusion/PrivacyAct/policy.n3'])
 }
 
-def runScenario(s, others=[], verbose=False):
+def runScenario(s, others=[], verbose=False, customBaseRulesURI=False, customBaseFactsURI=False):
     if s[-5:] == 'Local':
         OFFLINE[0] = True
     if s == 'test':
@@ -1299,7 +1302,7 @@ def runScenario(s, others=[], verbose=False):
  #       raise ValueError("I don't know about scenario %s" % s)
     else:
         facts, rules = knownScenarios[s]
-    return testPolicy(facts, rules, verbose=verbose)
+    return testPolicy(facts, rules, verbose=verbose, customBaseRulesURI=customBaseRulesURI, customBaseFactsURI=customBaseFactsURI)
 
 def main():
     global MM
@@ -1339,11 +1342,15 @@ for the future, but may still be buggy.
 """)
     parser.add_option('--verbose', '-v', dest="verbose", action="store_true", default=False,
                       help="""\"Oh policyrunner, why don't you talk to me the way you used to?\"""")
+    parser.add_option('--base-rules', '-r', dest="customBaseRulesURI", action="store", default=False,
+                      help="""Set the base rules URI.""")
+    parser.add_option('--base-facts', '-r', dest="customBaseFactsURI", action="store", default=False,
+                      help="""Set the base facts URI.""")
 
     (options, args) = parser.parse_args()
     if not args:
         args = ['s0']
-    call = lambda : runScenario(args[0], args[1:], options.verbose)
+    call = lambda : runScenario(args[0], args[1:], options.verbose, options.customBaseRulesURI, options.customBaseFactsURI)
     MM = eval(options.reasoner)
     if options.lookupOntologies:
         loadFactFormula.pClosureMode = True
