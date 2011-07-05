@@ -1297,12 +1297,9 @@ def runScenario(s, others=[], verbose=False, customBaseRulesURI=False, customBas
         rules = others[0:1]
         facts = others[1:]
     elif s not in knownScenarios:
- #       facts = ['http://dig.csail.mit.edu/TAMI/2007/%s/log.n3' % s]
- #       rules = ['http://dig.csail.mit.edu/TAMI/2007/%s/policy.n3' % s]
+        facts = ['http://dig.csail.mit.edu/TAMI/2007/%s/log.n3' % s]
+        rules = ['http://dig.csail.mit.edu/TAMI/2007/%s/policy.n3' % s]
  #       raise ValueError("I don't know about scenario %s" % s)
- # 	Modified facts and rules for testing with Test Framework.
-  	facts = ['http://people.csail.mit.edu/efcplaza/air/demo.rdf']
-	rules = ['%s/policy.n3' %s]
     else:
         facts, rules = knownScenarios[s]
     return testPolicy(facts, rules, verbose=verbose, customBaseRulesURI=customBaseRulesURI, customBaseFactsURI=customBaseFactsURI)
