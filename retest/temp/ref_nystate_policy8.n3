@@ -1,0 +1,72 @@
+     @prefix : <http://dig.csail.mit.edu/TAMI/2007/amord/tms#> .
+    @prefix a: <http://dig.csail.mit.edu/2009/AIR/air#> .
+    @prefix ai: <http://dig.csail.mit.edu/2009/AIR/airjustification#> .
+    @prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+    @prefix pml: <http://inference-web.org/2.0/pml-lite.owl#> .
+    
+    run:_g0     a ai:Dereference;
+         ai:source <http://people.csail.mit.edu/efcplaza/air/demo.rdf>;
+         pml:outputdata run:_g1 .
+    
+    run:_g2     a ai:RuleApplication;
+         a:rule <http://tw.rpi.edu/proj/tami/Special:URIResolver/state-residency-rule>;
+         ai:branch a:then;
+         ai:dataDependency run:_g0;
+         pml:inputdata {<http://tw.rpi.edu/proj/tami/Special:URIResolver/Alice>     <http://tw.rpi.edu/proj/tami/Special:URIResolver/Property-3ALives_in_city> <http://tw.rpi.edu/proj/tami/Special:URIResolver/Troy> .
+        <http://tw.rpi.edu/proj/tami/Special:URIResolver/Troy>     <http://tw.rpi.edu/proj/tami/Special:URIResolver/Property-3AHas_state> <http://tw.rpi.edu/proj/tami/Special:URIResolver/NY> .
+        };
+         pml:outputdata {<http://tw.rpi.edu/proj/tami/Special:URIResolver/Alice>     air:compliant-with <http://tw.rpi.edu/proj/tami/Special:URIResolver/ny_state_residency_policy> .
+        } .
+    
+    run:_g3     a ai:RuleApplication;
+         a:rule <http://tw.rpi.edu/proj/tami/Special:URIResolver/state-residency-rule>;
+         ai:branch a:then;
+         ai:dataDependency run:_g0;
+         pml:inputdata {<http://tw.rpi.edu/proj/tami/Special:URIResolver/Bob>     <http://tw.rpi.edu/proj/tami/Special:URIResolver/Property-3ALives_in_city> <http://tw.rpi.edu/proj/tami/Special:URIResolver/Troy> .
+        <http://tw.rpi.edu/proj/tami/Special:URIResolver/Troy>     <http://tw.rpi.edu/proj/tami/Special:URIResolver/Property-3AHas_state> <http://tw.rpi.edu/proj/tami/Special:URIResolver/NY> .
+        };
+         pml:outputdata {<http://tw.rpi.edu/proj/tami/Special:URIResolver/Bob>     air:compliant-with <http://tw.rpi.edu/proj/tami/Special:URIResolver/ny_state_residency_policy> .
+        } .
+    
+    run:_g4     a ai:ClosureComputation;
+         ai:dataDependency run:_g2,
+                run:_g3;
+         pml:outputdata {<http://tw.rpi.edu/proj/tami/Special:URIResolver/Alice>     air:compliant-with <http://tw.rpi.edu/proj/tami/Special:URIResolver/ny_state_residency_policy> .
+        <http://tw.rpi.edu/proj/tami/Special:URIResolver/Bob>     air:compliant-with <http://tw.rpi.edu/proj/tami/Special:URIResolver/ny_state_residency_policy> .
+        } .
+    
+    <http://tw.rpi.edu/proj/tami/Special:URIResolver/Alice>     air:compliant-with <http://tw.rpi.edu/proj/tami/Special:URIResolver/ny_state_residency_policy> .
+    
+    <http://tw.rpi.edu/proj/tami/Special:URIResolver/Bob>     air:compliant-with <http://tw.rpi.edu/proj/tami/Special:URIResolver/ny_state_residency_policy> .
+    
+    <http://tw.rpi.edu/proj/tami/Special:URIResolver/state-residency-rule>     :justification :premise .
+    {
+        <http://tw.rpi.edu/proj/tami/Special:URIResolver/Alice>     air:compliant-with <http://tw.rpi.edu/proj/tami/Special:URIResolver/ny_state_residency_policy> .
+        
+        }     :justification  [
+             :antecedent-expr  [
+                 a :And-justification;
+                 :sub-expr <http://tw.rpi.edu/proj/tami/Special:URIResolver/state-residency-rule>,
+                        {<http://tw.rpi.edu/proj/tami/Special:URIResolver/Alice>     <http://tw.rpi.edu/proj/tami/Special:URIResolver/Property-3ALives_in_city> <http://tw.rpi.edu/proj/tami/Special:URIResolver/Troy> .
+                <http://tw.rpi.edu/proj/tami/Special:URIResolver/Troy>     <http://tw.rpi.edu/proj/tami/Special:URIResolver/Property-3AHas_state> <http://tw.rpi.edu/proj/tami/Special:URIResolver/NY> .
+                } ];
+             :rule-name <http://tw.rpi.edu/proj/tami/Special:URIResolver/state-residency-rule> ] .
+    {
+        <http://tw.rpi.edu/proj/tami/Special:URIResolver/Bob>     air:compliant-with <http://tw.rpi.edu/proj/tami/Special:URIResolver/ny_state_residency_policy> .
+        
+        }     :justification  [
+             :antecedent-expr  [
+                 a :And-justification;
+                 :sub-expr <http://tw.rpi.edu/proj/tami/Special:URIResolver/state-residency-rule>,
+                        {<http://tw.rpi.edu/proj/tami/Special:URIResolver/Bob>     <http://tw.rpi.edu/proj/tami/Special:URIResolver/Property-3ALives_in_city> <http://tw.rpi.edu/proj/tami/Special:URIResolver/Troy> .
+                <http://tw.rpi.edu/proj/tami/Special:URIResolver/Troy>     <http://tw.rpi.edu/proj/tami/Special:URIResolver/Property-3AHas_state> <http://tw.rpi.edu/proj/tami/Special:URIResolver/NY> .
+                } ];
+             :rule-name <http://tw.rpi.edu/proj/tami/Special:URIResolver/state-residency-rule> ] .
+    {
+        <http://tw.rpi.edu/proj/tami/Special:URIResolver/Alice>     <http://tw.rpi.edu/proj/tami/Special:URIResolver/Property-3ALives_in_city> <http://tw.rpi.edu/proj/tami/Special:URIResolver/Troy> .
+        <http://tw.rpi.edu/proj/tami/Special:URIResolver/Bob>     <http://tw.rpi.edu/proj/tami/Special:URIResolver/Property-3ALives_in_city> <http://tw.rpi.edu/proj/tami/Special:URIResolver/Troy> .
+        <http://tw.rpi.edu/proj/tami/Special:URIResolver/Troy>     <http://tw.rpi.edu/proj/tami/Special:URIResolver/Property-3AHas_state> <http://tw.rpi.edu/proj/tami/Special:URIResolver/NY> .
+        
+        }     :justification :premise .
+    
+

@@ -1,0 +1,9 @@
+     @prefix : <http://dig.csail.mit.edu/TAMI/2007/amord/tms#> .
+    
+    run:_g0     a <http://dig.csail.mit.edu/2009/AIR/airjustification#ClosureComputation>;
+         <http://inference-web.org/2.0/pml-lite.owl#outputdata> {} .
+    {
+        
+        }     :justification :premise .
+    
+

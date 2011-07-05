@@ -1,0 +1,106 @@
+     @prefix : <http://dig.csail.mit.edu/2009/AIR/airjustification#> .
+    @prefix ai: <http://dig.csail.mit.edu/2009/AIR/air#> .
+    @prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+    @prefix pm: <http://inference-web.org/2.0/pml-justification.owl#> .
+    @prefix pml: <http://inference-web.org/2.0/pml-lite.owl#> .
+    @prefix tms: <http://dig.csail.mit.edu/TAMI/2007/amord/tms#> .
+    
+    run:_g0     a :Dereference;
+         :source <http://people.csail.mit.edu/efcplaza/air/demo.rdf>;
+         pml:outputdata run:_g1 .
+    
+    run:_g10     a :ClosureComputation;
+         :dataDependency run:_g9;
+         pml:outputdata {<http://tw.rpi.edu/proj/tami/Special:URIResolver/George>     air:compliant-with <http://tw.rpi.edu/proj/tami/Special:URIResolver/ny_neighbor_state_residency_policy> .
+        } .
+    
+    run:_g2     a :RuleApplication;
+         ai:rule <http://tw.rpi.edu/proj/tami/Special:URIResolver/non-ny-residency-rule>;
+         :branch ai:then;
+         :dataDependency run:_g0;
+         :outputVariableMappingList  (
+        run:_g7
+        run:_g8 );
+         pml:inputdata {<http://tw.rpi.edu/proj/tami/Special:URIResolver/George>     <http://tw.rpi.edu/proj/tami/Special:URIResolver/Property-3ALives_in_city> <http://tw.rpi.edu/proj/tami/Special:URIResolver/Boston> .
+        } .
+    
+    run:_g3     a :ClosingTheWorld;
+         :dataDependency run:_g0,
+                run:_g5;
+         :flowDependency run:_g0,
+                run:_g5 .
+    
+    run:_g5     a :Dereference;
+         :source <http://dig.csail.mit.edu/TAMI/2007/amord/base-assumptions.ttl>;
+         pml:outputdata run:_g4 .
+    
+    run:_g6     a :RuleApplication;
+         ai:rule <#_g0>;
+         :branch ai:else;
+         :dataDependency run:_g3;
+         :flowDependency run:_g3;
+         :nestedDependency run:_g2 .
+    
+    run:_g7     a pm:Mapping;
+         :mappingFrom <http://tw.rpi.edu/proj/tami/Special:URIResolver/PERSON>;
+         :mappingTo <http://tw.rpi.edu/proj/tami/Special:URIResolver/George> .
+    
+    run:_g8     a pm:Mapping;
+         :mappingFrom <http://tw.rpi.edu/proj/tami/Special:URIResolver/CITY>;
+         :mappingTo <http://tw.rpi.edu/proj/tami/Special:URIResolver/Boston> .
+    
+    run:_g9     a :RuleApplication;
+         ai:rule <http://tw.rpi.edu/proj/tami/Special:URIResolver/neighbor-state-rule>;
+         :branch ai:then;
+         :dataDependency run:_g0;
+         :nestedDependency run:_g6;
+         pml:inputdata {<http://tw.rpi.edu/proj/tami/Special:URIResolver/Boston>     <http://tw.rpi.edu/proj/tami/Special:URIResolver/Property-3AHas_state> <http://tw.rpi.edu/proj/tami/Special:URIResolver/MA> .
+        <http://tw.rpi.edu/proj/tami/Special:URIResolver/NY>     <http://tw.rpi.edu/proj/tami/Special:URIResolver/Property-3ANeighbor_state> <http://tw.rpi.edu/proj/tami/Special:URIResolver/MA> .
+        };
+         pml:outputdata {<http://tw.rpi.edu/proj/tami/Special:URIResolver/George>     air:compliant-with <http://tw.rpi.edu/proj/tami/Special:URIResolver/ny_neighbor_state_residency_policy> .
+        } .
+    
+    <http://tw.rpi.edu/proj/tami/Special:URIResolver/George>     air:compliant-with <http://tw.rpi.edu/proj/tami/Special:URIResolver/ny_neighbor_state_residency_policy> .
+    
+    <http://tw.rpi.edu/proj/tami/Special:URIResolver/non-ny-residency-rule>     tms:justification tms:premise .
+    {
+        <http://tw.rpi.edu/proj/tami/Special:URIResolver/George>     air:compliant-with <http://tw.rpi.edu/proj/tami/Special:URIResolver/ny_neighbor_state_residency_policy> .
+        
+        }     tms:justification  [
+             tms:antecedent-expr  [
+                 a tms:And-justification;
+                 tms:sub-expr  [
+                     ai:instanceOf <http://tw.rpi.edu/proj/tami/Special:URIResolver/neighbor-state-rule>;
+                     tms:justification  [
+                         tms:antecedent-expr  [
+                             a tms:And-justification;
+                             tms:sub-expr  [
+                                 ai:instanceOf <#_g0>;
+                                 tms:justification  [
+                                     tms:antecedent-expr  [
+                                         a tms:And-justification;
+                                         tms:sub-expr <http://tw.rpi.edu/proj/tami/Special:URIResolver/non-ny-residency-rule>,
+                                                {<http://tw.rpi.edu/proj/tami/Special:URIResolver/George>     <http://tw.rpi.edu/proj/tami/Special:URIResolver/Property-3ALives_in_city> <http://tw.rpi.edu/proj/tami/Special:URIResolver/Boston> .
+                                        } ];
+                                     tms:rule-name <http://tw.rpi.edu/proj/tami/Special:URIResolver/non-ny-residency-rule> ] ],
+                                     [
+                                 ai:closed-world-assumption  (
+                                <http://tw.rpi.edu/proj/tami/Special:URIResolver/ny_neighbor_state_residency_policy>
+                                air:base-rules
+                                <http://people.csail.mit.edu/efcplaza/air/demo.rdf>
+                                <http://dig.csail.mit.edu/TAMI/2007/amord/base-assumptions.ttl> );
+                                 tms:justification tms:premise ],
+                                    {} ];
+                         tms:rule-name <#_g0> ] ],
+                        {<http://tw.rpi.edu/proj/tami/Special:URIResolver/Boston>     <http://tw.rpi.edu/proj/tami/Special:URIResolver/Property-3AHas_state> <http://tw.rpi.edu/proj/tami/Special:URIResolver/MA> .
+                <http://tw.rpi.edu/proj/tami/Special:URIResolver/NY>     <http://tw.rpi.edu/proj/tami/Special:URIResolver/Property-3ANeighbor_state> <http://tw.rpi.edu/proj/tami/Special:URIResolver/MA> .
+                } ];
+             tms:rule-name <http://tw.rpi.edu/proj/tami/Special:URIResolver/neighbor-state-rule> ] .
+    {
+        <http://tw.rpi.edu/proj/tami/Special:URIResolver/Boston>     <http://tw.rpi.edu/proj/tami/Special:URIResolver/Property-3AHas_state> <http://tw.rpi.edu/proj/tami/Special:URIResolver/MA> .
+        <http://tw.rpi.edu/proj/tami/Special:URIResolver/George>     <http://tw.rpi.edu/proj/tami/Special:URIResolver/Property-3ALives_in_city> <http://tw.rpi.edu/proj/tami/Special:URIResolver/Boston> .
+        <http://tw.rpi.edu/proj/tami/Special:URIResolver/NY>     <http://tw.rpi.edu/proj/tami/Special:URIResolver/Property-3ANeighbor_state> <http://tw.rpi.edu/proj/tami/Special:URIResolver/MA> .
+        
+        }     tms:justification tms:premise .
+    
+
