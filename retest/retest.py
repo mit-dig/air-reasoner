@@ -15,11 +15,21 @@ Options:
                             (Summary error still raised when all tests have been tried)
 --air=../policyrunner.py    AIR command is ../policyrunner.py
 --help          -h          Print this message and exit
+--ref			    Specify location of reference file
+--data			    Specify location of test data
+--rules			    Specify location of rules
+--desc			    Add description to test (optional)
+
+There are two ways to use test framework:
 
 You must specify some test definitions, and normal or proofs or both,
 or nothing will happen.
 
 Example:    python retest.py -n -f regression.n3
+
+You can also specify locations for reference, data, and rules.
+
+Example: python retest.py --ref=/path/to/reference.n3 --data=http://example.com/data.rdf --rules=http://example.com/rules.n3
 
 """
 
@@ -171,6 +181,8 @@ def main():
     start = 1
     cwm_command='../airreasoner/policyrunner.py'
     python_command='python'
+    usingN3 = 1 # default: use N3 for list of test
+    desc = None
     global ploughOn # even if error
     ploughOn = 0
     global verbose
@@ -184,7 +196,8 @@ def main():
     try:
         opts, testFiles = getopt.getopt(sys.argv[1:], "h?s:nNcipf:v",
             ["help", "start=", "testsFrom=", "no-action", "No-normal", "chatty",
-                "ignoreErrors", "proofs", "verbose","overwrite","air="])
+                "ignoreErrors", "proofs", "verbose","overwrite","air=","ref=","data=",
+             "rules=","desc="])
     except getopt.GetoptError:
         # print help information and exit:
         usage()
@@ -214,6 +227,15 @@ def main():
             just_fix_it = 1
         if o in ("--air", "--the_end"):
             cwm_command=a
+        if o in ("--desc", "--description"):
+            desc=a
+        # All opts below for not usingN3
+        if o in ("--ref", "--reference"):
+            ref_location, usingN3=a, 0
+        if o in ("--data"):
+            data_location, usingN3=a, 0
+        if o in ("--rules"):
+            rules_location, usingN3=a, 0
 
     
     assert system("mkdir -p temp") == 0
@@ -243,160 +265,178 @@ def main():
 #    for fn in testFiles:
 #       print "Loading tests from", fn
 #       kb=load(fn)
-    
-    for t in kb.each(pred=rdf.type, obj=test.CwmTest):
-        verboseDebug = kb.contains(subj=t, pred=rdf.type, obj=test.VerboseTest)
-        u = t.uriref()
-        ref = kb.the(t, test.referenceOutput)
-        if ref == None:
-            case = str(kb.the(t, test.shortFileName))
-            refFile = "ref/%s" % case
-        else:
-            refFile = refTo(base(), ref.uriref())
+
+    if usingN3:
+        for t in kb.each(pred=rdf.type, obj=test.CwmTest):
+            verboseDebug = kb.contains(subj=t, pred=rdf.type, obj=test.VerboseTest)
+            u = t.uriref()
+            ref = kb.the(t, test.referenceOutput)
+            if ref == None:
+                case = str(kb.the(t, test.shortFileName))
+                refFile = "ref/%s" % case
+            else:
+                refFile = refTo(base(), ref.uriref())
+                case  = ""
+                for ch in refFile:
+                    if ch in "/#": case += "_"
+                    else: case += ch  # Make up test-unique temp filename
+            description = str(kb.the(t, test.description))
+            arguments = str(kb.the(t, test.arguments))
+            environment = kb.the(t, test.environment)
+            if environment == None: env=""
+            else: env = str(environment) + " "
+            testData.append((t, t.uriref(), case, refFile, description, env, arguments, verboseDebug))
+    else:
+        try:
+            verboseDebug = 0
+            refFile = ref_location
             case  = ""
             for ch in refFile:
                 if ch in "/#": case += "_"
                 else: case += ch  # Make up test-unique temp filename
-        description = str(kb.the(t, test.description))
-        arguments = str(kb.the(t, test.arguments))
-        environment = kb.the(t, test.environment)
-        if environment == None: env=""
-        else: env = str(environment) + " "
-        testData.append((t, t.uriref(), case, refFile, description, env, arguments, verboseDebug))
+            if desc == None: description = "No description specified."
+            else: description = desc
+            arguments = "test %s %s" % (rules_location, data_location)
+            env = ""
+            testData.append((0, rules_location, case, refFile, description, env, arguments, verboseDebug))
+        except:
+            print "\n If N3 is not used for test, retest must have valid values for ref, data, and rules." + "\n" + \
+                  "E.g. python retest.py --ref=/path/to/reference.n3 --data=http://example.com/data.rdf --rules=http://example.com/rules.n3 \n"
+            sys.exit(2)
 
-    for t in kb.each(pred=rdf.type, obj=rdft.PositiveParserTest):
-
-        x = t.uriref()
-        y = x.find("/rdf-tests/")
-        x = x[y+11:] # rest
-        for i in range(len(x)):
-            if x[i]in"/#": x = x[:i]+"_"+x[i+1:]
-        case = "rdft_" + x + ".nt" # Hack - temp file name
-        
-        description = str(kb.the(t, rdft.description))
-#           if description == None: description = case + " (no description)"
-        inputDocument = kb.the(t, rdft.inputDocument).uriref()
-        outputDocument = kb.the(t, rdft.outputDocument).uriref()
-        status = kb.the(t, rdft.status).string
-        good = 1
-        if status != "APPROVED":
-            if verbose: print "\tNot approved: "+ inputDocument[-40:]
-            good = 0
-        categories = kb.each(t, rdf.type)
-        for cat in categories:
-            if cat is triage.ReificationTest:
-                if verbose: print "\tNot supported (reification): "+ inputDocument[-40:]
-                good = 0
-##            if cat is triage.ParseTypeLiteralTest:
-##                if verbose: print "\tNot supported (Parse type literal): "+ inputDocument[-40:]
+##    for t in kb.each(pred=rdf.type, obj=rdft.PositiveParserTest):
+##
+##        x = t.uriref()
+##        y = x.find("/rdf-tests/")
+##        x = x[y+11:] # rest
+##        for i in range(len(x)):
+##            if x[i]in"/#": x = x[:i]+"_"+x[i+1:]
+##        case = "rdft_" + x + ".nt" # Hack - temp file name
+##        
+##        description = str(kb.the(t, rdft.description))
+###           if description == None: description = case + " (no description)"
+##        inputDocument = kb.the(t, rdft.inputDocument).uriref()
+##        outputDocument = kb.the(t, rdft.outputDocument).uriref()
+##        status = kb.the(t, rdft.status).string
+##        good = 1
+##        if status != "APPROVED":
+##            if verbose: print "\tNot approved: "+ inputDocument[-40:]
+##            good = 0
+##        categories = kb.each(t, rdf.type)
+##        for cat in categories:
+##            if cat is triage.ReificationTest:
+##                if verbose: print "\tNot supported (reification): "+ inputDocument[-40:]
 ##                good = 0
-        if good:
-            RDFTestData.append((t.uriref(), case, description,  inputDocument, outputDocument))
-
-    for t in kb.each(pred=rdf.type, obj=rdft.NegativeParserTest):
-
-        x = t.uriref()
-        y = x.find("/rdf-tests/")
-        x = x[y+11:] # rest
-        for i in range(len(x)):
-            if x[i]in"/#": x = x[:i]+"_"+x[i+1:]
-        case = "rdft_" + x + ".nt" # Hack - temp file name
-        
-        description = str(kb.the(t, rdft.description))
-#           if description == None: description = case + " (no description)"
-        inputDocument = kb.the(t, rdft.inputDocument).uriref()
-        status = kb.the(t, rdft.status).string
-        good = 1
-        if status != "APPROVED":
-            if verbose: print "\tNot approved: "+ inputDocument[-40:]
-            good = 0
-        categories = kb.each(t, rdf.type)
-        for cat in categories:
-            if cat is triage.knownError:
-                if verbose: print "\tknown failure: "+ inputDocument[-40:]
-                good = 0
-            if cat is triage.ReificationTest:
-                if verbose: print "\tNot supported (reification): "+ inputDocument[-40:]
-                good = 0
-        if good:
-            RDFNegativeTestData.append((t.uriref(), case, description,  inputDocument))
-
-
-
-    for t in kb.each(pred=rdf.type, obj=n3test.PositiveParserTest):
-        u = t.uriref()
-        hash = u.rfind("#")
-        slash = u.rfind("/")
-        assert hash >0 and slash > 0
-        case = u[slash+1:hash] + "_" + u[hash+1:] + ".out" # Make up temp filename
-        
-        description = str(kb.the(t, n3test.description))
-#           if description == None: description = case + " (no description)"
-        inputDocument = kb.the(t, n3test.inputDocument).uriref()
-        good = 1
-        categories = kb.each(t, rdf.type)
-        for cat in categories:
-            if cat is triage.knownError:
-                if verbose: print "\tknown failure: "+ inputDocument[-40:]
-                good = 0
-        if good:
-            n3PositiveTestData.append((t.uriref(), case, description,  inputDocument))
-
-
-    for t in kb.each(pred=rdf.type, obj=n3test.NegativeParserTest):
-        u = t.uriref()
-        hash = u.rfind("#")
-        slash = u.rfind("/")
-        assert hash >0 and slash > 0
-        case = u[slash+1:hash] + "_" + u[hash+1:] + ".out" # Make up temp filename
-        
-        description = str(kb.the(t, n3test.description))
-#           if description == None: description = case + " (no description)"
-        inputDocument = kb.the(t, n3test.inputDocument).uriref()
-
-        n3NegativeTestData.append((t.uriref(), case, description,  inputDocument))
-
-    for tt in kb.each(pred=rdf.type, obj=sparql_manifest.Manifest):
-        for t in kb.the(subj=tt, pred=sparql_manifest.entries):
-            name = str(kb.the(subj=t, pred=sparql_manifest.name))
-            query_node = kb.the(subj=t, pred=sparql_manifest.action)
-            if isinstance(query_node, AnonymousNode):
-                data = ''
-                for data_node in kb.each(subj=query_node, pred=sparql_query.data):
-                    data = data + ' ' + data_node.uriref()
-
-                inputDocument = kb.the(subj=query_node, pred=sparql_query.query).uriref()
-            else:
-                data = ''
-                inputDocument = query_node.uriref()
-            j = inputDocument.rfind('/')
-            case = inputDocument[j+1:]
-            outputDocument = kb.the(subj=t, pred=sparql_manifest.result)
-            if outputDocument:
-                outputDocument = outputDocument.uriref()
-            else:
-                outputDocument = None
-            good = 1
-            status = kb.the(subj=t, pred=dawg_test.approval)
-            if status != dawg_test.Approved:
-                print status, name
-                if verbose: print "\tNot approved: "+ inputDocument[-40:]
-                good = 0
-            if good:
-                sparqlTestData.append((tt.uriref(), case, name, inputDocument, data, outputDocument))
-        
-
-
-
-    for t in kb.each(pred=rdf.type, obj=test.PerformanceTest):
-        x = t.uriref()
-        theTime = kb.the(subj=t, pred=test.pyStones)
-        description = str(kb.the(t, test.description))
-        arguments = str(kb.the(t, test.arguments))
-        environment = kb.the(t, test.environment)
-        if environment == None: env=""
-        else: env = str(environment) + " "
-        perfData.append((x, theTime, description, env, arguments))
+####            if cat is triage.ParseTypeLiteralTest:
+####                if verbose: print "\tNot supported (Parse type literal): "+ inputDocument[-40:]
+####                good = 0
+##        if good:
+##            RDFTestData.append((t.uriref(), case, description,  inputDocument, outputDocument))
+##
+##    for t in kb.each(pred=rdf.type, obj=rdft.NegativeParserTest):
+##
+##        x = t.uriref()
+##        y = x.find("/rdf-tests/")
+##        x = x[y+11:] # rest
+##        for i in range(len(x)):
+##            if x[i]in"/#": x = x[:i]+"_"+x[i+1:]
+##        case = "rdft_" + x + ".nt" # Hack - temp file name
+##        
+##        description = str(kb.the(t, rdft.description))
+###           if description == None: description = case + " (no description)"
+##        inputDocument = kb.the(t, rdft.inputDocument).uriref()
+##        status = kb.the(t, rdft.status).string
+##        good = 1
+##        if status != "APPROVED":
+##            if verbose: print "\tNot approved: "+ inputDocument[-40:]
+##            good = 0
+##        categories = kb.each(t, rdf.type)
+##        for cat in categories:
+##            if cat is triage.knownError:
+##                if verbose: print "\tknown failure: "+ inputDocument[-40:]
+##                good = 0
+##            if cat is triage.ReificationTest:
+##                if verbose: print "\tNot supported (reification): "+ inputDocument[-40:]
+##                good = 0
+##        if good:
+##            RDFNegativeTestData.append((t.uriref(), case, description,  inputDocument))
+##
+##
+##
+##    for t in kb.each(pred=rdf.type, obj=n3test.PositiveParserTest):
+##        u = t.uriref()
+##        hash = u.rfind("#")
+##        slash = u.rfind("/")
+##        assert hash >0 and slash > 0
+##        case = u[slash+1:hash] + "_" + u[hash+1:] + ".out" # Make up temp filename
+##        
+##        description = str(kb.the(t, n3test.description))
+###           if description == None: description = case + " (no description)"
+##        inputDocument = kb.the(t, n3test.inputDocument).uriref()
+##        good = 1
+##        categories = kb.each(t, rdf.type)
+##        for cat in categories:
+##            if cat is triage.knownError:
+##                if verbose: print "\tknown failure: "+ inputDocument[-40:]
+##                good = 0
+##        if good:
+##            n3PositiveTestData.append((t.uriref(), case, description,  inputDocument))
+##
+##
+##    for t in kb.each(pred=rdf.type, obj=n3test.NegativeParserTest):
+##        u = t.uriref()
+##        hash = u.rfind("#")
+##        slash = u.rfind("/")
+##        assert hash >0 and slash > 0
+##        case = u[slash+1:hash] + "_" + u[hash+1:] + ".out" # Make up temp filename
+##        
+##        description = str(kb.the(t, n3test.description))
+###           if description == None: description = case + " (no description)"
+##        inputDocument = kb.the(t, n3test.inputDocument).uriref()
+##
+##        n3NegativeTestData.append((t.uriref(), case, description,  inputDocument))
+##
+##    for tt in kb.each(pred=rdf.type, obj=sparql_manifest.Manifest):
+##        for t in kb.the(subj=tt, pred=sparql_manifest.entries):
+##            name = str(kb.the(subj=t, pred=sparql_manifest.name))
+##            query_node = kb.the(subj=t, pred=sparql_manifest.action)
+##            if isinstance(query_node, AnonymousNode):
+##                data = ''
+##                for data_node in kb.each(subj=query_node, pred=sparql_query.data):
+##                    data = data + ' ' + data_node.uriref()
+##
+##                inputDocument = kb.the(subj=query_node, pred=sparql_query.query).uriref()
+##            else:
+##                data = ''
+##                inputDocument = query_node.uriref()
+##            j = inputDocument.rfind('/')
+##            case = inputDocument[j+1:]
+##            outputDocument = kb.the(subj=t, pred=sparql_manifest.result)
+##            if outputDocument:
+##                outputDocument = outputDocument.uriref()
+##            else:
+##                outputDocument = None
+##            good = 1
+##            status = kb.the(subj=t, pred=dawg_test.approval)
+##            if status != dawg_test.Approved:
+##                print status, name
+##                if verbose: print "\tNot approved: "+ inputDocument[-40:]
+##                good = 0
+##            if good:
+##                sparqlTestData.append((tt.uriref(), case, name, inputDocument, data, outputDocument))
+##        
+##
+##
+##
+##    for t in kb.each(pred=rdf.type, obj=test.PerformanceTest):
+##        x = t.uriref()
+##        theTime = kb.the(subj=t, pred=test.pyStones)
+##        description = str(kb.the(t, test.description))
+##        arguments = str(kb.the(t, test.arguments))
+##        environment = kb.the(t, test.environment)
+##        if environment == None: env=""
+##        else: env = str(environment) + " "
+##        perfData.append((x, theTime, description, env, arguments))
 
     testData.sort()
     cwmTests = len(testData)
@@ -420,33 +460,35 @@ def main():
     for t, u, case, refFile, description, env, arguments, verboseDebug in testData:
         tests = tests + 1
         if tests < start: continue
+
+        if t:
+            urel = refTo(base(), u)
+        else: urel = u
         
-        urel = refTo(base(), u)
-    
         print "%3i/%i %-30s  %s" %(tests, totalTests, urel, description)
     #    print "      %scwm %s   giving %s" %(arguments, case)
         assert case and description and arguments
         cleanup = """sed -e 's/\$[I]d.*\$//g' -e "s;%s;%s;g" -e '/@prefix run/d' -e 's;%s;%s;g'""" % (WD, REFWD,
-                                                                                                      cwm_command, '../policyrunner.py')
+                                                                                                      cwm_command, '../airreasoner/policyrunner.py')
         
         if normal:
             execute("""CWM_RUN_NS="run#" %s %s %s %s | %s > temp/%s""" %
                 (env, python_command, cwm_command, arguments, cleanup , case))  
             if diff(case, refFile):
-                problem("######### from normal case %s: %scwm %s" %( case, env, arguments))
+                problem("######### from normal case %s: %spolicyrunner.py %s" %( case, env, arguments))
                 continue
 
         if chatty and not verboseDebug:
             execute("""%s %s %s --chatty=100  %s  &> /dev/null""" %
                 (env, python_command, cwm_command, arguments), noStdErr=True)   
 
-        if proofs and kb.contains(subj=t, pred=rdf.type, obj=test.CwmProofTest):
-            execute("""%s %s %s --quiet %s --base=a --why  > proofs/%s""" %
-                (env, python_command, cwm_command, arguments, case))
-            execute("""%s ../check.py < proofs/%s | %s > temp/%s""" %
-                (python_command, case, cleanup , case)) 
-            if diff(case, refFile):
-                problem("######### from proof case %s: %scwm %s" %( case, env, arguments))
+##        if proofs and kb.contains(subj=t, pred=rdf.type, obj=test.CwmProofTest):
+##            execute("""%s %s %s --quiet %s --base=a --why  > proofs/%s""" %
+##                (env, python_command, cwm_command, arguments, case))
+##            execute("""%s ../check.py < proofs/%s | %s > temp/%s""" %
+##                (python_command, case, cleanup , case)) 
+##            if diff(case, refFile):
+##                problem("######### from proof case %s: %scwm %s" %( case, env, arguments))
 #       else:
 #           progress("No proof for "+`t`+ " "+`proofs`)
 #           progress("@@ %s" %(kb.each(t,rdf.type)))
