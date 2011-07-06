@@ -20,7 +20,7 @@ Options:
 
 You must specify some test definitions.
 
-Example:    python retest.py -n -f regression.n3
+Example:    python retest.py -n regression.n3
 
 You can also specify locations for reference, data, and rules.
 
@@ -221,7 +221,7 @@ def main():
             cwm_command=a
         if o in ("--desc", "--description"):
             desc=a
-        # All opts below for not usingN3
+        # All opts below if not usingN3
         if o in ("--ref", "--reference"):
             ref_location, usingN3=a, 0
         if o in ("--data"):
@@ -259,7 +259,7 @@ def main():
 #       kb=load(fn)
 
     if usingN3:
-        for t in kb.each(pred=rdf.type, obj=test.CwmTest):
+        for t in kb.each(pred=rdf.type, obj=test.AirTest):
             verboseDebug = kb.contains(subj=t, pred=rdf.type, obj=test.VerboseTest)
             u = t.uriref()
             ref = kb.the(t, test.referenceOutput)
@@ -273,8 +273,19 @@ def main():
                     if ch in "/#": case += "_"
                     else: case += ch  # Make up test-unique temp filename
             description = str(kb.the(t, test.description))
-            arguments = str(kb.the(t, test.arguments))
+            if description == 'None': description = "No description specified."
             environment = kb.the(t, test.environment)
+            rules = str(kb.the(t, test.rules)).split()
+            data = str(kb.the(t, test.data)).split()
+            rstring = "rules=["
+            dstring = "data=["
+            for rl in rules:
+                rstring = rstring + rl
+                if not rules[-1] == rl: rstring += ','
+            for dl in data:
+                dstring = dstring + dl
+                if not data[-1] == dl: dstring += ','
+            arguments = "list " + rstring + '] ' + dstring + ']'
             if environment == None: env=""
             else: env = str(environment) + " "
             testData.append((t, t.uriref(), case, refFile, description, env, arguments, verboseDebug))
@@ -292,7 +303,7 @@ def main():
             env = ""
             testData.append((0, rules_location, case, refFile, description, env, arguments, verboseDebug))
         except:
-            print "\n If N3 is not used for test, retest must have valid values for ref, data, and rules." + "\n" + \
+            print "\n If test definitions in RDF/XML or N3 is not used for test, retest must have valid values for ref, data, and rules." + "\n" + \
                   "E.g. python retest.py --ref=/path/to/reference.n3 --data=http://example.com/data.rdf --rules=http://example.com/rules.n3 \n"
             sys.exit(2)
 
