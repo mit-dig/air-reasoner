@@ -1296,6 +1296,10 @@ def runScenario(s, others=[], verbose=False, customBaseRulesURI=False, customBas
     if s == 'test':
         rules = others[0:1]
         facts = others[1:]
+    elif s == 'list':
+        for el in others:
+            if el[0:5] == 'rules': rules = el[7:-1].replace(',',' ').split()
+            elif el[0:4] == 'data': facts = el[6:-1].replace(',',' ').split()
     elif s not in knownScenarios:
         facts = ['http://dig.csail.mit.edu/TAMI/2007/%s/log.n3' % s]
         rules = ['http://dig.csail.mit.edu/TAMI/2007/%s/policy.n3' % s]

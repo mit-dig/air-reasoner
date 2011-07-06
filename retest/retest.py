@@ -7,8 +7,6 @@ Options:
 --testsFrom=uri -f uri      Take test definitions from these files (in RDF/XML or N3 format)
                             Or just by themselves at end of command line after options
 --normal        -n          Do normal tests, checking output NOW DEFAULT - NOT NEEDED
---chatty        -c          Do tests with debug --chatty=100 (flag just check doesn't crash)
---proof         -p          Do tests generating and cheking a proof (if a test:CwmProofTest)
 --start=13      -s 13       Skip the first 12 tests
 --verbose       -v          Print what you are doing as you go
 --ignoreErrors  -i          Print error message but plough on though more tests if errors found
@@ -20,10 +18,7 @@ Options:
 --rules			    Specify location of rules
 --desc			    Add description to test (optional)
 
-There are two ways to use test framework:
-
-You must specify some test definitions, and normal or proofs or both,
-or nothing will happen.
+You must specify some test definitions.
 
 Example:    python retest.py -n -f regression.n3
 
@@ -32,9 +27,6 @@ You can also specify locations for reference, data, and rules.
 Example: python retest.py --ref=/path/to/reference.n3 --data=http://example.com/data.rdf --rules=http://example.com/rules.n3
 
 """
-
-# Originally retest.py from Cwm.
-# Code still have to be modified further for AIR.
 
 from os import system, popen3
 import os
@@ -195,9 +187,9 @@ def main():
         a.close()
     try:
         opts, testFiles = getopt.getopt(sys.argv[1:], "h?s:nNcipf:v",
-            ["help", "start=", "testsFrom=", "no-action", "No-normal", "chatty",
-                "ignoreErrors", "proofs", "verbose","overwrite","air=","ref=","data=",
-             "rules=","desc="])
+            ["help", "start=", "testsFrom=", "no-action", "No-normal", #"chatty",
+                "ignoreErrors", #"proofs",
+		"verbose","overwrite","air=","ref=","data=","rules=","desc="])
     except getopt.GetoptError:
         # print help information and exit:
         usage()
@@ -219,10 +211,10 @@ def main():
             no_action = 1
         if o in ("-N", "--No-normal"):
             normal = 0
-        if o in ("-c", "--chatty"):
-            chatty = 1
-        if o in ("-p", "--proofs"):
-            proofs = 1
+        #if o in ("-c", "--chatty"):
+        #    chatty = 1
+        #if o in ("-p", "--proofs"):
+        #    proofs = 1
         if o in ("--overwrite",):
             just_fix_it = 1
         if o in ("--air", "--the_end"):

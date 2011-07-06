@@ -1,7 +1,3 @@
-This folder contains files for the AIR
+Contains files for the AIR
 Test Framework. Code is adapted from the
 Cwm Test framework.
-
-Status:
-retest.py has some basic functionality.
-Still has to be modified further for AIR.

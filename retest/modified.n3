@@ -1,0 +1,59 @@
+@prefix : <#>.
+@prefix x: <#>.
+@prefix test: <http://www.w3.org/2000/10/swap/test.n3#>.
+@prefix dc:  <http://purl.org/dc/elements/1.1/>. # yuk - under protest - no hash
+
+:t1001 a test:CwmTest;
+    test:referenceOutput <ref/nystate/policy2.n3>;
+    test:description   "Testing air reasoner on demo and Policy 2.";
+    test:arguments     """test http://people.csail.mit.edu/efcplaza/air/policy2/policy.n3 http://people.csail.mit.edu/efcplaza/air/demo.rdf""".
+
+:t1002 a test:CwmTest;
+    test:referenceOutput <ref/nystate/policy3.n3>;
+    test:description   "Testing air reasoner on demo and Policy 3.";
+    test:arguments     """test http://people.csail.mit.edu/efcplaza/air/policy3/policy.n3 http://people.csail.mit.edu/efcplaza/air/demo.rdf""".
+
+:t1003 a test:CwmTest;
+    test:referenceOutput <ref/nystate/policy4.n3>;
+    test:description   "Testing air reasoner on demo and Policy 4.";
+    test:arguments     """test http://people.csail.mit.edu/efcplaza/air/policy4/policy.n3 http://people.csail.mit.edu/efcplaza/air/demo.rdf""".
+
+:t1004 a test:CwmTest;
+    test:referenceOutput <ref/nystate/policy5.n3>;
+    test:description   "Testing air reasoner on demo and Policy 5.";
+    test:arguments     """test http://people.csail.mit.edu/efcplaza/air/policy5/policy.n3 http://people.csail.mit.edu/efcplaza/air/demo.rdf""".
+
+:t1005 a test:CwmTest;
+    test:referenceOutput <ref/nystate/policy6.n3>;
+    test:description   "Testing air reasoner on demo and Policy 6.";
+    test:arguments     """test http://people.csail.mit.edu/efcplaza/air/policy6/policy.n3 http://people.csail.mit.edu/efcplaza/air/demo.rdf""".
+
+:t1006 a test:CwmTest;
+    test:referenceOutput <ref/nystate/policy8.n3>;
+    test:description   "Testing air reasoner on demo and Policy 8.";
+    test:arguments     """test http://people.csail.mit.edu/efcplaza/air/policy8/policy.n3 http://people.csail.mit.edu/efcplaza/air/demo.rdf""".
+
+:t1007 a test:CwmTest;
+    test:referenceOutput <ref/nystate/policy11.n3>;
+    test:description   "Testing air reasoner on demo and Policy 11.";
+    test:arguments     """test http://people.csail.mit.edu/efcplaza/air/policy11/policy.n3 http://people.csail.mit.edu/efcplaza/air/demo.rdf""".
+
+:t1008 a test:CwmTest;
+    test:referenceOutput <ref/nystate/policy12.n3>;
+    test:description   "Testing air reasoner on demo and Policy 12.";
+    test:arguments     """test http://people.csail.mit.edu/efcplaza/air/policy12/policy.n3 http://people.csail.mit.edu/efcplaza/air/demo.rdf""".
+
+:t1009 a test:CwmTest;
+    test:referenceOutput <ref/nystate/policy16.n3>;
+    test:description   "Testing air reasoner on demo and Policy 16.";
+    test:arguments     """test http://people.csail.mit.edu/efcplaza/air/policy16/policy.n3 http://people.csail.mit.edu/efcplaza/air/demo.rdf""".
+
+:t10010 a test:CwmTest;
+    test:referenceOutput <ref/nystate/policy19.n3>;
+    test:description   "Testing air reasoner on demo and Policy 19.";
+    test:arguments     """test http://people.csail.mit.edu/efcplaza/air/policy19/policy.n3 http://people.csail.mit.edu/efcplaza/air/demo.rdf""".
+
+:t10011 a test:CwmTest;
+    test:referenceOutput <ref/nystate/policy21.n3>;
+    test:description   "Testing air reasoner on demo and Policy 21.";
+    test:arguments     """test http://people.csail.mit.edu/efcplaza/air/policy21/policy.n3 http://people.csail.mit.edu/efcplaza/air/demo.rdf""".
