@@ -3,6 +3,7 @@
     @prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
     @prefix pm: <http://inference-web.org/2.0/pml-justification.owl#> .
     @prefix pml: <http://inference-web.org/2.0/pml-lite.owl#> .
+    @prefix run: <http://dig.csail.mit.edu/TAMI/2007/amord/run#> .
     @prefix tms: <http://dig.csail.mit.edu/TAMI/2007/amord/tms#> .
     
      @forSome run:_g3 .

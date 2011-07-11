@@ -13,8 +13,8 @@ Options:
                             (Summary error still raised when all tests have been tried)
 --air=../policyrunner.py    AIR command is ../policyrunner.py
 --help          -h          Print this message and exit
---ref			    Specify location of reference file
---data			    Specify location of test data
+--ref	          	    Specify location of reference file
+--data		            Specify location of test data
 --rules			    Specify location of rules
 --desc			    Add description to test (optional)
 
@@ -122,6 +122,51 @@ def diff(case, ref=None, prog="diff -Bbwu"):
         else:
             os.system("cp temp/%s %s" %(case, ref))
             return 0
+    return result
+
+def infCheck(file, infFile):
+    """
+    Given a file, checks if inference is contained
+    """
+
+    #import openid
+    #from openid.cryptutil import randomString
+
+    # Pieces of cwm we need for this
+    try:
+        from swap import myStore
+        from swap import query
+        import os
+    except ImportError:
+        print "Make sure this module has access to cwm. Place a symlink named 'swap'"
+        print "in the current directory, pointing to 'swap' inside the cwm folder."
+        sys.exit(1)
+
+    result = 0
+    
+   # Create a store for cwm's rdf information
+    reasoningStore = myStore._checkStore()
+
+    # loading the output
+    outputFormula = reasoningStore.load(file)
+
+    kb = load(infFile)
+    for i in kb.each(pred=rdf.type, obj=test.InfReference):
+        s = str(kb.the(i, test.subj))
+        p = str(kb.the(i, test.pred))
+        o = str(kb.the(i, test.obj))
+
+        inferenceDict = {'subj':s, 'pred':p, 'obj':o}
+        
+        if not outputFormula.contains(subj=outputFormula.newSymbol(inferenceDict['subj']), \
+                                      pred=outputFormula.newSymbol(inferenceDict['pred']), \
+                                      obj=outputFormula.newSymbol(inferenceDict['obj'])):
+            result = 1
+
+        # print "File: %s" % file
+        # print "Inference: %s" % str(inferenceDict)
+        # print "Result of searching for inference: %s" %  (repr(result))
+
     return result
 
 def rdfcompare3(case, ref=None):
@@ -239,7 +284,7 @@ def main():
     global problems
     problems = []
     
-    REFWD="http://example.com/swap/test"
+    REFWD="http://dig.csail.mit.edu/TAMI/2007/amord"
     WD = base()[:-1] 
     
     #def basicTest(case, desc, args)
@@ -263,6 +308,8 @@ def main():
             verboseDebug = kb.contains(subj=t, pred=rdf.type, obj=test.VerboseTest)
             u = t.uriref()
             ref = kb.the(t, test.referenceOutput)
+            inf = kb.the(t, test.inferenceOutput) # Inference output
+            
             if ref == None:
                 case = str(kb.the(t, test.shortFileName))
                 refFile = "ref/%s" % case
@@ -272,6 +319,11 @@ def main():
                 for ch in refFile:
                     if ch in "/#": case += "_"
                     else: case += ch  # Make up test-unique temp filename
+
+            if not inf == None:
+                infFile = refTo(base(), inf.uriref())
+            else: infFile = 0
+                    
             description = str(kb.the(t, test.description))
             if description == 'None': description = "No description specified."
             environment = kb.the(t, test.environment)
@@ -288,7 +340,7 @@ def main():
             arguments = "list " + rstring + '] ' + dstring + ']'
             if environment == None: env=""
             else: env = str(environment) + " "
-            testData.append((t, t.uriref(), case, refFile, description, env, arguments, verboseDebug))
+            testData.append((t, t.uriref(), case, refFile, infFile, description, env, arguments, verboseDebug))
     else:
         try:
             verboseDebug = 0
@@ -443,7 +495,7 @@ def main():
 
     testData.sort()
     cwmTests = len(testData)
-    if verbose: print "Cwm tests: %i" % cwmTests
+    if verbose: print "Air tests: %i" % cwmTests
     RDFTestData.sort()
     RDFNegativeTestData.sort()
     rdfTests = len(RDFTestData)
@@ -460,7 +512,7 @@ def main():
                  + perfTests + n3PositiveTests + n3NegativeTests
     if verbose: print "RDF parser tests: %i" % rdfTests
 
-    for t, u, case, refFile, description, env, arguments, verboseDebug in testData:
+    for t, u, case, refFile, infFile, description, env, arguments, verboseDebug in testData:
         tests = tests + 1
         if tests < start: continue
 
@@ -471,15 +523,19 @@ def main():
         print "%3i/%i %-30s  %s" %(tests, totalTests, urel, description)
     #    print "      %scwm %s   giving %s" %(arguments, case)
         assert case and description and arguments
-        cleanup = """sed -e 's/\$[I]d.*\$//g' -e "s;%s;%s;g" -e '/@prefix run/d' -e 's;%s;%s;g'""" % (WD, REFWD,
+        cleanup = """sed -e 's/\$[I]d.*\$//g' -e "s;%s;%s;g" -e 's;%s;%s;g'""" % (WD, REFWD,
                                                                                                       cwm_command, '../airreasoner/policyrunner.py')
-        
         if normal:
             execute("""CWM_RUN_NS="run#" %s %s %s %s | %s > temp/%s""" %
                 (env, python_command, cwm_command, arguments, cleanup , case))  
             if diff(case, refFile):
                 problem("######### from normal case %s: %spolicyrunner.py %s" %( case, env, arguments))
                 continue
+            if infFile:
+                if infCheck("temp/"+case, infFile):
+			print "\tInference Check: Failed"
+                else: print "\tInference Check: Passed"
+            #else: print "\t Passed: %-30s" % urel
 
         if chatty and not verboseDebug:
             execute("""%s %s %s --chatty=100  %s  &> /dev/null""" %
@@ -498,145 +554,147 @@ def main():
         passes = passes + 1
 
 
-    for u, case, name, inputDocument, data, outputDocument in sparqlTestData:
-        tests += 1
-        if tests < start: continue
+##    for u, case, name, inputDocument, data, outputDocument in sparqlTestData:
+##        tests += 1
+##        if tests < start: continue
+##
+##        urel = refTo(base(), u)
+##        print "%3i/%i %-30s  %s" %(tests, totalTests, urel, name)
+##        inNtriples = case + '_1'
+##        outNtriples = case + '_2'
+##        try:
+##            execute("""%s %s %s --sparql=%s --filter=%s --filter=%s --ntriples > 'temp/%s'""" %
+##                    (python_command, cwm_command, data, inputDocument,
+##                     'sparql/filter1.n3', 'sparql/filter2.n3', inNtriples))
+##        except NotImplementedError:
+##            pass
+##        except:
+##            problem(str(sys.exc_info()[1]))
+##        if outputDocument:
+##            execute("""%s %s %s --ntriples > 'temp/%s'""" %
+##                    (python_command, cwm_command, outputDocument, outNtriples))
+##            if rdfcompare3(inNtriples, 'temp/' + outNtriples):
+##                problem('We have a problem with %s on %s' %  (inputDocument, data))
+##
+##
+##        passes += 1
+##        
+##    for u, case, description,  inputDocument, outputDocument in RDFTestData:
+##        tests = tests + 1
+##        if tests < start: continue
+##    
+##    
+##        print "%3i/%i)  %s   %s" %(tests, totalTests, case, description)
+##    #    print "      %scwm %s   giving %s" %(inputDocument, case)
+##        assert case and description and inputDocument and outputDocument
+###       cleanup = """sed -e 's/\$[I]d.*\$//g' -e "s;%s;%s;g" -e '/@prefix run/d' -e '/^#/d' -e '/^ *$/d'""" % (
+###                       WD, REFWD)
+##        execute("""%s %s --quiet --rdf=RT %s --ntriples  > temp/%s""" %
+##            (python_command, cwm_command, inputDocument, case))
+##        if rdfcompare3(case, localize(outputDocument)):
+##            problem("  from positive parser test %s running\n\tcwm %s\n" %( case,  inputDocument))
+##
+##        passes = passes + 1
+##
+##    for u, case, description,  inputDocument in RDFNegativeTestData:
+##        tests = tests + 1
+##        if tests < start: continue
+##    
+##    
+##        print "%3i/%i)  %s   %s" %(tests, totalTests, case, description)
+##    #    print "      %scwm %s   giving %s" %(inputDocument, case)
+##        assert case and description and inputDocument
+###       cleanup = """sed -e 's/\$[I]d.*\$//g' -e "s;%s;%s;g" -e '/@prefix run/d' -e '/^#/d' -e '/^ *$/d'""" % (
+###                       WD, REFWD)
+##        try:
+##            execute("""%s %s --quiet --rdf=RT %s --ntriples  > temp/%s 2>/dev/null""" %
+##            (python_command, cwm_command, inputDocument, case))
+##        except:
+##            pass
+##        else:
+##            problem("""I didn't get a parse error running python %s --quiet --rdf=RT %s --ntriples  > temp/%s
+##from test ^=%s
+##I should have.
+##""" %
+##            (cwm_command, inputDocument, case, u))
+##
+##        passes = passes + 1
+##
+##
+##    for u, case, description, inputDocument in n3PositiveTestData:
+##        tests = tests + 1
+##        if tests < start: continue
+##    
+##    
+##        print "%3i/%i)  %s   %s" %(tests, totalTests, case, description)
+##    #    print "      %scwm %s   giving %s" %(inputDocument, case)
+##        assert case and description and inputDocument
+###       cleanup = """sed -e 's/\$[I]d.*\$//g' -e "s;%s;%s;g" -e '/@prefix run/d' -e '/^#/d' -e '/^ *$/d'""" % (
+###                       WD, REFWD)
+##        try:
+##            execute("""%s %s --grammar=../grammar/n3-selectors.n3  --as=http://www.w3.org/2000/10/swap/grammar/n3#document --parse=%s  > temp/%s 2>/dev/null""" %
+##            (python_command, '../grammar/predictiveParser.py', inputDocument, case))
+##        except RuntimeError:
+##            problem("""Error running ``python %s --grammar=../grammar/n3-selectors.n3  --as=http://www.w3.org/2000/10/swap/grammar/n3#document --parse=%s  > temp/%s 2>/dev/null''""" %
+##            ('../grammar/predictiveParser.py', inputDocument, case))
+##        passes = passes + 1
+##
+##    for u, case, description, inputDocument in n3NegativeTestData:
+##        tests = tests + 1
+##        if tests < start: continue
+##    
+##    
+##        print "%3i/%i)  %s   %s" %(tests, totalTests, case, description)
+##    #    print "      %scwm %s   giving %s" %(inputDocument, case)
+##        assert case and description and inputDocument
+###       cleanup = """sed -e 's/\$[I]d.*\$//g' -e "s;%s;%s;g" -e '/@prefix run/d' -e '/^#/d' -e '/^ *$/d'""" % (
+###                       WD, REFWD)
+##        try:
+##            execute("""%s %s ../grammar/n3-selectors.n3  http://www.w3.org/2000/10/swap/grammar/n3#document %s  > temp/%s 2>/dev/null""" %
+##                (python_command, '../grammar/predictiveParser.py', inputDocument, case))
+##        except:
+##            pass
+##        else:
+##            problem("""There was no error executing ``python %s --grammar=../grammar/n3-selectors.n3  --as=http://www.w3.org/2000/10/swap/grammar/n3#document --parse=%s    > temp/%s''
+##            There should have been one.""" %
+##                ('../grammar/predictiveParser.py', inputDocument, case))
+##
+##        passes = passes + 1
 
-        urel = refTo(base(), u)
-        print "%3i/%i %-30s  %s" %(tests, totalTests, urel, name)
-        inNtriples = case + '_1'
-        outNtriples = case + '_2'
-        try:
-            execute("""%s %s %s --sparql=%s --filter=%s --filter=%s --ntriples > 'temp/%s'""" %
-                    (python_command, cwm_command, data, inputDocument,
-                     'sparql/filter1.n3', 'sparql/filter2.n3', inNtriples))
-        except NotImplementedError:
-            pass
-        except:
-            problem(str(sys.exc_info()[1]))
-        if outputDocument:
-            execute("""%s %s %s --ntriples > 'temp/%s'""" %
-                    (python_command, cwm_command, outputDocument, outNtriples))
-            if rdfcompare3(inNtriples, 'temp/' + outNtriples):
-                problem('We have a problem with %s on %s' %  (inputDocument, data))
 
-
-        passes += 1
-        
-    for u, case, description,  inputDocument, outputDocument in RDFTestData:
-        tests = tests + 1
-        if tests < start: continue
-    
-    
-        print "%3i/%i)  %s   %s" %(tests, totalTests, case, description)
-    #    print "      %scwm %s   giving %s" %(inputDocument, case)
-        assert case and description and inputDocument and outputDocument
-#       cleanup = """sed -e 's/\$[I]d.*\$//g' -e "s;%s;%s;g" -e '/@prefix run/d' -e '/^#/d' -e '/^ *$/d'""" % (
-#                       WD, REFWD)
-        execute("""%s %s --quiet --rdf=RT %s --ntriples  > temp/%s""" %
-            (python_command, cwm_command, inputDocument, case))
-        if rdfcompare3(case, localize(outputDocument)):
-            problem("  from positive parser test %s running\n\tcwm %s\n" %( case,  inputDocument))
-
-        passes = passes + 1
-
-    for u, case, description,  inputDocument in RDFNegativeTestData:
-        tests = tests + 1
-        if tests < start: continue
-    
-    
-        print "%3i/%i)  %s   %s" %(tests, totalTests, case, description)
-    #    print "      %scwm %s   giving %s" %(inputDocument, case)
-        assert case and description and inputDocument
-#       cleanup = """sed -e 's/\$[I]d.*\$//g' -e "s;%s;%s;g" -e '/@prefix run/d' -e '/^#/d' -e '/^ *$/d'""" % (
-#                       WD, REFWD)
-        try:
-            execute("""%s %s --quiet --rdf=RT %s --ntriples  > temp/%s 2>/dev/null""" %
-            (python_command, cwm_command, inputDocument, case))
-        except:
-            pass
-        else:
-            problem("""I didn't get a parse error running python %s --quiet --rdf=RT %s --ntriples  > temp/%s
-from test ^=%s
-I should have.
-""" %
-            (cwm_command, inputDocument, case, u))
-
-        passes = passes + 1
-
-
-    for u, case, description, inputDocument in n3PositiveTestData:
-        tests = tests + 1
-        if tests < start: continue
-    
-    
-        print "%3i/%i)  %s   %s" %(tests, totalTests, case, description)
-    #    print "      %scwm %s   giving %s" %(inputDocument, case)
-        assert case and description and inputDocument
-#       cleanup = """sed -e 's/\$[I]d.*\$//g' -e "s;%s;%s;g" -e '/@prefix run/d' -e '/^#/d' -e '/^ *$/d'""" % (
-#                       WD, REFWD)
-        try:
-            execute("""%s %s --grammar=../grammar/n3-selectors.n3  --as=http://www.w3.org/2000/10/swap/grammar/n3#document --parse=%s  > temp/%s 2>/dev/null""" %
-            (python_command, '../grammar/predictiveParser.py', inputDocument, case))
-        except RuntimeError:
-            problem("""Error running ``python %s --grammar=../grammar/n3-selectors.n3  --as=http://www.w3.org/2000/10/swap/grammar/n3#document --parse=%s  > temp/%s 2>/dev/null''""" %
-            ('../grammar/predictiveParser.py', inputDocument, case))
-        passes = passes + 1
-
-    for u, case, description, inputDocument in n3NegativeTestData:
-        tests = tests + 1
-        if tests < start: continue
-    
-    
-        print "%3i/%i)  %s   %s" %(tests, totalTests, case, description)
-    #    print "      %scwm %s   giving %s" %(inputDocument, case)
-        assert case and description and inputDocument
-#       cleanup = """sed -e 's/\$[I]d.*\$//g' -e "s;%s;%s;g" -e '/@prefix run/d' -e '/^#/d' -e '/^ *$/d'""" % (
-#                       WD, REFWD)
-        try:
-            execute("""%s %s ../grammar/n3-selectors.n3  http://www.w3.org/2000/10/swap/grammar/n3#document %s  > temp/%s 2>/dev/null""" %
-                (python_command, '../grammar/predictiveParser.py', inputDocument, case))
-        except:
-            pass
-        else:
-            problem("""There was no error executing ``python %s --grammar=../grammar/n3-selectors.n3  --as=http://www.w3.org/2000/10/swap/grammar/n3#document --parse=%s    > temp/%s''
-            There should have been one.""" %
-                ('../grammar/predictiveParser.py', inputDocument, case))
-
-        passes = passes + 1
-
-
-    timeMatcher = re.compile(r'\t([0-9]+)m([0-9]+)\.([0-9]+)s')
+##    timeMatcher = re.compile(r'\t([0-9]+)m([0-9]+)\.([0-9]+)s')
 ##    from test.pystone import pystones
 ##    pyStoneTime = pystones()[1]
-    for u, theTime, description, env, arguments in perfData:
-        tests = tests + 1
-        if tests < start: continue
-        
-        urel = refTo(base(), u)
-    
-        print "%3i/%i %-30s  %s" %(tests, totalTests, urel, description)
-        tt = os.times()[-1]
-        a = system("""%s %s %s --quiet %s >,time.out""" %
-                       (env, python_command, cwm_command, arguments))
-        userTime = os.times()[-1] - tt
-        print """%spython %s --quiet %s 2>,time.out""" % \
-                       (env, cwm_command, arguments)
-##        c = file(',time.out', 'r')
-##        timeOutput = c.read()
-##        c.close()
-##        timeList = [timeMatcher.search(b).groups() for b in timeOutput.split('\n') if timeMatcher.search(b) is not None]
-##        print timeList
-##        userTimeStr = timeList[1]
-##        userTime = int(userTimeStr[0])*60 + float(userTimeStr[1] + '.' + userTimeStr[2])
-        pyCount = pyStoneTime * userTime
-        print pyCount
+##    for u, theTime, description, env, arguments in perfData:
+##        tests = tests + 1
+##        if tests < start: continue
+##        
+##        urel = refTo(base(), u)
+##    
+##        print "%3i/%i %-30s  %s" %(tests, totalTests, urel, description)
+##        tt = os.times()[-1]
+##        a = system("""%s %s %s --quiet %s >,time.out""" %
+##                       (env, python_command, cwm_command, arguments))
+##        userTime = os.times()[-1] - tt
+##        print """%spython %s --quiet %s 2>,time.out""" % \
+##                       (env, cwm_command, arguments)
+####        c = file(',time.out', 'r')
+####        timeOutput = c.read()
+####        c.close()
+####        timeList = [timeMatcher.search(b).groups() for b in timeOutput.split('\n') if timeMatcher.search(b) is not None]
+####        print timeList
+####        userTimeStr = timeList[1]
+####        userTime = int(userTimeStr[0])*60 + float(userTimeStr[1] + '.' + userTimeStr[2])
+##        pyCount = pyStoneTime * userTime
+##        print pyCount
         
     if problems != []:
         sys.stderr.write("\nProblems:\n")
         for s in problems:
             sys.stderr.write("  " + s + "\n")
         raise RuntimeError("Total %i errors in %i tests." % (len(problems), tests))
+
+    #else: print "Done: %i tests with %i errors." % (tests, len(problems))
 
 if __name__ == "__main__":
     main()

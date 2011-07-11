@@ -3,6 +3,7 @@
     @prefix ai: <http://dig.csail.mit.edu/2009/AIR/airjustification#> .
     @prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
     @prefix pml: <http://inference-web.org/2.0/pml-lite.owl#> .
+    @prefix run: <http://dig.csail.mit.edu/TAMI/2007/amord/run#> .
     
     run:_g0     a ai:Dereference;
          ai:source <http://people.csail.mit.edu/efcplaza/air/demo.rdf>;

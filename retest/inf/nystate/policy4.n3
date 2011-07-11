@@ -1,0 +1,9 @@
+@prefix : <#>.
+@prefix x: <#>.
+@prefix test: <http://www.w3.org/2000/10/swap/test.n3#>.
+@prefix dc:  <http://purl.org/dc/elements/1.1/>. # yuk - under protest - no hash
+
+:t1001 a test:InfReference;
+    test:subj	"http://tw.rpi.edu/proj/tami/Special:URIResolver/George";
+    test:pred	"http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with";
+    test:obj	"http://tw.rpi.edu/proj/tami/Special:URIResolver/ny_neighbor_state_residency_policy".

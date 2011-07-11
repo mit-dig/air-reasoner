@@ -5,6 +5,7 @@
 
 :t1001 a test:AirTest;
     test:referenceOutput <ref/nystate/policy2.n3>;
+    test:inferenceOutput <ref/nystate/policy2_inf.n3>;
     test:description   "Testing air reasoner on demo and Policy 2.";
     test:rules	"http://people.csail.mit.edu/efcplaza/air/policy2/policy.n3";
     test:data	"http://people.csail.mit.edu/efcplaza/air/demo.rdf".
