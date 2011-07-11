@@ -13,20 +13,17 @@ Options:
                             (Summary error still raised when all tests have been tried)
 --air=../policyrunner.py    AIR command is ../policyrunner.py
 --help          -h          Print this message and exit
---ref	          	    Specify location of reference file
---data		            Specify location of test data
---rules			    Specify location of rules
---desc			    Add description to test (optional)
 
 You must specify some test definitions.
 
-Example:    python retest.py -n regression.n3
-
-You can also specify locations for reference, data, and rules.
-
-Example: python retest.py --ref=/path/to/reference.n3 --data=http://example.com/data.rdf --rules=http://example.com/rules.n3
+Example:    python retest.py -n cases.n3
 
 """
+# You can also specify locations for reference, data, and rules.
+
+# Example: python retest.py --ref=/path/to/reference.n3 --data=http://example.com/data.rdf --rules=http://example.com/rules.n3
+
+# """
 
 from os import system, popen3
 import os
@@ -152,16 +149,15 @@ def infCheck(file, infFile):
 
     kb = load(infFile)
     for i in kb.each(pred=rdf.type, obj=test.InfReference):
-        s = str(kb.the(i, test.subj))
-        p = str(kb.the(i, test.pred))
-        o = str(kb.the(i, test.obj))
-
-        inferenceDict = {'subj':s, 'pred':p, 'obj':o}
+        s = kb.the(i, test.subj)
+        p = kb.the(i, test.pred)
+        o = kb.the(i, test.obj)
         
-        if not outputFormula.contains(subj=outputFormula.newSymbol(inferenceDict['subj']), \
-                                      pred=outputFormula.newSymbol(inferenceDict['pred']), \
-                                      obj=outputFormula.newSymbol(inferenceDict['obj'])):
-            result = 1
+        if not s == None: s = outputFormula.newSymbol(str(s))
+        if not p == None: p = outputFormula.newSymbol(str(p))
+        if not o == None: o = outputFormula.newSymbol(str(o))
+        								
+        if not outputFormula.contains(subj=s,pred=p,obj=o): result = 1
 
         # print "File: %s" % file
         # print "Inference: %s" % str(inferenceDict)
@@ -169,47 +165,47 @@ def infCheck(file, infFile):
 
     return result
 
-def rdfcompare3(case, ref=None):
-    "Compare NTriples fieles using the cant.py"
-    global verbose
-    if ref == None:
-        ref = "ref/%s" % case
-    diffcmd = """python ../cant.py -d %s -f temp/%s >diffs/%s""" %(ref, case, case)
-    if verbose: print "  ", diffcmd
-    result = system(diffcmd)
-    if result < 0:
-        raise problem("Comparison fails: result %i executing %s" %(result, diffcmd))
-    if result > 0: print "Files differ, result=", result
-    d = urllib.urlopen("diffs/"+case)
-    buf = d.read()
-    if len(buf) > 0:
-#       print "#  If this is OK,   cp temp/%s %s" %(case, ref)
-        print "######### Differences from reference output:\n" + buf
-        return 1
-    return result
-
-def rdfcompare2(case, ref1):
-        """Comare ntriples files by canonicalizing and comparing text files"""
-        cant = "python ../cant.py"
-        ref = "temp/%s.ref" % case
-        execute("""cat %s | %s > %s""" % (ref1, cant, ref))
-        return diff(case, ref)
-
-
-def rdfcompare(case, ref=None):
-    """   The jena.rdfcompare program writes its results to the standard output stream and sets
-        its exit code to 0 if the models are equal, to 1 if they are not and
-        to -1 if it encounters an error.</p>
-    """
-    global verbose
-    if ref == None:
-        ref = "ref/%s" % case
-    diffcmd = """java jena.rdfcompare %s temp/%s N-TRIPLE N-TRIPLE  >diffs/%s""" %(ref, case, case)
-    if verbose: print "  ", diffcmd
-    result = system(diffcmd)
-    if result != 0:
-        raise problem("Comparison fails: result %s executing %s" %(result, diffcmd))
-    return result
+# def rdfcompare3(case, ref=None):
+#     "Compare NTriples fieles using the cant.py"
+#     global verbose
+#     if ref == None:
+#         ref = "ref/%s" % case
+#     diffcmd = """python ../cant.py -d %s -f temp/%s >diffs/%s""" %(ref, case, case)
+#     if verbose: print "  ", diffcmd
+#     result = system(diffcmd)
+#     if result < 0:
+#         raise problem("Comparison fails: result %i executing %s" %(result, diffcmd))
+#     if result > 0: print "Files differ, result=", result
+#     d = urllib.urlopen("diffs/"+case)
+#     buf = d.read()
+#     if len(buf) > 0:
+# #       print "#  If this is OK,   cp temp/%s %s" %(case, ref)
+#         print "######### Differences from reference output:\n" + buf
+#         return 1
+#     return result
+# 
+# def rdfcompare2(case, ref1):
+#         """Comare ntriples files by canonicalizing and comparing text files"""
+#         cant = "python ../cant.py"
+#         ref = "temp/%s.ref" % case
+#         execute("""cat %s | %s > %s""" % (ref1, cant, ref))
+#         return diff(case, ref)
+# 
+# 
+# def rdfcompare(case, ref=None):
+#     """   The jena.rdfcompare program writes its results to the standard output stream and sets
+#         its exit code to 0 if the models are equal, to 1 if they are not and
+#         to -1 if it encounters an error.</p>
+#     """
+#     global verbose
+#     if ref == None:
+#         ref = "ref/%s" % case
+#     diffcmd = """java jena.rdfcompare %s temp/%s N-TRIPLE N-TRIPLE  >diffs/%s""" %(ref, case, case)
+#     if verbose: print "  ", diffcmd
+#     result = system(diffcmd)
+#     if result != 0:
+#         raise problem("Comparison fails: result %s executing %s" %(result, diffcmd))
+#     return result
 
 
 
@@ -234,7 +230,7 @@ def main():
         opts, testFiles = getopt.getopt(sys.argv[1:], "h?s:nNcipf:v",
             ["help", "start=", "testsFrom=", "no-action", "No-normal", #"chatty",
                 "ignoreErrors", #"proofs",
-		"verbose","overwrite","air=","ref=","data=","rules=","desc="])
+		"verbose","overwrite","air="])#,"ref=","data=","rules=","desc="])
     except getopt.GetoptError:
         # print help information and exit:
         usage()
@@ -264,15 +260,15 @@ def main():
             just_fix_it = 1
         if o in ("--air", "--the_end"):
             cwm_command=a
-        if o in ("--desc", "--description"):
-            desc=a
+##        if o in ("--desc", "--description"):
+##            desc=a
         # All opts below if not usingN3
-        if o in ("--ref", "--reference"):
-            ref_location, usingN3=a, 0
-        if o in ("--data"):
-            data_location, usingN3=a, 0
-        if o in ("--rules"):
-            rules_location, usingN3=a, 0
+##        if o in ("--ref", "--reference"):
+##            ref_location, usingN3=a, 0
+##        if o in ("--data"):
+##            data_location, usingN3=a, 0
+##        if o in ("--rules"):
+##            rules_location, usingN3=a, 0
 
     
     assert system("mkdir -p temp") == 0
@@ -293,232 +289,136 @@ def main():
     
     kb = loadMany(testFiles, referer="")
     testData = []
-    RDFTestData  = []
-    RDFNegativeTestData = []
-    perfData = []
-    n3PositiveTestData = []
-    n3NegativeTestData = []
-    sparqlTestData = []
+#    RDFTestData  = []
+#    RDFNegativeTestData = []
+#    perfData = []
+#    n3PositiveTestData = []
+#    n3NegativeTestData = []
+#    sparqlTestData = []
 #    for fn in testFiles:
 #       print "Loading tests from", fn
 #       kb=load(fn)
 
-    if usingN3:
-        for t in kb.each(pred=rdf.type, obj=test.AirTest):
-            verboseDebug = kb.contains(subj=t, pred=rdf.type, obj=test.VerboseTest)
-            u = t.uriref()
-            ref = kb.the(t, test.referenceOutput)
-            inf = kb.the(t, test.inferenceOutput) # Inference output
-            
-            if ref == None:
-                case = str(kb.the(t, test.shortFileName))
-                refFile = "ref/%s" % case
-            else:
-                refFile = refTo(base(), ref.uriref())
-                case  = ""
-                for ch in refFile:
-                    if ch in "/#": case += "_"
-                    else: case += ch  # Make up test-unique temp filename
+#    if usingN3:
+    ruleDataError = 0
+    ruleDataErrorURI = []
+    infRefError = 0
+    infRefErrorURI = []
+    for t in kb.each(pred=rdf.type, obj=test.AirTest):
+        cFlag = 0 # Flag if errors
+        verboseDebug = kb.contains(subj=t, pred=rdf.type, obj=test.VerboseTest)
+        u = t.uriref()
+        ref = kb.the(t, test.referenceOutput)
+        inf = kb.the(t, test.inferenceOutput) # Inference output
+        rn = kb.the(t, test.rules)
+        dn = kb.the(t, test.data)
+        
+        if ref == None and inf == None:
+            infRefError, cFlag = 1, 1
+            infRefErrorURI.append(refTo(base(), t.uriref()))
+        if rn == None or dn == None:
+            ruleDataError, cFlag = 1, 1
+            ruleDataErrorURI.append(refTo(base(), t.uriref()))
 
-            if not inf == None:
-                infFile = refTo(base(), inf.uriref())
-            else: infFile = 0
-                    
-            description = str(kb.the(t, test.description))
-            if description == 'None': description = "No description specified."
-            environment = kb.the(t, test.environment)
-            rules = str(kb.the(t, test.rules)).split()
-            data = str(kb.the(t, test.data)).split()
-            rstring = "rules=["
-            dstring = "data=["
-            for rl in rules:
-                rstring = rstring + rl
-                if not rules[-1] == rl: rstring += ','
-            for dl in data:
-                dstring = dstring + dl
-                if not data[-1] == dl: dstring += ','
-            arguments = "list " + rstring + '] ' + dstring + ']'
-            if environment == None: env=""
-            else: env = str(environment) + " "
-            testData.append((t, t.uriref(), case, refFile, infFile, description, env, arguments, verboseDebug))
-    else:
-        try:
-            verboseDebug = 0
-            refFile = ref_location
+        if cFlag: continue
+        
+##        if ref == None:
+##            case = str(kb.the(t, test.shortFileName))
+##            refFile = "ref/%s" % case
+##        else:
+        if not ref == None:
+            refFile = refTo(base(), ref.uriref())
             case  = ""
             for ch in refFile:
                 if ch in "/#": case += "_"
                 else: case += ch  # Make up test-unique temp filename
-            if desc == None: description = "No description specified."
-            else: description = desc
-            arguments = "test %s %s" % (rules_location, data_location)
-            env = ""
-            testData.append((0, rules_location, case, refFile, description, env, arguments, verboseDebug))
-        except:
-            print "\n If test definitions in RDF/XML or N3 is not used for test, retest must have valid values for ref, data, and rules." + "\n" + \
-                  "E.g. python retest.py --ref=/path/to/reference.n3 --data=http://example.com/data.rdf --rules=http://example.com/rules.n3 \n"
-            sys.exit(2)
+        else:
+            refFile = 0
+            caseName = refTo(base(), t.uriref())
+            case  = ""
+            for ch in caseName:
+                if ch in "/#.": case += "_"
+                else: case += ch  # Make up test-unique temp filename            
 
-##    for t in kb.each(pred=rdf.type, obj=rdft.PositiveParserTest):
-##
-##        x = t.uriref()
-##        y = x.find("/rdf-tests/")
-##        x = x[y+11:] # rest
-##        for i in range(len(x)):
-##            if x[i]in"/#": x = x[:i]+"_"+x[i+1:]
-##        case = "rdft_" + x + ".nt" # Hack - temp file name
-##        
-##        description = str(kb.the(t, rdft.description))
-###           if description == None: description = case + " (no description)"
-##        inputDocument = kb.the(t, rdft.inputDocument).uriref()
-##        outputDocument = kb.the(t, rdft.outputDocument).uriref()
-##        status = kb.the(t, rdft.status).string
-##        good = 1
-##        if status != "APPROVED":
-##            if verbose: print "\tNot approved: "+ inputDocument[-40:]
-##            good = 0
-##        categories = kb.each(t, rdf.type)
-##        for cat in categories:
-##            if cat is triage.ReificationTest:
-##                if verbose: print "\tNot supported (reification): "+ inputDocument[-40:]
-##                good = 0
-####            if cat is triage.ParseTypeLiteralTest:
-####                if verbose: print "\tNot supported (Parse type literal): "+ inputDocument[-40:]
-####                good = 0
-##        if good:
-##            RDFTestData.append((t.uriref(), case, description,  inputDocument, outputDocument))
-##
-##    for t in kb.each(pred=rdf.type, obj=rdft.NegativeParserTest):
-##
-##        x = t.uriref()
-##        y = x.find("/rdf-tests/")
-##        x = x[y+11:] # rest
-##        for i in range(len(x)):
-##            if x[i]in"/#": x = x[:i]+"_"+x[i+1:]
-##        case = "rdft_" + x + ".nt" # Hack - temp file name
-##        
-##        description = str(kb.the(t, rdft.description))
-###           if description == None: description = case + " (no description)"
-##        inputDocument = kb.the(t, rdft.inputDocument).uriref()
-##        status = kb.the(t, rdft.status).string
-##        good = 1
-##        if status != "APPROVED":
-##            if verbose: print "\tNot approved: "+ inputDocument[-40:]
-##            good = 0
-##        categories = kb.each(t, rdf.type)
-##        for cat in categories:
-##            if cat is triage.knownError:
-##                if verbose: print "\tknown failure: "+ inputDocument[-40:]
-##                good = 0
-##            if cat is triage.ReificationTest:
-##                if verbose: print "\tNot supported (reification): "+ inputDocument[-40:]
-##                good = 0
-##        if good:
-##            RDFNegativeTestData.append((t.uriref(), case, description,  inputDocument))
-##
-##
-##
-##    for t in kb.each(pred=rdf.type, obj=n3test.PositiveParserTest):
-##        u = t.uriref()
-##        hash = u.rfind("#")
-##        slash = u.rfind("/")
-##        assert hash >0 and slash > 0
-##        case = u[slash+1:hash] + "_" + u[hash+1:] + ".out" # Make up temp filename
-##        
-##        description = str(kb.the(t, n3test.description))
-###           if description == None: description = case + " (no description)"
-##        inputDocument = kb.the(t, n3test.inputDocument).uriref()
-##        good = 1
-##        categories = kb.each(t, rdf.type)
-##        for cat in categories:
-##            if cat is triage.knownError:
-##                if verbose: print "\tknown failure: "+ inputDocument[-40:]
-##                good = 0
-##        if good:
-##            n3PositiveTestData.append((t.uriref(), case, description,  inputDocument))
-##
-##
-##    for t in kb.each(pred=rdf.type, obj=n3test.NegativeParserTest):
-##        u = t.uriref()
-##        hash = u.rfind("#")
-##        slash = u.rfind("/")
-##        assert hash >0 and slash > 0
-##        case = u[slash+1:hash] + "_" + u[hash+1:] + ".out" # Make up temp filename
-##        
-##        description = str(kb.the(t, n3test.description))
-###           if description == None: description = case + " (no description)"
-##        inputDocument = kb.the(t, n3test.inputDocument).uriref()
-##
-##        n3NegativeTestData.append((t.uriref(), case, description,  inputDocument))
-##
-##    for tt in kb.each(pred=rdf.type, obj=sparql_manifest.Manifest):
-##        for t in kb.the(subj=tt, pred=sparql_manifest.entries):
-##            name = str(kb.the(subj=t, pred=sparql_manifest.name))
-##            query_node = kb.the(subj=t, pred=sparql_manifest.action)
-##            if isinstance(query_node, AnonymousNode):
-##                data = ''
-##                for data_node in kb.each(subj=query_node, pred=sparql_query.data):
-##                    data = data + ' ' + data_node.uriref()
-##
-##                inputDocument = kb.the(subj=query_node, pred=sparql_query.query).uriref()
-##            else:
-##                data = ''
-##                inputDocument = query_node.uriref()
-##            j = inputDocument.rfind('/')
-##            case = inputDocument[j+1:]
-##            outputDocument = kb.the(subj=t, pred=sparql_manifest.result)
-##            if outputDocument:
-##                outputDocument = outputDocument.uriref()
-##            else:
-##                outputDocument = None
-##            good = 1
-##            status = kb.the(subj=t, pred=dawg_test.approval)
-##            if status != dawg_test.Approved:
-##                print status, name
-##                if verbose: print "\tNot approved: "+ inputDocument[-40:]
-##                good = 0
-##            if good:
-##                sparqlTestData.append((tt.uriref(), case, name, inputDocument, data, outputDocument))
-##        
-##
-##
-##
-##    for t in kb.each(pred=rdf.type, obj=test.PerformanceTest):
-##        x = t.uriref()
-##        theTime = kb.the(subj=t, pred=test.pyStones)
-##        description = str(kb.the(t, test.description))
-##        arguments = str(kb.the(t, test.arguments))
-##        environment = kb.the(t, test.environment)
-##        if environment == None: env=""
-##        else: env = str(environment) + " "
-##        perfData.append((x, theTime, description, env, arguments))
+        if not inf == None:
+            infFile = refTo(base(), inf.uriref())
+        else: infFile = 0
+                
+        description = str(kb.the(t, test.description))
+        if description == 'None': description = "No description specified."
+        environment = kb.the(t, test.environment)
+        rules = str(rn).split()
+        data = str(dn).split()
+        rstring = "rules=["
+        dstring = "data=["
+        for rl in rules:
+            rstring = rstring + rl
+            if not rules[-1] == rl: rstring += ','
+        for dl in data:
+            dstring = dstring + dl
+            if not data[-1] == dl: dstring += ','
+        arguments = "list " + rstring + '] ' + dstring + ']'
+        if environment == None: env=""
+        else: env = str(environment) + " "
+        testData.append((t, t.uriref(), case, refFile, infFile, description, env, arguments, verboseDebug))
+    if ruleDataError:
+        print "Error: ruleDataError"
+        print "Test definitions must have at least one argument for both rules and data."
+        print "Please check the following for missing arguments in rules and data (not included in test):"
+        for uri in ruleDataErrorURI:
+            print uri,
+        print '\n'
+    if infRefError:
+        print "Error: infRefError"
+        print "Test definitions must have at least either a referenceOutput or an inferenceOutput, or both."
+        print "Please check the following for missing referenceOutput and inferenceOutput (not included in test):"
+        for rUri in infRefErrorURI:
+            print rUri,
+        print '\n'
+##    else:
+##        try:
+##            verboseDebug = 0
+##            refFile = ref_location
+##            case  = ""
+##            for ch in refFile:
+##                if ch in "/#": case += "_"
+##                else: case += ch  # Make up test-unique temp filename
+##            if desc == None: description = "No description specified."
+##            else: description = desc
+##            arguments = "test %s %s" % (rules_location, data_location)
+##            env = ""
+##            testData.append((0, rules_location, case, refFile, description, env, arguments, verboseDebug))
+##        except:
+##            print "\n If test definitions in RDF/XML or N3 is not used for test, retest must have valid values for ref, data, and rules." + "\n" + \
+##                  "E.g. python retest.py --ref=/path/to/reference.n3 --data=http://example.com/data.rdf --rules=http://example.com/rules.n3 \n"
+##            sys.exit(2)
 
     testData.sort()
     cwmTests = len(testData)
     if verbose: print "Air tests: %i" % cwmTests
-    RDFTestData.sort()
-    RDFNegativeTestData.sort()
-    rdfTests = len(RDFTestData)
-    rdfNegativeTests = len(RDFNegativeTestData)
-    perfData.sort()
-    perfTests = len(perfData)
-    n3PositiveTestData.sort()
-    n3PositiveTests = len(n3PositiveTestData)
-    n3NegativeTestData.sort()
-    n3NegativeTests = len(n3NegativeTestData)
-    sparqlTestData.sort()
-    sparqlTests = len(sparqlTestData)
-    totalTests = cwmTests + rdfTests + rdfNegativeTests + sparqlTests \
-                 + perfTests + n3PositiveTests + n3NegativeTests
-    if verbose: print "RDF parser tests: %i" % rdfTests
+#    RDFTestData.sort()
+#    RDFNegativeTestData.sort()
+#    rdfTests = len(RDFTestData)
+#    rdfNegativeTests = len(RDFNegativeTestData)
+#    perfData.sort()
+#    perfTests = len(perfData)
+#    n3PositiveTestData.sort()
+#    n3PositiveTests = len(n3PositiveTestData)
+#    n3NegativeTestData.sort()
+#    n3NegativeTests = len(n3NegativeTestData)
+#    sparqlTestData.sort()
+#    sparqlTests = len(sparqlTestData)
+    totalTests = cwmTests #+ rdfTests + rdfNegativeTests + sparqlTests \
+                 #+ perfTests + n3PositiveTests + n3NegativeTests
+    #if verbose: print "RDF parser tests: %i" % rdfTests
 
     for t, u, case, refFile, infFile, description, env, arguments, verboseDebug in testData:
         tests = tests + 1
         if tests < start: continue
 
-        if t:
-            urel = refTo(base(), u)
-        else: urel = u
+        #if t:
+        urel = refTo(base(), u)
+        #else: urel = u
         
         print "%3i/%i %-30s  %s" %(tests, totalTests, urel, description)
     #    print "      %scwm %s   giving %s" %(arguments, case)
@@ -528,13 +428,17 @@ def main():
         if normal:
             execute("""CWM_RUN_NS="run#" %s %s %s %s | %s > temp/%s""" %
                 (env, python_command, cwm_command, arguments, cleanup , case))  
-            if diff(case, refFile):
-                problem("######### from normal case %s: %spolicyrunner.py %s" %( case, env, arguments))
-                continue
+            if refFile:
+                if diff(case, refFile):
+                    problem("######### from normal case %s: %spolicyrunner.py %s" %( case, env, arguments))
+                    continue
+                else: print "\tReference Check: Passed"
+            else: print "\tReference Check: Not Checking"
             if infFile:
                 if infCheck("temp/"+case, infFile):
 			print "\tInference Check: Failed"
                 else: print "\tInference Check: Passed"
+            else: print "\tInference Check: Not Checking"
             #else: print "\t Passed: %-30s" % urel
 
         if chatty and not verboseDebug:
@@ -552,141 +456,6 @@ def main():
 #           progress("No proof for "+`t`+ " "+`proofs`)
 #           progress("@@ %s" %(kb.each(t,rdf.type)))
         passes = passes + 1
-
-
-##    for u, case, name, inputDocument, data, outputDocument in sparqlTestData:
-##        tests += 1
-##        if tests < start: continue
-##
-##        urel = refTo(base(), u)
-##        print "%3i/%i %-30s  %s" %(tests, totalTests, urel, name)
-##        inNtriples = case + '_1'
-##        outNtriples = case + '_2'
-##        try:
-##            execute("""%s %s %s --sparql=%s --filter=%s --filter=%s --ntriples > 'temp/%s'""" %
-##                    (python_command, cwm_command, data, inputDocument,
-##                     'sparql/filter1.n3', 'sparql/filter2.n3', inNtriples))
-##        except NotImplementedError:
-##            pass
-##        except:
-##            problem(str(sys.exc_info()[1]))
-##        if outputDocument:
-##            execute("""%s %s %s --ntriples > 'temp/%s'""" %
-##                    (python_command, cwm_command, outputDocument, outNtriples))
-##            if rdfcompare3(inNtriples, 'temp/' + outNtriples):
-##                problem('We have a problem with %s on %s' %  (inputDocument, data))
-##
-##
-##        passes += 1
-##        
-##    for u, case, description,  inputDocument, outputDocument in RDFTestData:
-##        tests = tests + 1
-##        if tests < start: continue
-##    
-##    
-##        print "%3i/%i)  %s   %s" %(tests, totalTests, case, description)
-##    #    print "      %scwm %s   giving %s" %(inputDocument, case)
-##        assert case and description and inputDocument and outputDocument
-###       cleanup = """sed -e 's/\$[I]d.*\$//g' -e "s;%s;%s;g" -e '/@prefix run/d' -e '/^#/d' -e '/^ *$/d'""" % (
-###                       WD, REFWD)
-##        execute("""%s %s --quiet --rdf=RT %s --ntriples  > temp/%s""" %
-##            (python_command, cwm_command, inputDocument, case))
-##        if rdfcompare3(case, localize(outputDocument)):
-##            problem("  from positive parser test %s running\n\tcwm %s\n" %( case,  inputDocument))
-##
-##        passes = passes + 1
-##
-##    for u, case, description,  inputDocument in RDFNegativeTestData:
-##        tests = tests + 1
-##        if tests < start: continue
-##    
-##    
-##        print "%3i/%i)  %s   %s" %(tests, totalTests, case, description)
-##    #    print "      %scwm %s   giving %s" %(inputDocument, case)
-##        assert case and description and inputDocument
-###       cleanup = """sed -e 's/\$[I]d.*\$//g' -e "s;%s;%s;g" -e '/@prefix run/d' -e '/^#/d' -e '/^ *$/d'""" % (
-###                       WD, REFWD)
-##        try:
-##            execute("""%s %s --quiet --rdf=RT %s --ntriples  > temp/%s 2>/dev/null""" %
-##            (python_command, cwm_command, inputDocument, case))
-##        except:
-##            pass
-##        else:
-##            problem("""I didn't get a parse error running python %s --quiet --rdf=RT %s --ntriples  > temp/%s
-##from test ^=%s
-##I should have.
-##""" %
-##            (cwm_command, inputDocument, case, u))
-##
-##        passes = passes + 1
-##
-##
-##    for u, case, description, inputDocument in n3PositiveTestData:
-##        tests = tests + 1
-##        if tests < start: continue
-##    
-##    
-##        print "%3i/%i)  %s   %s" %(tests, totalTests, case, description)
-##    #    print "      %scwm %s   giving %s" %(inputDocument, case)
-##        assert case and description and inputDocument
-###       cleanup = """sed -e 's/\$[I]d.*\$//g' -e "s;%s;%s;g" -e '/@prefix run/d' -e '/^#/d' -e '/^ *$/d'""" % (
-###                       WD, REFWD)
-##        try:
-##            execute("""%s %s --grammar=../grammar/n3-selectors.n3  --as=http://www.w3.org/2000/10/swap/grammar/n3#document --parse=%s  > temp/%s 2>/dev/null""" %
-##            (python_command, '../grammar/predictiveParser.py', inputDocument, case))
-##        except RuntimeError:
-##            problem("""Error running ``python %s --grammar=../grammar/n3-selectors.n3  --as=http://www.w3.org/2000/10/swap/grammar/n3#document --parse=%s  > temp/%s 2>/dev/null''""" %
-##            ('../grammar/predictiveParser.py', inputDocument, case))
-##        passes = passes + 1
-##
-##    for u, case, description, inputDocument in n3NegativeTestData:
-##        tests = tests + 1
-##        if tests < start: continue
-##    
-##    
-##        print "%3i/%i)  %s   %s" %(tests, totalTests, case, description)
-##    #    print "      %scwm %s   giving %s" %(inputDocument, case)
-##        assert case and description and inputDocument
-###       cleanup = """sed -e 's/\$[I]d.*\$//g' -e "s;%s;%s;g" -e '/@prefix run/d' -e '/^#/d' -e '/^ *$/d'""" % (
-###                       WD, REFWD)
-##        try:
-##            execute("""%s %s ../grammar/n3-selectors.n3  http://www.w3.org/2000/10/swap/grammar/n3#document %s  > temp/%s 2>/dev/null""" %
-##                (python_command, '../grammar/predictiveParser.py', inputDocument, case))
-##        except:
-##            pass
-##        else:
-##            problem("""There was no error executing ``python %s --grammar=../grammar/n3-selectors.n3  --as=http://www.w3.org/2000/10/swap/grammar/n3#document --parse=%s    > temp/%s''
-##            There should have been one.""" %
-##                ('../grammar/predictiveParser.py', inputDocument, case))
-##
-##        passes = passes + 1
-
-
-##    timeMatcher = re.compile(r'\t([0-9]+)m([0-9]+)\.([0-9]+)s')
-##    from test.pystone import pystones
-##    pyStoneTime = pystones()[1]
-##    for u, theTime, description, env, arguments in perfData:
-##        tests = tests + 1
-##        if tests < start: continue
-##        
-##        urel = refTo(base(), u)
-##    
-##        print "%3i/%i %-30s  %s" %(tests, totalTests, urel, description)
-##        tt = os.times()[-1]
-##        a = system("""%s %s %s --quiet %s >,time.out""" %
-##                       (env, python_command, cwm_command, arguments))
-##        userTime = os.times()[-1] - tt
-##        print """%spython %s --quiet %s 2>,time.out""" % \
-##                       (env, cwm_command, arguments)
-####        c = file(',time.out', 'r')
-####        timeOutput = c.read()
-####        c.close()
-####        timeList = [timeMatcher.search(b).groups() for b in timeOutput.split('\n') if timeMatcher.search(b) is not None]
-####        print timeList
-####        userTimeStr = timeList[1]
-####        userTime = int(userTimeStr[0])*60 + float(userTimeStr[1] + '.' + userTimeStr[2])
-##        pyCount = pyStoneTime * userTime
-##        print pyCount
         
     if problems != []:
         sys.stderr.write("\nProblems:\n")
