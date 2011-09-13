@@ -1,0 +1,17 @@
+Installing air-reasoner as a CGI script (on Ubuntu)?  Here's how:
+
+1. Make sure that CGI is properly enabled (e.g. in your
+/etc/apache2/sites-available/[site] file, you should see a reference
+to "ServerAlias /cgi-bin/ /usr/lib/cgi-bin/", and some <Directory>
+settings for /usr/lib/cgi-bin (or the equivalent place for running CGI
+scripts.
+
+2. Copy server_cgi.py from this repository to the place where your CGI
+scripts are stored (e.g. /usr/lib/cgi-bin).
+
+3. Copy this repository to the "airreasoner" directory within that
+same place. (e.g. "/usr/lib/cgi-bin/airreasoner")
+
+4. Make sure that references to policyrunner in the server_cgi.py file
+you copied refer to airreasoner.policyrunner, so as to access the copy
+of the repository.
