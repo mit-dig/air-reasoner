@@ -1311,7 +1311,8 @@ def runScenario(s, others=[], verbose=False, customBaseRulesURI=False, customBas
 def main():
     global MM
     from optparse import OptionParser
-    usage = "usage: %prog [options] scenarioName"
+    usage = "usage: %prog [options] scenarioName\n"
+    usage + "       %prog [options] test rulesFile logsFile+"
     parser = OptionParser(usage)
     parser.add_option('--profile', dest="profile", action="store_true", default=False,
                       help="""Instead of displaying output, display profile information.
