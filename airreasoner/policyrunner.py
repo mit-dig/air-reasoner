@@ -5,6 +5,8 @@ an attempt at an amord implementation built on cwm
 
 """
 
+import os
+
 import weakref
 #WVD = weakref.WeakValueDictionary
 WVD = dict
@@ -1150,7 +1152,7 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
     for logFormulaObj in logFormulaObjs:
         logFormulae.append(loadFactFormulaObj(formulaTMS, logFormulaObj, ""))
 
-    baseFactsFormula = loadFactFormula(formulaTMS, baseFactsURI)
+#    baseFactsFormula = loadFactFormula(formulaTMS, baseFactsURI)
 
     eventLoop = EventLoop()
 
@@ -1164,7 +1166,7 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
         fCopy = store.newFormula()
         fCopy.loadFormulaWithSubstitution(ruleFormulaObj, Env())
         policyFormulae.append(fCopy)
-    baseRulesFormula = store.load(baseRulesURI)
+#    baseRulesFormula = store.load(baseRulesURI)
 
 #    rdfsRulesFormula = store.load('http://python-dlp.googlecode.com/files/pD-rules.n3')
     
@@ -1191,12 +1193,13 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
     allGoalRules = []
 #    # We need to 'flatten' the policy formulae before we can compile it.
     policyFormula = store.mergeFormulae(policyFormulae)
-    for pf in [policyFormula] + [baseRulesFormula]:
+    for pf in [policyFormula]: # + [baseRulesFormula]:
 #    for pf in policyFormulae + [baseRulesFormula]:
-        if pf is baseRulesFormula: ## Realy bad hack!
-            base=True
-        else:
-            base=False
+#        if pf is baseRulesFormula: ## Realy bad hack!
+#            base=True
+#        else:
+#            base=False
+        base = False
         policies, rules, goal_rules, cwm_rules = Rule.compileFormula(eventLoop, formulaTMS, pf, base=base)
         formulaTMS.assumedPolicies.extend(policies)
         allRules += rules
@@ -1287,7 +1290,7 @@ knownScenarios = {
              ['http://dig.csail.mit.edu/2009/DHS-fusion/samples/uri-content.n3']),
     'dhs2' : (['http://dig.csail.mit.edu/2009/DHS-fusion/samples/request.n3'],
              ['http://dig.csail.mit.edu/2009/DHS-fusion/Mass/MGL_6-172/MGL_temp_1112.n3']),
-    'privacy' : (['http://dig.csail.mit.edu/2009/DHS-fusion/PrivacyAct/log.n3'], ['http://dig.csail.mit.edu/2009/DHS-fusion/PrivacyAct/policy.n3'])
+    'privacy' : (['http://dig.csail.mit.edu/2009/DHS-fusion/PrivacyAct/log.n3'], ['http://dig.csail.mit.edu/2009/DHS-fusion/PrivacyAct/policy.n3']),
     'idm' : (['http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_6-172_ONT.n3',
               'file://' + os.path.abspath(os.path.join(os.path.realpath(__file__), '../../tests/mia_analysa.rdf')),
               'file://' + os.path.abspath(os.path.join(os.path.realpath(__file__), '../../tests/frederick_agenti.rdf')),
