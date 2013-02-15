@@ -5,6 +5,8 @@ an attempt at an amord implementation built on cwm
 
 """
 
+import os
+
 import weakref
 #WVD = weakref.WeakValueDictionary
 WVD = dict
@@ -528,6 +530,7 @@ much how the rule was represented in the rdf network
         self.generated = generated
         self.isBase = base
         self.isElided = elided
+        self.reachableGoals = set()
         if base:
             self.baseRules.add(sourceNode)
         if debugLevel > 15:        
@@ -576,7 +579,8 @@ much how the rule was represented in the rdf network
                     (s, p, o), newVars = canonicalizeVariables(triple, self.vars)
                     self.eventLoop.add(AuxTripleJustifier(self.tms, GOAL, s, p, o, newVars, self.sourceNode, [self.tms.getThing(self)]))
         index = workingContext._index
-        bottomBeta = MM.compilePattern(index, patterns, self.vars, self.contextFormula, buildGoals=False, goalPatterns=self.goal, supportBuiltin=self.supportBuiltin)
+        buildGoals = False  # If true, goals will be matched first.
+        bottomBeta = MM.compilePattern(index, patterns, self.vars, self.contextFormula, buildGoals=buildGoals, goalWildcard=getWildcardResource(self.tms.getContext(GOAL).store), goalContext=self.tms.getContext(GOAL), goalPatterns=self.reachableGoals, supportBuiltin=self.supportBuiltin)
         trueBottom =  MM.ProductionNode(bottomBeta, self.onSuccess, self.onFailure)
         return trueBottom
 
@@ -615,13 +619,31 @@ much how the rule was represented in the rdf network
                               self.sourceNode, self.goal, self.matchName, base=self.isBase, elided=self.isElided, generated=True)
 
     @classmethod
-    def compileFromTriples(cls, eventLoop, tms, F, ruleNode, goal=False, vars=frozenset(), preboundVars=frozenset(), base=False):
+    def compileFromTriples(cls, eventLoop, tms, F, ruleNode, goal=False,
+                           vars=frozenset(), preboundVars=frozenset(),
+                           base=False):
+        """Compiles a Rule object which makes use of the specified eventLoop
+        and TMS.  The rule is identified by the RDF node ruleNode
+        contained in the Formula F.  If goal is True, the Rule is to
+        be considered a goal-rule.  vars contains the set of defined
+        variables (both bound and unbound) prior to the execution of
+        this rule, while preboundVars contains only the set of bound
+        variables.  If base is True, the rule being compiled is from
+        the base AIR rule set (which contains basic RDFS and OWL
+        rules); output of base rules are hidden when justifications
+        are constructed.
+
+        NOTE: This function does NOT compile the Rete tree for the
+        Rule.  That is done by Rule.compileToRete."""
+
+        # Define namespaces.
         assert tms is not None
         rdfs = F.newSymbol('http://www.w3.org/2000/01/rdf-schema')
         rdf = F.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
         p = F.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
 
-        # Get the pattern (we'll need it for testing variable binding)
+        # Get the pattern for the rule (we'll need it for testing
+        # which variables are bound in this rule)
         try:
             pattern = F.the(subj=ruleNode, pred=p['if'])
         except AssertionError:
@@ -630,13 +652,12 @@ much how the rule was represented in the rdf network
         if pattern is None:
             raise ValueError('%s must have an air:if clause. You did not give it one' % (ruleNode,))
         
-#        vars = vars.union(F.each(subj=node, pred=p['variable']))
-        # Find the variables in this rule.
+        # Find the variables used in this rule and determine if any
+        # variables are newly bound when matching the pattern.
         vars = vars.union(F.universals())
-        varsUsed = set()
-        for var in vars:
-            if pattern.contains(subj=var) or pattern.contains(pred=var) or pattern.contains(obj=var):
-                varsUsed.add(var)
+        # ASSUMPTION: variables will never be a predicate(!)
+        varsUsed = set([var for var in vars
+                        if pattern.contains(subj=var) or pattern.contains(obj=var)])
         varBinding = len(varsUsed - preboundVars) > 0
         preboundVars = preboundVars.union(F.universals())
 
@@ -760,17 +781,6 @@ much how the rule was represented in the rdf network
                     print "WARNING: %s has an air:statement clause inside an air:assert clause.  This is no longer supported in AIR 2.5, and will not work with future versions of the reasoner." % (ruleNode)
                     airstatementWarnings.add(ruleNode)
                 statement = F.the(subj=statement, pred=p['statement'])
-#            statement = F.the(subj=assertion, pred=p['statement'])
-#            justNode = F.the(subj=assertion, pred=p['justification'])
-#            if justNode is not None:
-#                antecedents = frozenset(F.each(subj=justNode, pred=p['antecedent']))
-#            rule_id = F.the(subj=justNode, pred=p['rule-id'])
-#            
-#            if justNode is not None and rule_id is not None:
-#                assertionObjs.append(SubstitutingTuple(
-#                        (Assertion(statement, antecedents, rule_id),
-#                         description)))
-#            else:
             assertionObjs.append(SubstitutingTuple(
                     (Assertion(statement),
                      description,
@@ -870,17 +880,6 @@ much how the rule was represented in the rdf network
                     print "WARNING: %s has an air:statement clause inside an air:assert clause.  This is no longer supported in AIR 2.5, and will not work with future versions of the reasoner." % (ruleNode)
                     airstatementWarnings.add(ruleNode)
                 statement = F.the(subj=statement, pred=p['statement'])
-#            statement = F.the(subj=assertion, pred=p['statement'])
-#            justNode = F.the(subj=assertion, pred=p['justification'])
-#            if justNode is not None:
-#                antecedents = frozenset(F.each(subj=justNode, pred=p['antecedent']))
-#            rule_id = F.the(subj=justNode, pred=p['rule-id'])###here
-#            
-#            if justNode is not None and rule_id is not None:
-#                assertionObjs.append(SubstitutingTuple(
-#                        (Assertion(statement, antecedents, rule_id),
-#                         description)))
-#            else:
             assertionObjs.append(SubstitutingTuple(
                     (Assertion(statement),
                      description,
@@ -890,6 +889,7 @@ much how the rule was represented in the rdf network
         node = ruleNode
         matchedGraph = F.the(subj=node, pred=p['matched-graph'])
         
+        # Construct the rule object.
         self = cls(eventLoop, tms,
                    vars, unicode(label),
                    pattern,
@@ -898,6 +898,40 @@ much how the rule was represented in the rdf network
 #                   descriptions=descriptions,
                    alt=resultList[1],# altDescriptions=altDescriptions,
                    goal=goal, matchName=matchedGraph, sourceNode=node, base=base, elided=elided)
+
+        # We now have THIS rule, but not the goal rules it should be
+        # contingent on.
+
+        # Find all of the goals of this rule.
+        goalFilter = set()
+
+        # Find all goals this rule may ultimately match and add
+        # them to the goals to use as a trigger.
+
+        # Collect unbound vars with each result
+        possibleResults = [(possibleResult, self.vars)
+                           for possibleResult in self.result + self.alt]
+        while len(possibleResults) > 0:
+            possibleResult, vars = possibleResults.pop()
+            if isinstance(possibleResult[0].pattern, Rule):
+                # We will need to traverse descendants.
+                possibleResults.extend([(newResult, possibleResult[0].pattern.vars)
+                                        for newResult in possibleResult[0].pattern.result + possibleResult[0].pattern.alt])
+            else:  # isinstance(possibleResult[0].pattern, Formula)
+                # We have an assertion formula.  Statements in it
+                # are reachable goals.
+                def fixVariable(term):
+                    if term in vars:
+                        return (None, term)
+                    else:
+                        return term
+                goalFilter.update([(fixVariable(stmt.subject()),
+                                    fixVariable(stmt.predicate()),
+                                    fixVariable(stmt.object()))
+                                   for stmt in possibleResult[0].pattern.statements])
+        # POST: goalFilter now contains a set of all goal-patterns
+        # (with variables set to None) reachable from this rule.
+        self.reachableGoals = goalFilter
         return self
 
     @classmethod
@@ -939,7 +973,7 @@ much how the rule was represented in the rdf network
                                         pf,
                                         x,
 #                                        vars=globalVars.union(pf.each(subj=y, pred=p['variable'])),
-                                        vars=globalVars.union(pf.universals()),
+                                        vars=globalVars,
                                         base=base)
                         for x in pf.each(subj=y, pred=p['rule'])]
                     for y in policies], [])
@@ -948,7 +982,7 @@ much how the rule was represented in the rdf network
                                                        pf,
                                                        x,
 #                                                       vars=globalVars.union(pf.each(subj=y, pred=p['variable'])),
-                                                       vars=globalVars.union(pf.universals()),
+                                                       vars=globalVars,
                                                        base=base)
                         for x in pf.each(subj=y, pred=p['goal-rule'])]
                     for y in policies], [])
@@ -1117,11 +1151,18 @@ store = llyn.RDFStore()
 
 n3NS = store.newSymbol('http://www.w3.org/2000/10/swap/grammar/n3#n3')
 
-def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with'], verbose=False):
-    trace, result = runPolicy(logURIs, policyURIs, logFormula=logFormula, ruleFormula=ruleFormula, filterProperties=filterProperties, verbose=verbose)
+def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with'], verbose=False, customBaseFactsURI=False, customBaseRulesURI=False):
+    trace, result = runPolicy(logURIs, policyURIs, logFormula=logFormula, ruleFormula=ruleFormula, filterProperties=filterProperties, verbose=verbose, customBaseFactsURI=customBaseFactsURI, customBaseRulesURI=customBaseRulesURI)
     return trace.n3String()
 
-def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with'], logFormulaObjs=[], ruleFormulaObjs=[], store=store, verbose=False):
+_wildcardResource = None
+def getWildcardResource(store):
+    global _wildcardResource
+    if _wildcardResource is None:
+        _wildcardResource = store.newSymbol(store.genId())
+    return _wildcardResource
+
+def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with'], logFormulaObjs=[], ruleFormulaObjs=[], store=store, verbose=False, customBaseFactsURI=False, customBaseRulesURI=False):
     global baseFactsURI, baseRulesURI
     if OFFLINE[0]:
         baseFactsURI = uripath.join(uripath.base(),
@@ -1132,6 +1173,9 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
                                                            '../../..'))
         logURIs = map(lambda x: uripath.join(uripath.base(), x), logURIs)
         policyURIs = map(lambda x: uripath.join(uripath.base(), x), policyURIs)
+    elif customBaseFactsURI or customBaseRulesURI:
+        baseFactsURI = customBaseFactsURI
+        baseRulesURI = customBaseRulesURI
     import time
     formulaTMS = setupTMS(store)
     workingContext = formulaTMS.workingContext
@@ -1147,7 +1191,7 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
     for logFormulaObj in logFormulaObjs:
         logFormulae.append(loadFactFormulaObj(formulaTMS, logFormulaObj, ""))
 
-    baseFactsFormula = loadFactFormula(formulaTMS, baseFactsURI)
+#    baseFactsFormula = loadFactFormula(formulaTMS, baseFactsURI)
 
     eventLoop = EventLoop()
 
@@ -1161,7 +1205,7 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
         fCopy = store.newFormula()
         fCopy.loadFormulaWithSubstitution(ruleFormulaObj, Env())
         policyFormulae.append(fCopy)
-    baseRulesFormula = store.load(baseRulesURI)
+#    baseRulesFormula = store.load(baseRulesURI)
 
 #    rdfsRulesFormula = store.load('http://python-dlp.googlecode.com/files/pD-rules.n3')
     
@@ -1183,17 +1227,24 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
     rdfsRules = [] #[Rule.compileCwmRule(eventLoop, formulaTMS, rdfsRulesFormula, x) for x in rdfsRulesFormula.statementsMatching(pred=store.implies)]
 
 
+    # Add the filterProperties as goals through AuxTripleJustifier
+    for p in filterProperties:
+        s = getWildcardResource(store)
+        p = store.newSymbol(p)
+        o = getWildcardResource(store)
+        eventLoop.add(AuxTripleJustifier(formulaTMS, True, s, p, o, frozenset([s]), None, []))
 
     allRules = []
     allGoalRules = []
 #    # We need to 'flatten' the policy formulae before we can compile it.
     policyFormula = store.mergeFormulae(policyFormulae)
-    for pf in [policyFormula] + [baseRulesFormula]:
+    for pf in [policyFormula]: # + [baseRulesFormula]:
 #    for pf in policyFormulae + [baseRulesFormula]:
-        if pf is baseRulesFormula: ## Realy bad hack!
-            base=True
-        else:
-            base=False
+#        if pf is baseRulesFormula: ## Realy bad hack!
+#            base=True
+#        else:
+#            base=False
+        base = False
         policies, rules, goal_rules, cwm_rules = Rule.compileFormula(eventLoop, formulaTMS, pf, base=base)
         formulaTMS.assumedPolicies.extend(policies)
         allRules += rules
@@ -1284,27 +1335,39 @@ knownScenarios = {
              ['http://dig.csail.mit.edu/2009/DHS-fusion/samples/uri-content.n3']),
     'dhs2' : (['http://dig.csail.mit.edu/2009/DHS-fusion/samples/request.n3'],
              ['http://dig.csail.mit.edu/2009/DHS-fusion/Mass/MGL_6-172/MGL_temp_1112.n3']),
-    'privacy' : (['http://dig.csail.mit.edu/2009/DHS-fusion/PrivacyAct/log.n3'], ['http://dig.csail.mit.edu/2009/DHS-fusion/PrivacyAct/policy.n3'])
+    'privacy' : (['http://dig.csail.mit.edu/2009/DHS-fusion/PrivacyAct/log.n3'], ['http://dig.csail.mit.edu/2009/DHS-fusion/PrivacyAct/policy.n3']),
+    'idm' : (['http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_6-172_ONT.n3',
+              'file://' + os.path.abspath(os.path.join(os.path.realpath(__file__), '../../tests/mia_analysa.rdf')),
+              'file://' + os.path.abspath(os.path.join(os.path.realpath(__file__), '../../tests/frederick_agenti.rdf')),
+              'http://dice.csail.mit.edu/xmpparser.py?uri=http://dice.csail.mit.edu/idm/MA/documents/Fake_MA_Request.pdf',
+              'http://dice.csail.mit.edu/idm/MA/rules/mgl_sameAs.n3',
+              'file://' + os.path.abspath(os.path.join(os.path.realpath(__file__), '../../tests/idm_nonce.n3'))],
+             ['http://dice.csail.mit.edu/idm/MA/rules/MGL_6-172.n3']),
 }
 
-def runScenario(s, others=[], verbose=False):
+def runScenario(s, others=[], verbose=False, customBaseRulesURI=False, customBaseFactsURI=False):
     if s[-5:] == 'Local':
         OFFLINE[0] = True
     if s == 'test':
         rules = others[0:1]
         facts = others[1:]
+    elif s == 'list':
+        for el in others:
+            if el[0:5] == 'rules': rules = el[7:-1].replace(',',' ').split()
+            elif el[0:4] == 'data': facts = el[6:-1].replace(',',' ').split()
     elif s not in knownScenarios:
         facts = ['http://dig.csail.mit.edu/TAMI/2007/%s/log.n3' % s]
         rules = ['http://dig.csail.mit.edu/TAMI/2007/%s/policy.n3' % s]
  #       raise ValueError("I don't know about scenario %s" % s)
     else:
         facts, rules = knownScenarios[s]
-    return testPolicy(facts, rules, verbose=verbose)
+    return testPolicy(facts, rules, verbose=verbose, customBaseRulesURI=customBaseRulesURI, customBaseFactsURI=customBaseFactsURI)
 
 def main():
     global MM
     from optparse import OptionParser
-    usage = "usage: %prog [options] scenarioName"
+    usage = "usage: %prog [options] scenarioName\n"
+    usage + "       %prog [options] test rulesFile logsFile+"
     parser = OptionParser(usage)
     parser.add_option('--profile', dest="profile", action="store_true", default=False,
                       help="""Instead of displaying output, display profile information.
@@ -1339,11 +1402,15 @@ for the future, but may still be buggy.
 """)
     parser.add_option('--verbose', '-v', dest="verbose", action="store_true", default=False,
                       help="""\"Oh policyrunner, why don't you talk to me the way you used to?\"""")
+    parser.add_option('--base-rules', '-R', dest="customBaseRulesURI", action="store", default=False,
+                      help="""Set the base rules URI.""")
+    parser.add_option('--base-facts', '-F', dest="customBaseFactsURI", action="store", default=False,
+                      help="""Set the base facts URI.""")
 
     (options, args) = parser.parse_args()
     if not args:
         args = ['s0']
-    call = lambda : runScenario(args[0], args[1:], options.verbose)
+    call = lambda : runScenario(args[0], args[1:], options.verbose, options.customBaseRulesURI, options.customBaseFactsURI)
     MM = eval(options.reasoner)
     if options.lookupOntologies:
         loadFactFormula.pClosureMode = True
