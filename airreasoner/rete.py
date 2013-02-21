@@ -31,16 +31,17 @@ fullUnify = False
 OWL_RULES = 'http://dig.csail.mit.edu/TAMI/2007/amord/owl-rules.n3'
 
 def compilePattern(index, patterns, vars, context, buildGoals=False,
-                   goalContext=None, goalPatterns=set(), goalWildcard=None,
-                   supportBuiltin=None, ignoreBuiltins=False):
+                   goalBottomBeta=None, supportBuiltin=None,
+                   ignoreBuiltins=False):
     """Compile the RETE network for a given set of patterns and return the
     'goal' node."""
     if buildGoals:
         # Root node is determined by the matched goals.
-        current = compilePatternWithGoals(index, patterns, vars, context,
-                                          goalContext, goalPatterns,
-                                          goalWildcard,
-                                          supportBuiltin, ignoreBuiltins)
+        current = EmptyRoot
+    elif goalBottomBeta is not None:
+        # The root node comes from a previously compiled goal pattern.
+        current = EmptyRoot
+        # TODO: But the variable bindings should be passed in.
     else:
         # Start with an empty root node...
         current = EmptyRoot
@@ -56,21 +57,21 @@ def compilePattern(index, patterns, vars, context, buildGoals=False,
     # any success for the RETE match (and the only one that matters).
     return current
 
-def compilePatternWithGoals(index, patterns, vars, context, goalWildcard=None,
-                            goalContext=None, goalPatterns=set(),
-                            supportBuiltin=None, ignoreBuiltins=False):
+def compileGoalPattern(index, patterns, vars, 
+                       goalWildcards, goalContext, goalPatterns,
+                       supportBuiltin=None):
     """Compile the RETE network for a given set of goal patterns and return the
     'goal' node."""
     # Goal-direction only ever matches one pattern at a time, so the
     # construction is effectively a giant OR.
     alphas = [GoalAlphaFilter.build(index, pattern, vars, goalContext,
-                                    goalWildcard,
+                                    goalWildcards,
                                     supportBuiltin=supportBuiltin)
               for pattern in goalPatterns]
     # TODO: Alphas should match goalWildcard in goalContext
     # (Non-binding variable)
     # Join all alphas simultaneously (giant OR)
-    output = GoalJoinNode(alphas)
+    output = GoalJoinNode(EmptyRoot, alphas)
     output = BetaMemory(output)
 
     # The last pattern matched is, of course, the one that triggers
@@ -582,11 +583,54 @@ generates variable bindings
 class GoalAlphaFilter(AlphaFilter):
     """An AlphaFilter that explicitly matches goals (including non-binding
     goal-wildcard variables)."""
-    def __init__(self, pattern, vars, context, index, parents, goalWildcard,
-                 supportBuiltin):
+    def __init__(self, pattern, vars, context, index, parents,
+                 goalWildcards, supportBuiltin):
         AlphaFilter.__init__(self, pattern, vars, context, index, parents,
                              supportBuiltin)
-        self.goalWildcard = goalWildcard
+        self.goalWildcards = goalWildcards
+
+    @classmethod
+    def build(cls, index, pattern, vars, context, goalWildcards,
+              supportBuiltin):
+        secondaryAlpha = cls.construct(index, pattern, vars, context,
+                                       goalWildcards, supportBuiltin)
+        secondaryAlpha.initialize()
+        return secondaryAlpha
+
+    @classmethod
+    def construct(cls, index, pattern, vars, context, goalWildcards,
+                  supportBuiltin):
+        def replaceWithNil(x):
+            if isinstance(x, Formula) or x.occurringIn(vars):
+                return None
+            return x
+        masterPatternTuple = tuple(replaceWithNil(x) for x in (pattern.predicate(),
+                                                         pattern.subject(),
+                                                         pattern.object()))
+
+        parents = []
+        secondaryAlpha = cls(pattern, vars, context, index, parents,
+                             goalWildcards, supportBuiltin)
+        p, s, o = masterPatternTuple
+        V = VAR_PLACEHOLDER
+        pts = [(p, s, o)]
+        for loc in 0, 1, 2:
+            if masterPatternTuple[loc] is not None:
+                newpts = []
+                for t in pts:
+                    newtuple = list(t)
+                    newtuple[loc] = V
+                    newtuple = tuple(newtuple)
+                    newpts.append(t)
+                    newpts.append(newtuple)
+                pts = newpts
+        for patternTuple in pts:
+            primaryAlpha = index.setdefault(patternTuple, AlphaMemory())
+            parents.append(primaryAlpha)
+            for secondaryAlpha2 in primaryAlpha.successors:
+                if secondaryAlpha2.pattern == pattern:
+                    return secondaryAlpha2
+        return secondaryAlpha
 
     varCounter = itertools.count()
     def rightActivate(self, s):
@@ -611,12 +655,13 @@ class GoalAlphaFilter(AlphaFilter):
             s2 = s
         for  unWantedBindings, env in unify(s2, self.pattern, vars = self.vars | s2.variables): #
             # ONLY FOR WILDCARDS: Filter bindings to wildcards.
-            env = Env(Env(), dict([item for item in env.asDict().items() if item[1] != self.goalWildcard]))
+            # TODO: Weird bindings here (for compliance)
+            # TODO: Excess rdf:types!!
+            env = Env(Env(), dict([(item[0], (item[1], Env())) for item in env.asDict().items() if item[1] not in self.goalWildcards.values()]))
             if s2.variables.intersection(env.asDict().values()):
                 print 'we have trouble with %s' % s2.variables.intersection(env.asDict().values())
                 # We are in trouble here!
-            if fullUnify or not frozenset(unWantedBindings.asDict().values()).difference(self.vars): # bad, but speeds things up
-                self.add(TripleWithBinding(s, env))
+            self.add(TripleWithBinding(s, env))
 
     def triplesMatching(self, successor, env, includeMissing=False):
         # Like the original AlphaFilter.triplesMatching except that we
@@ -863,9 +908,8 @@ to get larger matches.
 class GoalJoinNode(ReteNode):
     """Like a JoinNode, except that it may be right-activated by any one
     of many GoalAlphaFilters."""
-    def __new__(cls, alphaNodes):
+    def __new__(cls, parent, alphaNodes):
         # The first alphaNode will be treated as the parent.
-        parent = alphaNodes[0]
         for child in parent.allChildren:
             if isinstance(child, cls) and child.alphaNodes == alphaNodes:
                 return child
@@ -879,15 +923,61 @@ class GoalJoinNode(ReteNode):
                 alphaNode.successors.appendleft(self)
         return self
 
+    def relinkAlphas(self):
+        for alphaNode in self.alphaNodes:
+            alphaNode.successors.appendleft( self)
+    def relinkBeta(self):
+        self.parent.children.add(self)
+
+    def leftActivate(self, token):
+        if self.parent.empty:
+            self.relinkAlphas()
+            # Only delink this join if it's not for a triple that
+            # isn't a BuiltIn...
+            for alphaNode in self.alphaNodes:
+                if not isinstance(alphaNode.pattern.predicate(), BuiltIn) and alphaNode.empty:
+                    self.parent.children.remove(self)
+        matchedSomething = False
+        for alphaNode in self.alphaNodes:
+            for i in alphaNode.triplesMatching(self, token.env, False):
+                # No merging.  Just leftActivate the children.
+                triple = i.triple
+                env = i.env
+                for c in self.children:
+                    c.leftActivate(token, triple, env)
+
+    def test(self, token, env2):  # Not good enough! need to unify somehow....
+        env = token.env
+        newEnv = env
+        
+        for var, (val, source) in env2.items():
+            if var in env:
+                if env[var] == val:
+                    pass
+                else:
+                    return None
+            else:
+                newEnv = newEnv.bind(var, (val, source))
+        return newEnv
+
     def rightActivate(self, triple_holder):
-        # No merging.  Just leftActivate the children.
+        if all([x.empty for x in self.alphaNodes]):
+            self.relinkBeta()
+            if self.parent.empty:
+                for alphaNode in self.alphaNodes:
+                    dequeRemove(alphaNode.successors, self)
         triple = triple_holder.triple
         env = triple_holder.env
-        token = Token(self, NullToken, triple, env, penalty=0)
-        for c in self.children:
-            c.leftActivate(token, triple, env)
-    
-
+        for token in self.parent.items:
+            newBinding = self.test(token, env)
+            if newBinding is not None:
+##                if token in self.falseMatches:
+##                    falseTriple = self.falseMatches[token]
+##                    del self.falseMatches[token]
+##                    if False and self.retractTriple is not None:
+##                        self.retractTriple(falseTriple)
+                for c in self.children:
+                    c.leftActivate(token, triple, newBinding)
     
 class ProductionNode(ReteNode):
     """A production node sits at the leaf of the node tree,
