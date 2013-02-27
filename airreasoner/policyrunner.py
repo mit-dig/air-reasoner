@@ -531,6 +531,7 @@ much how the rule was represented in the rdf network
         self.isBase = base
         self.isElided = elided
         self.goalWildcards = goalWildcards
+        self.goalEnvironments = set()
         self.discoverReachableGoals()
         if base:
             self.baseRules.add(sourceNode)
@@ -625,21 +626,24 @@ much how the rule was represented in the rdf network
     def assertNewGoals(self, (triples, environment, penalty)):
         # Assert new goals of this rule by substituting in the matched
         # environments of goals this rule can satisfy.
-        patterns = self.pattern.statements
-        if self.goal:
-            workingContext = self.tms.getContext(GOAL)
-        else:
-            workingContext = self.tms.workingContext
-        index = workingContext._index
-        for triple in patterns:
-            triple = triple.substitution(environment)
-            (s, p, o), newVars = canonicalizeVariables(triple, self.vars)
-            self.eventLoop.add(AuxTripleJustifier(self.tms, GOAL, s, p, o, newVars, self.sourceNode, [self.tms.getThing(self)]))
+        if environment not in self.goalEnvironments:
+            # Only ever assert goals for a given environment once.
+            self.goalEnvironments.add(environment)
+            patterns = self.pattern.statements
+            if self.goal:
+                workingContext = self.tms.getContext(GOAL)
+            else:
+                workingContext = self.tms.workingContext
+            index = workingContext._index
+            for triple in patterns:
+                triple = triple.substitution(environment)
+                (s, p, o), newVars = canonicalizeVariables(triple, self.vars)
+                self.eventLoop.add(AuxTripleJustifier(self.tms, GOAL, s, p, o, newVars, self.sourceNode, [self.tms.getThing(self)]))
 
-        # TODO: Pass the environment.
-        # TODO: This isn't triggering for the right things.
-        bottomBeta = MM.compilePattern(index, patterns, self.vars, self.contextFormula, supportBuiltin=self.supportBuiltin)
-        trueBottom =  MM.ProductionNode(bottomBeta, self.onSuccess, self.onFailure)
+            # TODO: Pass the environment.
+            # TODO: This isn't triggering for the right things.
+            bottomBeta = MM.compilePattern(index, patterns, self.vars, self.contextFormula, supportBuiltin=self.supportBuiltin)
+            trueBottom =  MM.ProductionNode(bottomBeta, self.onSuccess, self.onFailure)
 
     def onSuccess(self, (triples, environment, penalty)):
         self.success = True
