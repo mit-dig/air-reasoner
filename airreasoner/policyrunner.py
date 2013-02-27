@@ -153,7 +153,7 @@ This is currently only used for goals
             if isinstance(node.datum, tuple):
                 if len(node.datum) == 4:
                     self.workingContext.removeStatement(self.getStatement(node.datum))
-                    self.getContext(GOAL).removeStatement(self.getStatement(node.datum))
+#                    self.getContext(GOAL).removeStatement(self.getStatement(node.datum))
                 else:
                     self.getContext(GOAL).removeStatement(self.getAuxStatement(node.datum))
         if isinstance(node.datum, Rule):
@@ -194,7 +194,7 @@ This is currently only used for goals
                 variables = node.datum[3]
                 if variables is None:
                     self.workingContext.add(*triple)                
-                    self.getContext(GOAL).add(*triple)
+#                    self.getContext(GOAL).add(*triple)
                 else:  # slow path --- do we need it?
                     s, p, o = triple
                     s1 = self.workingContext._buildStoredStatement(subj=s,
@@ -206,14 +206,14 @@ This is currently only used for goals
                     s1.variables = v
                     result = self.workingContext. _addStatement(s1)
                     
-                    s2 = getContext(GOAL)._buildStoredStatement(subj=s,
-                                                                 pred=p,
-                                                                 obj=o,
-                                                                why=None)
-                    if isinstance(s2, int):
-                        raise TypeError(node)
-                    s2.variables = v
-                    result = self.getContext(GOAL). _addStatement(s1)
+#                    s2 = getContext(GOAL)._buildStoredStatement(subj=s,
+#                                                                 pred=p,
+#                                                                 obj=o,
+#                                                                why=None)
+#                    if isinstance(s2, int):
+#                        raise TypeError(node)
+#                    s2.variables = v
+#                    result = self.getContext(GOAL). _addStatement(s1)
             else:
                 if self.tracking:
                     workcount['goal'] += 1
