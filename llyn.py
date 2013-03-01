@@ -128,6 +128,8 @@ META_run = META_NS_URI + "run"
 
 doMeta = 0  # wait until we have written the code! :-)
     
+load_time = 0
+total_time = 0    
 
 def isVariable(statement, node):
     return node in statement.variables
@@ -1024,6 +1026,7 @@ class BI_semantics(HeavyBuiltIn, Function):
     N3 forumula.  The URI is used to find a representation of the resource in
     bits which is then parsed according to its content type."""
     def evalObj(self, subj, queue, bindings, proof, query):
+        start = time.time()
         store = subj.store
         if isinstance(subj, Fragment): doc = subj.resource
         else: doc = subj
@@ -1039,7 +1042,13 @@ class BI_semantics(HeavyBuiltIn, Function):
 #       else: flags=""
         F = self.store.load(inputURI, why=becauseSubexpression)
         if diag.chatty_flag>10: progress("    semantics: %s" % (F))
-        return F.canonicalize()
+        load_done = time.time()
+        data = F.canonicalize()
+        end = time.time()
+        global load_time, total_time
+        load_time += load_done - start
+        total_time += end - start
+        return data
 
 class BI_semanticsWithImportsClosure(HeavyBuiltIn, Function):
 

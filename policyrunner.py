@@ -15,7 +15,7 @@ from itertools import chain
 
 import llyn
 from formula import Formula, StoredStatement
-from term import List, Env, Symbol, Term, BuiltIn
+from term import List, Env, Symbol, Term, BuiltIn, SUBJ, PRED, OBJ
 
 import uripath
 
@@ -153,7 +153,7 @@ This is currently only used for goals
             if isinstance(node.datum, tuple):
                 if len(node.datum) == 4:
                     self.workingContext.removeStatement(self.getStatement(node.datum))
-                    self.getContext(GOAL).removeStatement(self.getStatement(node.datum))
+#                    self.getContext(GOAL).removeStatement(self.getStatement(node.datum))
                 else:
                     self.getContext(GOAL).removeStatement(self.getAuxStatement(node.datum))
         if isinstance(node.datum, Rule):
@@ -194,7 +194,7 @@ This is currently only used for goals
                 variables = node.datum[3]
                 if variables is None:
                     self.workingContext.add(*triple)                
-                    self.getContext(GOAL).add(*triple)
+#                    self.getContext(GOAL).add(*triple)
                 else:  # slow path --- do we need it?
                     s, p, o = triple
                     s1 = self.workingContext._buildStoredStatement(subj=s,
@@ -206,14 +206,14 @@ This is currently only used for goals
                     s1.variables = v
                     result = self.workingContext. _addStatement(s1)
                     
-                    s2 = getContext(GOAL)._buildStoredStatement(subj=s,
-                                                                 pred=p,
-                                                                 obj=o,
-                                                                why=None)
-                    if isinstance(s2, int):
-                        raise TypeError(node)
-                    s2.variables = v
-                    result = self.getContext(GOAL). _addStatement(s1)
+#                    s2 = getContext(GOAL)._buildStoredStatement(subj=s,
+#                                                                 pred=p,
+#                                                                 obj=o,
+#                                                                why=None)
+#                    if isinstance(s2, int):
+#                        raise TypeError(node)
+#                    s2.variables = v
+#                    result = self.getContext(GOAL). _addStatement(s1)
             else:
                 if self.tracking:
                     workcount['goal'] += 1
@@ -503,7 +503,7 @@ much how the rule was represented in the rdf network
     def __init__(self, eventLoop, tms, vars, label,
                  pattern, contextFormula, result, alt, sourceNode,
                  goal=False, matchName=None, base=False, elided=False,
-                 generated=False):
+                 generated=False, goalWildcards={}):
         self.generatedLabel = False
         if label is None or label=='None':
             self.generatedLabel = True
@@ -530,7 +530,9 @@ much how the rule was represented in the rdf network
         self.generated = generated
         self.isBase = base
         self.isElided = elided
-        self.reachableGoals = set()
+        self.goalWildcards = goalWildcards
+        self.goalEnvironments = set()
+        self.discoverReachableGoals()
         if base:
             self.baseRules.add(sourceNode)
         if debugLevel > 15:        
@@ -543,6 +545,38 @@ much how the rule was represented in the rdf network
         alt=%s
         matchName=%s''' % (tms, self.vars, label, pattern, result, alt, matchName)
 
+    def discoverReachableGoals(self):
+        """Find all goals reachable from this rule."""
+        # We now have THIS rule, but not the goal rules it should be
+        # contingent on.
+
+        # Find all of the goals of this rule.
+        goalFilter = set()
+
+        # Find all goals this rule may ultimately match and add
+        # them to the goals to use as a trigger.
+
+        # Collect unbound vars with each result
+        seenStatements = set()
+        possibleResults = [(possibleResult, self.vars)
+                           for possibleResult in self.result + self.alt]
+        while len(possibleResults) > 0:
+            possibleResult, vars = possibleResults.pop()
+            if isinstance(possibleResult[0].pattern, Rule):
+                # We will need to traverse descendants.
+                possibleResults.extend([(newResult, possibleResult[0].pattern.vars)
+                                        for newResult in possibleResult[0].pattern.result + possibleResult[0].pattern.alt])
+            else:  # isinstance(possibleResult[0].pattern, Formula)
+                # We have an assertion formula.  Statements in it
+                # are reachable goals.
+                for statement in possibleResult[0].pattern.statements:
+                    # Eugh.  hash(StoredStatement) is by id, not contents.
+                    if statement.spo() not in seenStatements:
+                        goalFilter.add(statement)
+                        seenStatements.add(statement.spo())
+        # POST: goalFilter now contains a set of all goal-patterns
+        # (with variables set to None) reachable from this rule.
+        self.reachableGoals = goalFilter
 
     def __eq__(self, other):
         return isinstance(other, Rule) and \
@@ -575,14 +609,10 @@ much how the rule was represented in the rdf network
             workingContext = self.tms.getContext(GOAL)
         else:
             workingContext = self.tms.workingContext
-            for triple in patterns:
-                    (s, p, o), newVars = canonicalizeVariables(triple, self.vars)
-                    self.eventLoop.add(AuxTripleJustifier(self.tms, GOAL, s, p, o, newVars, self.sourceNode, [self.tms.getThing(self)]))
         index = workingContext._index
-        buildGoals = False  # If true, goals will be matched first.
-        bottomBeta = MM.compilePattern(index, patterns, self.vars, self.contextFormula, buildGoals=buildGoals, goalWildcard=getWildcardResource(self.tms.getContext(GOAL).store), goalContext=self.tms.getContext(GOAL), goalPatterns=self.reachableGoals, supportBuiltin=self.supportBuiltin)
-        trueBottom =  MM.ProductionNode(bottomBeta, self.onSuccess, self.onFailure)
-        return trueBottom
+#        buildGoals = False  # If true, goals will be matched first.
+        self.goalBottomBeta = MM.compileGoalPattern(self.tms.getContext(GOAL)._index, patterns, self.vars, self.goalWildcards, self.tms.getContext(GOAL), self.reachableGoals, supportBuiltin=self.supportBuiltin)
+        goalBottom = MM.ProductionNode(self.goalBottomBeta, self.assertNewGoals, lambda: True)
 
     def supportBuiltin(self, triple):
         # Create the TMS node representing this triple's extraction.
@@ -592,6 +622,28 @@ much how the rule was represented in the rdf network
         self.tms.getTriple(*triple.spo()).assume()
     def retractTriple(self, triple):
         self.tms.getTriple(*triple.spo()).retract()
+
+    def assertNewGoals(self, (triples, environment, penalty)):
+        # Assert new goals of this rule by substituting in the matched
+        # environments of goals this rule can satisfy.
+        if environment not in self.goalEnvironments:
+            # Only ever assert goals for a given environment once.
+            self.goalEnvironments.add(environment)
+            patterns = self.pattern.statements
+            if self.goal:
+                workingContext = self.tms.getContext(GOAL)
+            else:
+                workingContext = self.tms.workingContext
+            index = workingContext._index
+            for triple in patterns:
+                triple = triple.substitution(environment)
+                (s, p, o), newVars = canonicalizeVariables(triple, self.vars)
+                self.eventLoop.add(AuxTripleJustifier(self.tms, GOAL, s, p, o, newVars, self.sourceNode, [self.tms.getThing(self)]))
+
+            # TODO: Pass the environment.
+            # TODO: This isn't triggering for the right things.
+            bottomBeta = MM.compilePattern(index, patterns, self.vars, self.contextFormula, supportBuiltin=self.supportBuiltin)
+            trueBottom =  MM.ProductionNode(bottomBeta, self.onSuccess, self.onFailure)
 
     def onSuccess(self, (triples, environment, penalty)):
         self.success = True
@@ -621,7 +673,7 @@ much how the rule was represented in the rdf network
     @classmethod
     def compileFromTriples(cls, eventLoop, tms, F, ruleNode, goal=False,
                            vars=frozenset(), preboundVars=frozenset(),
-                           base=False):
+                           base=False, goalWildcards={}):
         """Compiles a Rule object which makes use of the specified eventLoop
         and TMS.  The rule is identified by the RDF node ruleNode
         contained in the Formula F.  If goal is True, the Rule is to
@@ -722,7 +774,7 @@ much how the rule was represented in the rdf network
             try:
                 subruleNode = F.the(subj=node, pred=p['rule'])
                 if subruleNode is not None:
-                    subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, subruleNode, vars=vars, preboundVars=preboundVars, base=base))
+                    subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, subruleNode, vars=vars, preboundVars=preboundVars, base=base, goalWildcards=goalWildcards))
             except AssertionError:
                 raise ValueError('%s has too many rules in an air:then, being all of %s'
                                  % (ruleNode, F.each(subj=node, pred=p['rule'])))
@@ -735,7 +787,7 @@ much how the rule was represented in the rdf network
             try:
                 goal_subruleNode = F.the(subj=node, pred=p['goal-rule'])
                 if goal_subruleNode is not None:
-                    goal_subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, goal_subruleNode, goal=True, vars=vars, preboundVars=preboundVars, base=base))
+                    goal_subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, goal_subruleNode, goal=True, vars=vars, preboundVars=preboundVars, base=base, goalWildcards=goalWildcards))
             except AssertionError:
                 raise ValueError('%s has too many goal-rules in an air:then, being all of %s'
                                  % (ruleNode, F.each(subj=node, pred=p['goal-rule'])))
@@ -821,7 +873,7 @@ much how the rule was represented in the rdf network
             try:
                 subruleNode = F.the(subj=node, pred=p['rule'])
                 if subruleNode is not None:
-                    subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, subruleNode, vars=vars, preboundVars=preboundVars, base=base))
+                    subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, subruleNode, vars=vars, preboundVars=preboundVars, base=base, goalWildcards=goalWildcards))
             except AssertionError:
                 raise ValueError('%s has too many rules in an air:else, being all of %s'
                                  % (ruleNode, F.each(subj=node, pred=p['rule'])))
@@ -834,7 +886,7 @@ much how the rule was represented in the rdf network
             try:
                 goal_subruleNode = F.the(subj=node, pred=p['goal-rule'])
                 if goal_subruleNode is not None:
-                    goal_subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, goal_subruleNode, goal=True, vars=vars, preboundVars=preboundVars, base=base))
+                    goal_subrule = Assertion(cls.compileFromTriples(eventLoop, tms, F, goal_subruleNode, goal=True, vars=vars, preboundVars=preboundVars, base=base, goalWildcards=goalWildcards))
             except AssertionError:
                 raise ValueError('%s has too many goal-rules in an air:else, being all of %s'
                                  % (ruleNode, F.each(subj=node, pred=p['goal-rule'])))
@@ -897,41 +949,7 @@ much how the rule was represented in the rdf network
                    resultList[0],
 #                   descriptions=descriptions,
                    alt=resultList[1],# altDescriptions=altDescriptions,
-                   goal=goal, matchName=matchedGraph, sourceNode=node, base=base, elided=elided)
-
-        # We now have THIS rule, but not the goal rules it should be
-        # contingent on.
-
-        # Find all of the goals of this rule.
-        goalFilter = set()
-
-        # Find all goals this rule may ultimately match and add
-        # them to the goals to use as a trigger.
-
-        # Collect unbound vars with each result
-        possibleResults = [(possibleResult, self.vars)
-                           for possibleResult in self.result + self.alt]
-        while len(possibleResults) > 0:
-            possibleResult, vars = possibleResults.pop()
-            if isinstance(possibleResult[0].pattern, Rule):
-                # We will need to traverse descendants.
-                possibleResults.extend([(newResult, possibleResult[0].pattern.vars)
-                                        for newResult in possibleResult[0].pattern.result + possibleResult[0].pattern.alt])
-            else:  # isinstance(possibleResult[0].pattern, Formula)
-                # We have an assertion formula.  Statements in it
-                # are reachable goals.
-                def fixVariable(term):
-                    if term in vars:
-                        return (None, term)
-                    else:
-                        return term
-                goalFilter.update([(fixVariable(stmt.subject()),
-                                    fixVariable(stmt.predicate()),
-                                    fixVariable(stmt.object()))
-                                   for stmt in possibleResult[0].pattern.statements])
-        # POST: goalFilter now contains a set of all goal-patterns
-        # (with variables set to None) reachable from this rule.
-        self.reachableGoals = goalFilter
+                   goal=goal, matchName=matchedGraph, sourceNode=node, base=base, elided=elided, goalWildcards=goalWildcards)
         return self
 
     @classmethod
@@ -955,7 +973,7 @@ much how the rule was represented in the rdf network
 
 
     @classmethod
-    def compileFormula(cls, eventLoop, formulaTMS, pf, base=False):
+    def compileFormula(cls, eventLoop, formulaTMS, pf, base=False, goalWildcards={}):
         rdf = pf.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
         p = pf.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
         # New AIR terminology.
@@ -974,7 +992,8 @@ much how the rule was represented in the rdf network
                                         x,
 #                                        vars=globalVars.union(pf.each(subj=y, pred=p['variable'])),
                                         vars=globalVars,
-                                        base=base)
+                                        base=base,
+                                        goalWildcards=goalWildcards)
                         for x in pf.each(subj=y, pred=p['rule'])]
                     for y in policies], [])
         goal_rules = reduce(list.__add__, [[cls.compileFromTriples(eventLoop,
@@ -983,7 +1002,8 @@ much how the rule was represented in the rdf network
                                                        x,
 #                                                       vars=globalVars.union(pf.each(subj=y, pred=p['variable'])),
                                                        vars=globalVars,
-                                                       base=base)
+                                                       base=base,
+                                                       goalWildcards=goalWildcards)
                         for x in pf.each(subj=y, pred=p['goal-rule'])]
                     for y in policies], [])
         return policies, rules, goal_rules, cwm_rules               
@@ -1155,12 +1175,7 @@ def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterPro
     trace, result = runPolicy(logURIs, policyURIs, logFormula=logFormula, ruleFormula=ruleFormula, filterProperties=filterProperties, verbose=verbose, customBaseFactsURI=customBaseFactsURI, customBaseRulesURI=customBaseRulesURI)
     return trace.n3String()
 
-_wildcardResource = None
-def getWildcardResource(store):
-    global _wildcardResource
-    if _wildcardResource is None:
-        _wildcardResource = store.newSymbol(store.genId())
-    return _wildcardResource
+goalWildcards = {}
 
 def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with'], logFormulaObjs=[], ruleFormulaObjs=[], store=store, verbose=False, customBaseFactsURI=False, customBaseRulesURI=False):
     global baseFactsURI, baseRulesURI
@@ -1228,11 +1243,16 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
 
 
     # Add the filterProperties as goals through AuxTripleJustifier
+    goalWildcards = {
+        SUBJ: store.newSymbol(store.genId()),
+        PRED: store.newSymbol(store.genId()),
+        OBJ: store.newSymbol(store.genId())
+        }
     for p in filterProperties:
-        s = getWildcardResource(store)
+        s = goalWildcards[SUBJ]
         p = store.newSymbol(p)
-        o = getWildcardResource(store)
-        eventLoop.add(AuxTripleJustifier(formulaTMS, True, s, p, o, frozenset([s]), None, []))
+        o = goalWildcards[OBJ]
+        eventLoop.add(AuxTripleJustifier(formulaTMS, True, s, p, o, frozenset([s, o]), None, []))
 
     allRules = []
     allGoalRules = []
@@ -1245,7 +1265,7 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
 #        else:
 #            base=False
         base = False
-        policies, rules, goal_rules, cwm_rules = Rule.compileFormula(eventLoop, formulaTMS, pf, base=base)
+        policies, rules, goal_rules, cwm_rules = Rule.compileFormula(eventLoop, formulaTMS, pf, base=base, goalWildcards=goalWildcards)
         formulaTMS.assumedPolicies.extend(policies)
         allRules += rules
         allRules += cwm_rules
@@ -1274,6 +1294,7 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
     if verbose:
         print 'time reasoning took=', totalTime
         print '  of which %s was after loading, and %s was actual reasoning' % (now-compileStartTime, now-eventStartTime)
+        print '  additionally, %s was in log:semantics, %s of which was parsing' % (llyn.total_time, llyn.load_time)
 
 #    rete.printRete()
     if len(filterProperties) > 0:
