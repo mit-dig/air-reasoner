@@ -1294,6 +1294,7 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
     if verbose:
         print 'time reasoning took=', totalTime
         print '  of which %s was after loading, and %s was actual reasoning' % (now-compileStartTime, now-eventStartTime)
+        print '  additionally, %s was in log:semantics, %s of which was parsing' % (llyn.total_time, llyn.load_time)
 
 #    rete.printRete()
     if len(filterProperties) > 0:
