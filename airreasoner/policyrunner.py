@@ -1364,6 +1364,15 @@ knownScenarios = {
               'http://dice.csail.mit.edu/idm/MA/rules/mgl_sameAs.n3',
               'file://' + os.path.abspath(os.path.join(os.path.realpath(__file__), '../../tests/idm_nonce.n3'))],
              ['http://dice.csail.mit.edu/idm/MA/rules/MGL_6-172.n3']),
+    'millie' : (['http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_6-172_ONT.n3',
+              'http://dig.csail.mit.edu/2010/DHS-fusion/MA/profiles/MiaAnalysa',
+              'http://dig.csail.mit.edu/2010/DHS-fusion/MA/profiles/MillieRecruiting',
+              'http://dice.csail.mit.edu/xmpparser.py?uri=http://dig.csail.mit.edu/2010/DHS-fusion/MA/documents/Fake_Recruiter_Response.badxmp.pdf',
+              'http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_66A-1_ONT.n3',
+              'http://dig.csail.mit.edu/2010/DHS-fusion/common/fusion_ONT.n3',
+              'http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/mgl_sameAs.n3',
+              'file://' + os.path.abspath(os.path.join(os.path.realpath(__file__), '../../tests/millie_nonce.n3'))],
+             ['http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_6-172.alt.n3']),
 }
 
 def runScenario(s, others=[], verbose=False, customBaseRulesURI=False, customBaseFactsURI=False):

@@ -1,0 +1,12 @@
+@prefix : <http://dig.csail.mit.edu/2010/DHS-fusion/common/fusion_ONT#>.
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+
+<http://dig.csail.mit.edu/2010/DHS-fusion/common/fusion_ONT#Transaction> a <http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_6-172_ONT#Request>, <http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_6-172_ONT#Disseminate>;
+    <http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_6-172_ONT#by> <http://dig.csail.mit.edu/2010/DHS-fusion/MA/profiles/MiaAnalysa#me>;
+    <http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_6-172_ONT#to> <http://dig.csail.mit.edu/2010/DHS-fusion/MA/profiles/MillieRecruiting#me>;
+    <http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_6-172_ONT#data> <http://dig.csail.mit.edu/2010/DHS-fusion/MA/documents/Fake_Recruiter_Response.badxmp.pdf>;
+    <http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_6-172_ONT#doc-data> <http://dice.csail.mit.edu/xmpparser.py?uri=http://dig.csail.mit.edu/2010/DHS-fusion/MA/documents/Fake_Recruiter_Response.badxmp.pdf>.
+
+<http://dig.csail.mit.edu/2010/DHS-fusion/MA/profiles/MiaAnalysa#me> <http://www.w3.org/2000/01/rdf-schema#label> "Mia Analysa".
+<http://dig.csail.mit.edu/2010/DHS-fusion/MA/profiles/MillieRecruiting#me> <http://www.w3.org/2000/01/rdf-schema#label> "Millie Recruiting".
+<http://dig.csail.mit.edu/2010/DHS-fusion/MA/documents/Fake_Recruiter_Response.badxmp.pdf> <http://www.w3.org/2000/01/rdf-schema#label> "Fake_Recruiter_Response.badxmp.pdf".

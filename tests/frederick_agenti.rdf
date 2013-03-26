@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF
+   xmlns:ns1="urn:test:idmanagement.gov:icam:attribute:v1:"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+>
+  <rdf:Description rdf:about="#me">
+    <ns1:organizationUnitName>Immigration and Customs Enforcement</ns1:organizationUnitName>
+    <rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Person"/>
+    <ns1:title>GS-12</ns1:title>
+    <ns1:givenName>Ferderick</ns1:givenName>
+    <rdfs:label>Ferderick Agenti</rdfs:label>
+    <ns1:organizationName>Department of Homeland Security</ns1:organizationName>
+    <ns1:fasc-n>70121243202001113900000003170121</ns1:fasc-n>
+    <ns1:sn>Agenti</ns1:sn>
+    <ns1:countryOfCitizenship>US</ns1:countryOfCitizenship>
+  </rdf:Description>
+</rdf:RDF>
+

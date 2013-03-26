@@ -1,0 +1,15 @@
+@prefix : <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix id: <http://dice.csail.mit.edu/idm/idm_query.cgi?c=US&st=Massachusetts&o=Massachusetts%20State%20Police&cn=Mia%20Analysa#> .
+@prefix i: <http://dice.csail.mit.edu/idm/idm_query.cgi?cn=Frederick%20Agenti&ou=Immigration%20and%20Customs%20Enforcement&o=Department%20of%20Homeland%20Security&st=District%20of%20Columbia&c=US#> .
+@prefix fusion: <http://dig.csail.mit.edu/2012/DHS/JHU/common/fusion_ONT#> .
+@prefix mgl_: <http://dice.csail.mit.edu/idm/MA/rules/MGL_6-172_ONT#> .
+
+<http://dice.csail.mit.edu/idm/MA/documents/Fake_MA_Request.pdf>     :label "Fake_MA_Request.pdf" .
+        id:me     :label "Mia Analysa" .
+        i:me     :label "Frederick Agenti" .
+        fusion:Transaction     a mgl_:Disseminate,
+                    mgl_:Request;
+             mgl_:by id:me;
+             mgl_:data <http://dice.csail.mit.edu/idm/MA/documents/Fake_MA_Request.pdf>;
+             mgl_:doc-data <http://dice.csail.mit.edu/xmpparser.py?uri=http://dice.csail.mit.edu/idm/MA/documents/Fake_MA_Request.pdf>;
+             mgl_:to i:me .
