@@ -1080,7 +1080,7 @@ fire only when there are no events to fire.
         if self.phase == EventLoop.PHASE_OPEN and self.events:
             return self.events.pop()(self)
         elif self.phase <= EventLoop.PHASE_CLOSED and self.alternateEvents:
-            print "close!"
+#            print "close!"
             self.phase = EventLoop.PHASE_CLOSED
             return self.alternateEvents.pop()(self)
         elif self.phase <= EventLoop.PHASE_REOPEN and self.assertionEvents:
@@ -1090,7 +1090,7 @@ fire only when there are no events to fire.
                 self.newAlternateEvents = deque()
             return self.assertionEvents.pop()()
         elif self.events:
-            print "open!"
+#            print "open!"
             self.phase = EventLoop.PHASE_OPEN
             if len(self.newAlternateEvents) > 0:
                 self.alternateEvents = self.newAlternateEvents
