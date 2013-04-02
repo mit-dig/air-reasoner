@@ -911,7 +911,7 @@ class GoalJoinNode(ReteNode):
     def __new__(cls, parent, alphaNodes):
         # The first alphaNode will be treated as the parent.
         for child in parent.allChildren:
-            if isinstance(child, cls) and child.alphaNodes == alphaNodes:
+            if isinstance(child, cls) and child.alphaNodes == alphaNodes and all([x is y for (x, y) in zip(child.alphaNodes, alphaNodes)]):
                 return child
         self = ReteNode.__new__(cls, parent)
         self.alphaNodes = alphaNodes

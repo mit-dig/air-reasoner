@@ -642,8 +642,11 @@ much how the rule was represented in the rdf network
 
             # TODO: Pass the environment.
             # TODO: This isn't triggering for the right things.
-            bottomBeta = MM.compilePattern(index, patterns, self.vars, self.contextFormula, supportBuiltin=self.supportBuiltin)
-            trueBottom =  MM.ProductionNode(bottomBeta, self.onSuccess, self.onFailure)
+            def reallyCompileRete(eventLoop):
+                bottomBeta = MM.compilePattern(index, patterns, self.vars, self.contextFormula, supportBuiltin=self.supportBuiltin)
+                trueBottom =  MM.ProductionNode(bottomBeta, self.onSuccess, self.onFailure)
+#            print "push", reallyCompileRete, "from", patterns
+            self.eventLoop.pushPostGoal(reallyCompileRete)
 
     def onSuccess(self, (triples, environment, penalty)):
         self.success = True
@@ -1040,6 +1043,7 @@ fire only when there are no events to fire.
     def __init__(self):
         self.events = deque()
         self.alternateEvents = deque()
+        self.postGoalEvents = deque()
         self.phase = EventLoop.PHASE_OPEN
         self.assertionEvents = deque()
         self.newAlternateEvents = deque()
@@ -1055,6 +1059,15 @@ fire only when there are no events to fire.
             self.alternateEvents.appendleft(event)
         else:
             self.newAlternateEvents.appendleft(event)
+
+    def pushPostGoal(self, event):
+        # Only ever run this event once we're done with normal
+        # events. (i.e. once all necessary goal-rules have been
+        # matched.)
+
+        # Also, this runs as a stack.  Goals matched later will
+        # execute first.
+        self.postGoalEvents.append(event)
     
     def addAssertion(self, event):
 #        print "addAssertion", event
@@ -1083,6 +1096,10 @@ fire only when there are no events to fire.
                 self.alternateEvents = self.newAlternateEvents
                 self.newAlternateEvents = deque()
             return self.events.pop()(self)
+        elif self.postGoalEvents:
+            event = self.postGoalEvents.pop()
+#            print "pop", event
+            return event(self)
         else:
             if len(self.newAlternateEvents) > 0:
                 self.alternateEvents = self.newAlternateEvents
@@ -1090,7 +1107,7 @@ fire only when there are no events to fire.
             return None
 
     def __len__(self):
-        return len(self.events) + len(self.alternateEvents) + len(self.assertionEvents)
+        return len(self.events) + len(self.alternateEvents) + len(self.assertionEvents) + len(self.postGoalEvents)
 
 
             
