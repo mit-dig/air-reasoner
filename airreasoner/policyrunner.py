@@ -1096,6 +1096,9 @@ fire only when there are no events to fire.
                 self.alternateEvents = self.newAlternateEvents
                 self.newAlternateEvents = deque()
             return self.events.pop()(self)
+        elif self.alternateEvents:
+            self.phase = EventLoop.PHASE_CLOSED
+            return self.alternateEvents.pop()(self)
         elif self.postGoalEvents:
             event = self.postGoalEvents.pop()
 #            print "pop", event
