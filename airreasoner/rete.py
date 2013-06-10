@@ -68,6 +68,7 @@ def compileGoalPattern(index, patterns, vars,
                                     goalWildcards,
                                     supportBuiltin=supportBuiltin)
               for pattern in goalPatterns]
+
     # TODO: Alphas should match goalWildcard in goalContext
     # (Non-binding variable)
     # Join all alphas simultaneously (giant OR)
@@ -601,7 +602,7 @@ class GoalAlphaFilter(AlphaFilter):
     def construct(cls, index, pattern, vars, context, goalWildcards,
                   supportBuiltin):
         def replaceWithNil(x):
-            if isinstance(x, Formula) or x.occurringIn(vars):
+            if isinstance(x, Formula) or x.occurringIn(vars) or x.occurringIn(goalWildcards.values()):
                 return None
             return x
         masterPatternTuple = tuple(replaceWithNil(x) for x in (pattern.predicate(),
@@ -653,7 +654,7 @@ class GoalAlphaFilter(AlphaFilter):
             s2.variables  = frozenset(var_bindings.values())
         else:
             s2 = s
-        for  unWantedBindings, env in unify(s2, self.pattern, vars = self.vars | s2.variables): #
+        for  unWantedBindings, env in unify(s2, self.pattern, vars = self.vars | s2.variables | set(self.goalWildcards.values())): #
             # ONLY FOR WILDCARDS: Filter bindings to wildcards.
             # TODO: Weird bindings here (for compliance)
             # TODO: Excess rdf:types!!

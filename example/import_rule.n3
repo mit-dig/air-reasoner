@@ -1,0 +1,15 @@
+# Believe this hides everything inside.  It appears to.
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+
+@forAll :A, :B, :C .
+
+:ImportPolicy a air:Policy;
+	air:rule :BasicRule .
+
+:BasicRule a air:Belief-rule ;
+       air:if { @forSome :X, :Y . :X :left-of :Y . };
+       air:then [ air:import <./basic_rule.n3> ] ;
+       air:else [ air:assert { :thisFormula air:non-compliant-with :Policy . } ] .
+

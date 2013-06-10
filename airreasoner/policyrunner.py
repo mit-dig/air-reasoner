@@ -150,6 +150,8 @@ This is currently only used for goals
         if justification is False:
             if isinstance(node.datum, Rule):
                 pass # not worth the work
+            elif isinstance(node.datum, ImportedRuleset):
+                pass
             if isinstance(node.datum, tuple):
                 if len(node.datum) == 4:
                     self.workingContext.removeStatement(self.getStatement(node.datum))
@@ -170,6 +172,22 @@ This is currently only used for goals
             node.datum.compileToRete()
             if debugLevel >= 4:
                 progress('\t\t ... built rule')
+        elif isinstance(node.datum, ImportedRuleset):
+            # Actually import the ruleset.
+            # TODO: Relative uris
+            pf = store.load(node.datum.uri.uriref())
+            # ruleAssumptions
+            policies, rules, goal_rules, cwm_rules = Rule.compileFormula(node.datum.eventLoop, node.datum.tms, pf, base=False, goalWildcards=goalWildcards)
+            node.datum.tms.assumedPolicies.extend(policies)
+            verbose = False
+            if verbose:
+                print 'run-time import of ', node.datum.uri
+                print 'rules = ', rules + cwm_rules
+                print 'goal rules = ', goal_rules
+            for rule in rules + goal_rules + cwm_rules:
+                a  = node.datum.tms.getThing(rule)
+                #ruleAssumptions.append(a)
+                a.assume()
         if isinstance(node.datum, Symbol):
             if debugLevel >= 2:
                 progress('Now supporting %s because of %s' % (node, justification))
@@ -415,11 +433,13 @@ class RuleFire(object):
                 r2 = r12.pattern
                 support = r12.support
                 ruleId = r12.rule
-                assert isinstance(r2, Rule) or not r2.occurringIn(self.vars), (r2, env, penalty, self.label)
+                assert isinstance(r2, Rule) or isinstance(r2, ImportedRuleset) or not r2.occurringIn(self.vars), (r2, env, penalty, self.label)
 #            print '   ...... so about to assert %s' % r2
                 r2TMS = self.tms.getThingWithEnv(r2, env)
                 if support is None:
                     if isinstance(r2, Rule):
+                        r2TMS.justify(self.sourceNode, triplesTMS + [self.tms.getThing(self)])
+                    elif isinstance(r2, ImportedRuleset):
                         r2TMS.justify(self.sourceNode, triplesTMS + [self.tms.getThing(self)])
                     else:
                         # Delay the justification of assertions in else clauses.
@@ -427,6 +447,8 @@ class RuleFire(object):
                 else:
                     supportTMS = reduce(frozenset.union, support, frozenset())
                     if isinstance(r2, Rule):
+                        r2TMS.justify(ruleId, supportTMS)
+                    elif isinstance(r2, ImportedRuleset):
                         r2TMS.justify(ruleId, supportTMS)
                     else:
                         eventLoop.addAssertion(lambda: r2TMS.justify(ruleId, supportTMS))
@@ -471,13 +493,15 @@ class RuleFire(object):
                 r2 = r12.pattern
                 support = r12.support
                 ruleId = r12.rule
-                assert isinstance(r2, Rule) or not r2.occurringIn(self.vars), (r2, env, penalty, self.label)
+                assert isinstance(r2, Rule) or isinstance(r2, ImportedRuleset) or not r2.occurringIn(self.vars), (r2, env, penalty, self.label)
 #            print '   ...... so about to assert %s' % r2
                 # Justify r2's TMS node with the triples in
                 # triplesTMS, and us as a rule (and any closed world)
                 r2TMS = self.tms.getThingWithEnv(r2, env)
                 if support is None:
                     if isinstance(r2, Rule):
+                        r2TMS.justify(RuleName(self.sourceNode, desc, prompt), triplesTMS + [self.tms.getThing(self)] + altSupport)
+                    elif isinstance(r2, ImportedRuleset):
                         r2TMS.justify(RuleName(self.sourceNode, desc, prompt), triplesTMS + [self.tms.getThing(self)] + altSupport)
                     else:
                         # Delay the justification of assertions in else clauses.
@@ -486,11 +510,28 @@ class RuleFire(object):
                     supportTMS = reduce(frozenset.union, support, frozenset()).union(altSupport)
                     if isinstance(r2, Rule):
                         r2TMS.justify(RuleName(ruleId, desc, prompt), supportTMS)
+                    elif isinstance(r2, ImportedRuleset):
+                        r2TMS.justify(RuleName(ruleId, desc, prompt), supportTMS)
                     else:
                         eventLoop.addAssertion(lambda: r2TMS.justify(RuleName(ruleId, desc, prompt), supportTMS))
 #                assert self.tms.getThing(self).supported
 #                assert r2TMS.supported
 
+class ImportedRuleset(object):
+    """An ImportedRuleset indicates a ruleset that should be imported from
+    a remote URI."""
+    def __init__(self, eventLoop, tms, goalWildcards, uri):
+        self.eventLoop = eventLoop
+        self.tms = tms
+        self.goalWildcards = goalWildcards
+        self.uri = uri
+
+    def substitution(self, env):
+        if not env:
+            return self
+        # TODO: Fix the goal direction with imported rulesets.
+        return self.__class__(self.eventLoop, self.tms, self.goalWildcards,
+                              self.uri.substitution(env))
 
 class Rule(object):
     """A Rule contains all of the information necessary to build the rete
@@ -566,6 +607,13 @@ much how the rule was represented in the rdf network
                 # We will need to traverse descendants.
                 possibleResults.extend([(newResult, possibleResult[0].pattern.vars)
                                         for newResult in possibleResult[0].pattern.result + possibleResult[0].pattern.alt])
+            elif isinstance(possibleResult[0].pattern, ImportedRuleset):
+                # We cannot predict whether this is useful or not
+                # without doing an import, so assert a wildcard.
+                goalFilter.add(StoredStatement((None,
+                                                self.goalWildcards[PRED],
+                                                self.goalWildcards[SUBJ],
+                                                self.goalWildcards[OBJ])))
             else:  # isinstance(possibleResult[0].pattern, Formula)
                 # We have an assertion formula.  Statements in it
                 # are reachable goals.
@@ -671,7 +719,7 @@ much how the rule was represented in the rdf network
             label = self.label
         return self.__class__(self.eventLoop, self.tms, self.vars,
                               label, pattern, self.contextFormula, result, alt,
-                              self.sourceNode, self.goal, self.matchName, base=self.isBase, elided=self.isElided, generated=True)
+                              self.sourceNode, self.goal, self.matchName, base=self.isBase, elided=self.isElided, generated=True, goalWildcards=self.goalWildcards)
 
     @classmethod
     def compileFromTriples(cls, eventLoop, tms, F, ruleNode, goal=False,
@@ -749,6 +797,7 @@ much how the rule was represented in the rdf network
         goal_subrules = []
         assertions = []
         goal_assertions = []
+        import_rules = []
         for node in thenNodes:
             actions = []
             
@@ -820,9 +869,23 @@ much how the rule was represented in the rdf network
                     SubstitutingTuple((goal_assertion, description, prompt)))
                 actions.append(goal_assertion)
             
+            # TODO: Actually add some explanation here...
+            # Get any import...
+            try:
+                import_rule = F.the(subj=node, pred=p['import'])
+                if import_rule is not None:
+                    import_rule = Assertion(ImportedRuleset(eventLoop, tms, goalWildcards, import_rule))
+            except AssertionError:
+                raise ValueError('%s has too many imports in an air:then, being all of %s'
+                                 % (ruleNode, F.each(subj=node, pred=p['import'])))
+            if import_rule is not None:
+                import_rules.append(
+                    SubstitutingTuple((import_rule, description, prompt)))
+                actions.append(import_rule)
+            
             # Make sure there was exactly one of the above.
             if len(actions) != 1:
-                raise ValueError('%s has more than one of {air:rule, air:goal-rule, air:assert, air:assert-goal} in an air:then, being all of %s'
+                raise ValueError('%s has more than one of {air:rule, air:goal-rule, air:assert, air:assert-goal, air:import} in an air:then, being all of %s'
                                  % (ruleNode, actions))
             
         # Get the data from the assertions.
@@ -840,7 +903,7 @@ much how the rule was represented in the rdf network
                     (Assertion(statement),
                      description,
                      prompt)))
-        resultList.append(subrules + assertionObjs + goal_subrules)
+        resultList.append(subrules + assertionObjs + goal_subrules + import_rules)
         
         # Now do what we did to collect the assertions and such for
         # any air:else actions.
@@ -848,6 +911,7 @@ much how the rule was represented in the rdf network
         goal_subrules = []
         assertions = []
         goal_assertions = []
+        import_rules = []
         for node in elseNodes:
             actions = []
             
@@ -919,9 +983,23 @@ much how the rule was represented in the rdf network
                     SubstitutingTuple((goal_assertion, description, prompt)))
                 actions.append(goal_assertion)
             
+            # TODO: Actually add some explanation here...
+            # Get any import...
+            try:
+                import_rule = F.the(subj=node, pred=p['import'])
+                if import_rule is not None:
+                    import_rule = Assertion(ImportedRuleset(eventLoop, tms, goalWildcards, import_rule))
+            except AssertionError:
+                raise ValueError('%s has too many imports in an air:else, being all of %s'
+                                 % (ruleNode, F.each(subj=node, pred=p['import'])))
+            if import_rule is not None:
+                import_rules.append(
+                    SubstitutingTuple((import_rule, description, prompt)))
+                actions.append(import_rule)
+            
             # Make sure there was exactly one of the above.
             if len(actions) != 1:
-                raise ValueError('%s has more than one of {air:rule, air:goal-rule, air:assert, air:assert-goal} in an air:else, being all of %s'
+                raise ValueError('%s has more than one of {air:rule, air:goal-rule, air:assert, air:assert-goal, air:import} in an air:else, being all of %s'
                                  % (ruleNode, actions))
             
         # Get the data from the assertions.
@@ -939,7 +1017,7 @@ much how the rule was represented in the rdf network
                     (Assertion(statement),
                      description,
                      prompt)))
-        resultList.append(subrules + assertionObjs + goal_subrules)
+        resultList.append(subrules + assertionObjs + goal_subrules + import_rules)
         
         node = ruleNode
         matchedGraph = F.the(subj=node, pred=p['matched-graph'])
