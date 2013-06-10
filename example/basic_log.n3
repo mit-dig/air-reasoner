@@ -2,3 +2,4 @@
 
 :block-a :left-of :block-b .
 :block-b :left-of :block-c .
+:block-a :please-import <./basic_rule.n3> .
