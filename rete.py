@@ -32,7 +32,7 @@ OWL_RULES = 'http://dig.csail.mit.edu/TAMI/2007/amord/owl-rules.n3'
 
 def compilePattern(index, patterns, vars, context, buildGoals=False,
                    goalBottomBeta=None, supportBuiltin=None,
-                   ignoreBuiltins=False):
+                   ignoreBuiltins=False, reachedGoal=lambda: False):
     """Compile the RETE network for a given set of patterns and return the
     'goal' node."""
     if buildGoals:
@@ -49,7 +49,8 @@ def compilePattern(index, patterns, vars, context, buildGoals=False,
         # And for each pattern in order, build the alpha filter, join
         # node, and beta memory.
         alpha = AlphaFilter.build(index, pattern, vars, context,
-                                  supportBuiltin=supportBuiltin)
+                                  supportBuiltin=supportBuiltin,
+                                  reachedGoal=reachedGoal)
         current = JoinNode(current, alpha, buildGoals)
         current = BetaMemory(current)
 
@@ -272,13 +273,14 @@ class AlphaFilter(AlphaMemory):
 generates variable bindings
 """
     def __init__(self, pattern, vars, context, index, parents,
-                 supportBuiltin):
+                 supportBuiltin, reachedGoal):
         self.index = index
         self.penalty = 10
         self.parents = parents
         self.pattern = pattern
         self.supportBuiltin = supportBuiltin
         self.context = context
+        self.reachedGoal = reachedGoal
         freeVariables = vars
         def findExistentials(x):
             if hasattr(x, 'spo'):
@@ -329,6 +331,11 @@ generates variable bindings
 
     varCounter = itertools.count()
     def rightActivate(self, s):
+        if self.reachedGoal():
+            # We reached a goal, so this rule should be turned off.
+            print "ALREADY REACHED A GOAL!"
+            return
+
         if s.variables:
             var_bindings = {}
             for var in s.variables:
@@ -350,14 +357,15 @@ generates variable bindings
                 self.add(TripleWithBinding(s, env))
 
     @classmethod
-    def build(cls, index, pattern, vars, context, supportBuiltin):
+    def build(cls, index, pattern, vars, context, supportBuiltin, reachedGoal):
         secondaryAlpha = cls.construct(index, pattern, vars, context,
-                                       supportBuiltin)
+                                       supportBuiltin, reachedGoal)
         secondaryAlpha.initialize()
         return secondaryAlpha
 
     @classmethod
-    def construct(cls, index, pattern, vars, context, supportBuiltin):
+    def construct(cls, index, pattern, vars, context, supportBuiltin,
+                  reachedGoal):
         def replaceWithNil(x):
             if isinstance(x, Formula) or x.occurringIn(vars):
                 return None
@@ -368,7 +376,7 @@ generates variable bindings
 
         parents = []
         secondaryAlpha = cls(pattern, vars, context, index, parents,
-                             supportBuiltin)
+                             supportBuiltin, reachedGoal)
         p, s, o = masterPatternTuple
         V = VAR_PLACEHOLDER
         pts = [(p, s, o)]
@@ -587,7 +595,7 @@ class GoalAlphaFilter(AlphaFilter):
     def __init__(self, pattern, vars, context, index, parents,
                  goalWildcards, supportBuiltin):
         AlphaFilter.__init__(self, pattern, vars, context, index, parents,
-                             supportBuiltin)
+                             supportBuiltin, lambda: False)
         self.goalWildcards = goalWildcards
 
     @classmethod

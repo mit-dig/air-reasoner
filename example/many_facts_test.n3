@@ -1,0 +1,59 @@
+# 1. Look for compliance.
+# 2. Activate left-of rule
+# 3. Deactivate when x->y->z is matched.
+
+@prefix : <http://dig.csail.mit.edu/TAMI/2007/cwmrete/nonce#> .
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#> .
+
+@forAll :A, :B, :C .
+
+:BasicPolicy a air:Policy;
+       air:rule :BasicRule , :TransitiveRule1, :TransitiveRule2 .
+
+# NOTE: We force expansion in ONE direction by defining
+# :transitive-left-of otherwise the reasoner expands in BOTH
+# directions, introducing a search for :A :left-of :B with its
+# corresponding explosion.
+
+# But this raises an interesting question: Can we identify recursive
+# bidirectional explosion and limit it so that we don't get:
+#
+# 1. a left-of b
+# 2. a left-of Y && Y left-of b
+# 3. a left-of X && X left-of Y && Y left-of Z && Z left-of b 
+#
+# Which introduces a general search?
+
+:TransitiveRule1 a air:Belief-rule ;
+       air:if { :A :left-of :B . :B :transitive-left-of :C . } ;
+       air:then [ air:assert { :A :transitive-left-of :C . } ] .
+
+:TransitiveRule2 a air:Belief-rule ;
+       air:if { :A :left-of :B . } ;
+       air:then [ air:assert { :A :transitive-left-of :B . } ] .
+
+# The color MUST be green.
+:BasicRule a air:Belief-rule ;
+       air:if { @forSome :X. :X :color :green . } ;
+       air:then [ air:rule :BasicRule1a ] ;
+       air:else [ air:assert { :thisFormula air:non-compliant-with :BasicPolicy . } ] .
+
+# THE FOLLOWING WON'T WORK!  Why?
+# Because right now we establish the need to look for {:A :left-of :z}
+# before we know what :A is.
+#:BasicRule1a a air:Belief-rule ;
+#       air:if { :A :color :green ; :transitive-left-of :z . } ;
+#       air:then [ air:assert { :A air:compliant-with :BasicPolicy . } ;
+#                  air:description (:A " is a green block left of " :z) ] ;
+#       air:else [ air:assert { :A air:non-compliant-with :BasicPolicy . } ] .
+
+# THIS IS MORE CORRECT because it binds :A first.
+:BasicRule1a a air:Belief-rule ;
+       air:if { :A :color :green . } ;
+       air:then [ air:rule :BasicRule2 ] .
+
+:BasicRule2 a air:Belief-rule ;
+       air:if { :A :transitive-left-of :z . } ;
+       air:then [ air:assert { :A air:compliant-with :BasicPolicy . } ;
+                  air:description (:A " is a green block left of " :z) ] ;
+       air:else [ air:assert { :A air:non-compliant-with :BasicPolicy . } ] .
