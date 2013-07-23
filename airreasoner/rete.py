@@ -51,8 +51,8 @@ def compilePattern(index, patterns, vars, context, buildGoals=False,
         alpha = AlphaFilter.build(index, pattern, vars, context,
                                   supportBuiltin=supportBuiltin,
                                   reachedGoal=reachedGoal)
-        current = JoinNode(current, alpha, buildGoals)
-        current = BetaMemory(current)
+        current = JoinNode(current, alpha, buildGoals, reachedGoal=reachedGoal)
+        current = BetaMemory(current, reachedGoal=reachedGoal)
 
     # The last pattern matched is, of course, the one that triggers
     # any success for the RETE match (and the only one that matters).
@@ -331,11 +331,12 @@ generates variable bindings
 
     varCounter = itertools.count()
     def rightActivate(self, s):
-        if self.reachedGoal():
-            # We reached a goal, so this rule should be turned off.
-            print "ALREADY REACHED A GOAL!"
-            return
-
+        # AlphaMemory is shared, so this is a bad idea.
+#        if self.reachedGoal():
+#            # We reached a goal, so this rule should be turned off.
+#            print "ALREADY REACHED A GOAL!"
+#            return
+#
         if s.variables:
             var_bindings = {}
             for var in s.variables:
@@ -777,11 +778,12 @@ EmptyRoot = EmptyRootClass()
 class BetaMemory(ReteNode):
     """A beta memory stores Tokens, received from the one parent join node
 """
-    def __new__(cls, parent):
+    def __new__(cls, parent, reachedGoal=lambda: False):
         for B in parent.children:
             if isinstance(B, cls):
                 return B  # A join node should only have one child!
         self = ReteNode.__new__(cls, parent)
+        self.reachedGoal = reachedGoal
         self.items = set()
         self.allChildren = set()
         self.empty = True
@@ -790,6 +792,11 @@ class BetaMemory(ReteNode):
         return self
 
     def leftActivate(self, token, triple, newBinding, penalty=0):
+        if self.reachedGoal():
+            # We reached a goal, so this rule should be turned off.
+#            print "ALREADY REACHED A GOAL!"
+            return
+
         newToken = Token(self, token, triple, newBinding, penalty=penalty)
         if newToken.penalty > 10:
             newToken.fail()
@@ -801,6 +808,11 @@ class BetaMemory(ReteNode):
 
 
     def updateFromAbove(self):
+        if self.reachedGoal():
+            # We reached a goal, so this rule should be turned off.
+#            print "ALREADY REACHED A GOAL!"
+            return
+
         parent = self.parent
         parentChildren = parent.children
         parent.children = set([self])
@@ -823,11 +835,12 @@ class JoinNode(ReteNode):
     """A join node combines matches from a beta memory and an alphaFilter
 to get larger matches.
 """
-    def __new__(cls, parent, alphaNode, buildGoals=False):
+    def __new__(cls, parent, alphaNode, buildGoals=False, reachedGoal=lambda: False):
         for child in parent.allChildren:
             if isinstance(child, cls) and child.alphaNode is alphaNode:
                 return child
         self = ReteNode.__new__(cls, parent)
+        self.reachedGoal = reachedGoal
         self.alphaNode = alphaNode
         self.vars = self.parent.vars | self.alphaNode.vars
         if not parent.empty:
@@ -841,6 +854,11 @@ to get larger matches.
         return self
 
     def leftActivate(self, token):
+        if self.reachedGoal():
+            # We reached a goal, so this rule should be turned off.
+#            print "ALREADY REACHED A GOAL!"
+            return
+
         if self.parent.empty:
             self.relinkAlpha()
             # Only delink this join if it's not for a triple that
@@ -889,6 +907,11 @@ to get larger matches.
         return newEnv
 
     def rightActivate(self, triple_holder):
+        if self.reachedGoal():
+            # We reached a goal, so this rule should be turned off.
+#            print "ALREADY REACHED A GOAL!"
+            return
+
         if self.alphaNode.empty:
             self.relinkBeta()
             if self.parent.empty:
