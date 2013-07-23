@@ -350,7 +350,7 @@ These are then passed to the scheduler
         self.tms = tms
         self.args = args
 
-    def __call__(self, eventLoop):
+    def __call__(self, eventLoop=None):
         self.tms.justifyAuxTriple(*self.args)
 
 class RuleName(object):
@@ -722,16 +722,29 @@ much how the rule was represented in the rdf network
         if environment not in self.goalEnvironments:
             # Only ever assert goals for a given environment once.
             self.goalEnvironments.add(environment)
-            patterns = self.pattern.statements
-            if self.goal:
-                workingContext = self.tms.getContext(GOAL)
+
+            substituted_self = self.substitution(environment.asDict())
+            patterns = substituted_self.pattern.statements
+
+            # NOTE: Because this is a new Rule object, it has yet to
+            # be supported in the TMS.  We must justify it identically
+            # to how we justified this rule, before any conclusions
+            # will also be supported.
+            baseTMS = self.tms.getThing(self)
+            substitutedTMS = self.tms.getThing(substituted_self)
+            # We support this substituted rule contingent ONLY on the
+            # original rule.
+            substitutedTMS.justify(RuleName(self.sourceNode, '', ''), [baseTMS])
+
+            if substituted_self.goal:
+                workingContext = substituted_self.tms.getContext(GOAL)
             else:
-                workingContext = self.tms.workingContext
+                workingContext = substituted_self.tms.workingContext
             index = workingContext._index
             for triple in patterns:
                 triple = triple.substitution(environment)
-                (s, p, o), newVars = canonicalizeVariables(triple, self.vars)
-                self.eventLoop.add(AuxTripleJustifier(self.tms, GOAL, s, p, o, newVars, self.sourceNode, [self.tms.getThing(self)]))
+                (s, p, o), newVars = canonicalizeVariables(triple, substituted_self.vars)
+                substituted_self.eventLoop.addAssertion(AuxTripleJustifier(substituted_self.tms, GOAL, s, p, o, newVars, substituted_self.sourceNode, [substituted_self.tms.getThing(substituted_self)]))
 
             # TODO: Pass the environment.
             # TODO: This isn't triggering for the right things.
@@ -740,18 +753,7 @@ much how the rule was represented in the rdf network
             # build more retes but probably do less work with
             # recursive rules!
             def reallyCompileRete(eventLoop):
-                substituted_self = self.substitution(environment.asDict())
-                patterns = substituted_self.pattern.statements
-
-                # NOTE: Because this is a new Rule object, it has yet
-                # to be supported in the TMS.  We must justify it
-                # identically to how we justified this rule, before
-                # any conclusions will also be supported.
-                baseTMS = self.tms.getThing(self)
-                substitutedTMS = self.tms.getThing(substituted_self)
-                # We support this substituted rule contingent ONLY on
-                # the original rule.
-                substitutedTMS.justify(RuleName(self.sourceNode, '', ''), [baseTMS])
+#                print "really compile", patterns
 
                 bottomBeta = MM.compilePattern(index, patterns, substituted_self.vars, substituted_self.contextFormula, supportBuiltin=substituted_self.supportBuiltin, reachedGoal=lambda: substituted_self.reachedGoal)
                 trueBottom =  MM.ProductionNode(bottomBeta, substituted_self.onSuccess, substituted_self.onFailure)
@@ -759,13 +761,17 @@ much how the rule was represented in the rdf network
             self.eventLoop.pushPostGoal(reallyCompileRete)
 
     def onSuccess(self, (triples, environment, penalty)):
+        event = RuleFire(self, triples, environment, penalty, self.result)
+#        print "succeeded", self.pattern.statements, event
         self.success = True
-        self.eventLoop.add(RuleFire(self, triples, environment, penalty, self.result))
+        self.eventLoop.add(event)
 
     def onFailure(self):
         assert not self.success
         if self.alt:
-            self.eventLoop.addAlternate(RuleFire(self, [], Env(), 0, self.alt, alt=True))
+            event = RuleFire(self, [], Env(), 0, self.alt, alt=True)
+#            print "failed", self.pattern.statements, event
+            self.eventLoop.addAlternate(event)
 
     def onReachedGoal(self, (triples, environment, penalty)):
         self.reachedGoal = True
@@ -1194,10 +1200,12 @@ fire only when there are no events to fire.
     def add(self, event):
 #        if hasattr(event, 'rule'):
 #            print "add", event.rule
+#        print "add", event
         self.events.appendleft(event)
 
     def addAlternate(self, event):
 #        print "addAlternate", event.rule
+#        print "addAlternate", event
         if self.phase != EventLoop.PHASE_CLOSED:
             self.alternateEvents.appendleft(event)
         else:
@@ -1210,6 +1218,7 @@ fire only when there are no events to fire.
 
         # Also, this runs as a stack.  Goals matched later will
         # execute first.
+#        print "postGoal", event
         self.postGoalEvents.append(event)
     
     def addAssertion(self, event):
@@ -1220,31 +1229,52 @@ fire only when there are no events to fire.
             event()
 
     def next(self):
+        # Order of events is as follows:
+        #
+        # 1. Exhaust all possible open world events (successes)
+        # 2. Close the world and exhaust all EXISTING alternative events (failures) while queuing new ones.
+        # 3. Exhaust all assertion events resulting from the above.
+        # 4. Build no more than one Rete tree (the least recently requested build[?]  I'm not sure why it's least rather than most, but sure.).
+        # 5. If a Rete tree was built, goto 1.
+        # 6. If any open world events are newly pending, goto 1.
+        # 7. If any alternative events are newly pending, goto 2.
         if self.phase == EventLoop.PHASE_OPEN and self.events:
-            return self.events.pop()(self)
+            event = self.events.pop()
+#            print "open event", event
+            return event(self)
         elif self.phase <= EventLoop.PHASE_CLOSED and self.alternateEvents:
-#            print "close!"
+            event = self.alternateEvents.pop()
+#            print "closed event", event
             self.phase = EventLoop.PHASE_CLOSED
-            return self.alternateEvents.pop()(self)
+            return event(self)
         elif self.phase <= EventLoop.PHASE_REOPEN and self.assertionEvents:
             self.phase = EventLoop.PHASE_REOPEN
             if len(self.newAlternateEvents) > 0:
                 self.alternateEvents = self.newAlternateEvents
                 self.newAlternateEvents = deque()
-            return self.assertionEvents.pop()()
-        elif self.events:
-#            print "open!"
+            event = self.assertionEvents.pop()
+#            print "reopening event", event
+            return event()
+        elif self.phase <= EventLoop.PHASE_REOPEN and self.postGoalEvents:
             self.phase = EventLoop.PHASE_OPEN
             if len(self.newAlternateEvents) > 0:
                 self.alternateEvents = self.newAlternateEvents
                 self.newAlternateEvents = deque()
-            return self.events.pop()(self)
+            event = self.postGoalEvents.popleft()
+#            print "build", event
+            return event(self)
+        elif self.events:
+            self.phase = EventLoop.PHASE_OPEN
+            if len(self.newAlternateEvents) > 0:
+                self.alternateEvents = self.newAlternateEvents
+                self.newAlternateEvents = deque()
+            event = self.events.pop()
+#            print "force open event", event
+            return event(self)
         elif self.alternateEvents:
             self.phase = EventLoop.PHASE_CLOSED
-            return self.alternateEvents.pop()(self)
-        elif self.postGoalEvents:
-            event = self.postGoalEvents.pop()
-#            print "pop", event
+            event = self.alternateEvents.pop()
+#            print "force closed event", event
             return event(self)
         else:
             if len(self.newAlternateEvents) > 0:
@@ -1527,6 +1557,15 @@ knownScenarios = {
               'http://dice.csail.mit.edu/idm/MA/rules/mgl_sameAs.n3',
               'file://' + os.path.abspath(os.path.join(os.path.realpath(__file__), '../../tests/idm_nonce.n3'))],
              ['http://dice.csail.mit.edu/idm/MA/rules/MGL_6-172.n3']),
+    'millie' : (['http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_6-172_ONT.n3',
+              'http://dig.csail.mit.edu/2010/DHS-fusion/MA/profiles/MiaAnalysa',
+              'http://dig.csail.mit.edu/2010/DHS-fusion/MA/profiles/MillieRecruiting',
+              'http://dice.csail.mit.edu/xmpparser.py?uri=http://dig.csail.mit.edu/2010/DHS-fusion/MA/documents/Fake_Recruiter_Response.badxmp.pdf',
+              'http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_66A-1_ONT.n3',
+              'http://dig.csail.mit.edu/2010/DHS-fusion/common/fusion_ONT.n3',
+              'http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/mgl_sameAs.n3',
+              'file://' + os.path.abspath(os.path.join(os.path.realpath(__file__), '../../tests/millie_nonce.n3'))],
+             ['http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_6-172.alt.n3']),
 }
 
 def runScenario(s, others=[], verbose=False, customBaseRulesURI=False, customBaseFactsURI=False):
