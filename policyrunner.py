@@ -687,7 +687,7 @@ much how the rule was represented in the rdf network
             compliancePredicates = [goal1[PRED].store.newSymbol(pred) for pred in compliancePredicates]
 
             if goal1[SUBJ] == goal2[SUBJ] and goal1[OBJ] == goal2[OBJ] and goal1[PRED] in compliancePredicates and goal2[PRED] in compliancePredicates:
-                reachableGoalCount == 1
+                reachableGoalCount = 1
 
         if reachableGoalCount == 1:
             # Check to make sure that everything is bound.
@@ -704,7 +704,7 @@ much how the rule was represented in the rdf network
             if not foundUnboundVar:
                 # No unbound variables left, so we can build the "off
                 # switch"
-                bottomBeta = MM.compileGoalPattern(self.tms.workingContext._index, patterns, self.vars, self.goalWildcards, self.tms.workingContext, self.reachableGoals, supportBuiltin=self.supportBuiltin)
+                bottomBeta = MM.compileGoalPattern(self.tms.workingContext._index, self.reachableGoals, self.vars, self.goalWildcards, self.tms.workingContext, self.reachableGoals, supportBuiltin=self.supportBuiltin)
                 trueBottom =  MM.ProductionNode(bottomBeta, self.onReachedGoal, lambda: True)
 
     def supportBuiltin(self, triple):
