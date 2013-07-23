@@ -1,0 +1,956 @@
+# $Date: $
+# $Revision: $
+# $Author: wdc $
+
+# by William D. Cattey, based on mglRule.n3 by Rafael Crespo 
+# and MGL_6-172 written by Patrick Vatterott as amended by the group.
+# Policy file for MGL 6-172.
+
+@prefix foaf:  <http://xmlns.com/foaf/0.1/>.
+@prefix air: <http://dig.csail.mit.edu/TAMI/2007/amord/air#>.
+@prefix owl: <http://www.w3.org/2002/07/owl#>.
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+@prefix log: <http://www.w3.org/2000/10/swap/log#>.
+@prefix mgl: <http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_6-172_ONT#>.
+#@prefix mgl: <http://musigma.csail.mit.edu/MGL_6-172_ONT#>.
+
+@prefix mglcja: <http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_66A-1_ONT#>.
+@prefix mgl66a: <http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_66A-1#>.
+@prefix board_cert: <http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_Board_Certified#>.
+@prefix time: <http://www.w3.org/2000/10/swap/time#>.
+@prefix math: <http://www.w3.org/2000/10/swap/math#>.
+@prefix : <http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_6-172#>.
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>.
+@prefix fusion: <http://dig.csail.mit.edu/2010/DHS-fusion/common/fusion_ONT#>.
+
+@forAll :S, :P, :R, :INFO, :IMPOSED, :LENGTH, :EVENT.
+@forAll :SENDER, :RECEIVER, :DOC-DATA, :DATA, :SUBJECT.
+@forAll :SITUATION, :HERE, :AGENCY, :FUNCTION, :CORI.
+@forAll :ONTOLOGY, :ONTOLOGY2, :LOG, :CONJUNCTION.
+@forAll :CHAR-SUB-PROPERTY, :MEMBERSHIP.
+@forAll :CONVICTION_DATA, :CUSTODY_STATUS, :ABOUT.
+@forAll :DATE, :DATE-IN-SECS, :WEEK-FROM-DATE, :CUR-DATE, :CUR-DATE-IN-SECS.
+@forAll :RELEASE-DATE, :RELEASE-DATE-IN-SECS, :YEAR-IN-SECS, :MAX-LENGTH, :ENDPOINT.
+@forAll :TWO-YEARS-IN-SECS, :THREE-YEARS-IN-SECS.
+
+:MGL_Ann_6_172 rdfs:seeAlso "http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_6-172_ONT.n3".
+:MGL_Ann_6_172 rdfs:seeAlso "http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_66A-1_ONT.n3".
+:MGL_Ann_6_172 rdfs:seeAlso "http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/mgl_sameAs.n3".
+:MGL_Ann_6_172 fusion:transaction_ontology "http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_6-172_ONT".
+
+:MGL_Ann_6_172 a air:Policy;
+    air:rule :MGL_66A-1;			# Test for Criminal Justice Agency affiliation.
+    air:rule :MGL_Org_Membership;		# Find membership in FOAF if any.
+#    air:rule :MGL_DEBUG;
+    air:rule :MGL_Data_is_About;
+    air:rule :MGL_Conviction_Data;
+    air:rule :MGL_Custody_Status;
+    air:rule :MGL_Sentence_Imposed;
+    air:rule :MGL_Maximum_Sentence_Length;
+    # air:rule :MGL_Personal_Characteristics;	# Set up tests for Personal Characteristics if we don't use air:owlEntails in dig0011
+    air:rule :MGL_6_172_Para_1_Sent_1;		# Test for dissemination to valid agency. dig0001, dig0002, dig0003
+    	     					# or a valid written request by anyone dig0015.
+   						# Test for dissemination of court data summary by parole board dig0018b
+    						# Test for dissemination of court data after a conviction. dig0020
+    						# Finally, test for conflict of rules instruction.  dig0018
+    rdfs:comment "Dissemination of record information; certification; eligibility for access; scope of inquiry; listing; access limited; rules; use of information";
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172".
+
+:MGL_DEBUG a air:Belief-rule;
+    rdfs:comment "Use this to single step when it says there is nothing to prove.";
+    air:if {
+        :EVENT a mgl:Disseminate, mgl:Request;
+            mgl:by :S;
+            mgl:to :R;
+            mgl:data :INFO;
+            mgl:doc-data :DATA.
+        :S log:semantics :SENDER.
+        :R log:semantics :RECEIVER.
+        :DATA log:semantics :DOC-DATA.
+	:SENDER log:includes { :S foaf:government_type mgl:MA_Executive_Branch. }.
+        :R foaf:member :MEMBERSHIP.
+	@forSome :board_list.
+        board_cert:Board_Certified log:semantics :board_list.
+	:board_list log:includes { board_cert:Board_Certified foaf:Organization :MEMBERSHIP. }.
+    };
+    air:then [
+        air:description (:R " is a member of " :MEMBERSHIP " which is certified by the board, as required by MGL 6-172 Paragraph 2.");
+	air:assert [air:statement {:EVENT air:compliant-with :MGL_DEBUG.}]].
+
+# Document may contain indication that it is about Criminal_Offender_Record_Information in
+# and rdf:type or "a" triple.  Extract that into the :ABOUT variable.
+:MGL_Data_is_About a air:Belief-rule;
+    rdfs:comment "Fetch what this document is about, if possible.";
+    air:if {
+        :EVENT a mgl:Disseminate, mgl:Request;
+            mgl:by :S;
+            mgl:to :R;
+            mgl:data :INFO;
+            mgl:doc-data :DATA.
+        :DATA log:semantics :DOC-DATA.
+	:DOC-DATA log:includes {:INFO a :ABOUT. }.
+    };
+    air:then [ 
+	air:description (  :INFO " is a " :ABOUT ".");
+	air:assert [air:statement {
+		   :INFO a :ABOUT .
+        } ]].
+
+# Extract Conviction data from data file once in case we need it.
+:MGL_Conviction_Data a air:Belief-rule;
+    rdfs:comment "Fetch conviction data if any.";
+    air:if {
+        :EVENT a mgl:Disseminate, mgl:Request;
+            mgl:by :S;
+            mgl:to :R;
+            mgl:data :INFO;
+            mgl:doc-data :DATA.
+        :DATA log:semantics :DOC-DATA.
+	#:DOC-DATA log:includes {:INFO mgl:convicted_pursuant :CONVICTION_DATA. }.
+	<http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_6-172_ONT.n3> log:semantics :ONTOLOGY .
+	<http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/mgl_sameAs.n3> log:semantics :ONTOLOGY2 .
+	(:ONTOLOGY :ONTOLOGY2 :DOC-DATA) log:conjunction :CONJUNCTION .
+	:CONJUNCTION air:owlEntails { :INFO mgl:convicted_pursuant :CONVICTION_DATA. } .
+    };
+    air:then [ 
+	air:description (  :INFO " contains conviction data. Subject is convicted pursuant to " :CONVICTION_DATA ".");
+	air:assert [air:statement {
+		   :INFO a mgl:Conviction_Data.
+        } ]].
+
+:MGL_Custody_Status a air:Belief-rule;
+    rdfs:comment "Fetch Custody Status if any.";
+    air:if {
+        :EVENT a mgl:Disseminate, mgl:Request;
+            mgl:by :S;
+            mgl:to :R;
+            mgl:data :INFO;
+            mgl:doc-data :DATA.
+        :DATA log:semantics :DOC-DATA.
+	#:DOC-DATA log:includes {:INFO mgl:has_custody_status :CUSTODY_STATUS. }.
+	<http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_6-172_ONT.n3> log:semantics :ONTOLOGY .
+	<http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/mgl_sameAs.n3> log:semantics :ONTOLOGY2 .
+	(:ONTOLOGY :ONTOLOGY2 :DOC-DATA) log:conjunction :CONJUNCTION .
+	:CONJUNCTION air:owlEntails { :INFO mgl:has_custody_status :CUSTODY_STATUS. } .
+    };
+    air:then [ 
+	air:description (  :INFO " contains custody status: " :CUSTODY_STATUS ".");
+	air:assert [air:statement {
+		   :INFO mgl:has_custody_status :CUSTODY_STATUS.
+        } ]].
+
+:MGL_Sentence_Imposed a air:Belief-rule;
+    rdfs:comment "Fetch sentence imposed if any.";
+    air:if {
+        :EVENT a mgl:Disseminate, mgl:Request;
+            mgl:by :S;
+            mgl:to :R;
+            mgl:data :INFO;
+            mgl:doc-data :DATA.
+        :DATA log:semantics :DOC-DATA.
+	<http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_6-172_ONT.n3> log:semantics :ONTOLOGY .
+	<http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/mgl_sameAs.n3> log:semantics :ONTOLOGY2 .
+	(:ONTOLOGY :ONTOLOGY2 :DOC-DATA) log:conjunction :CONJUNCTION .
+	:CONJUNCTION air:owlEntails { :INFO mgl:sentence_imposed :ENDPOINT. } .
+    };
+    air:then [ 
+	air:description (  :INFO " Subject received sentence: " :ENDPOINT ".");
+	air:assert [air:statement {
+		   :INFO mgl:sentence_imposed :ENDPOINT.
+        } ]].
+
+:MGL_Maximum_Sentence_Length a air:Belief-rule;
+    rdfs:comment "Fetch maximum allowable sentence length if any.";
+    air:if {
+        :EVENT a mgl:Disseminate, mgl:Request;
+            mgl:by :S;
+            mgl:to :R;
+            mgl:data :INFO;
+            mgl:doc-data :DATA.
+        :DATA log:semantics :DOC-DATA.
+	<http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_6-172_ONT.n3> log:semantics :ONTOLOGY .
+	<http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/mgl_sameAs.n3> log:semantics :ONTOLOGY2 .
+	(:ONTOLOGY :ONTOLOGY2 :DOC-DATA) log:conjunction :CONJUNCTION .
+	:CONJUNCTION air:owlEntails { :INFO mgl:maximum_allowable_sentence_length :MAX-LENGTH. } .
+    };
+    air:then [ 
+	air:description (  :INFO " maximum allowable sentence length of: " :MAX-LENGTH ".");
+	air:assert [air:statement {
+		   :INFO mgl:maximum_allowable_sentence_length :MAX-LENGTH.
+        } ]].
+
+:MGL_66A-1 a air:Belief-rule;
+    air:if {
+    	:EVENT mgl:to :R.
+        @forSome :log, :logsame, :rule .
+	# We don't need the MGL_66A-1_ONT.n3 in our call out to MGL_66A-1. 
+        <http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/mgl_sameAs.n3> log:semantics :logsame .
+	( { :R a mglcja:Party . } :logsame ) log:conjunction :log .
+#        <file:///home/wdc/DIG/DHS-fusion/MA/rules/MGL_66A-1.n3> log:semantics :rule.
+        <http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_66A-1.n3> log:semantics :rule.
+        ( ( :log ) ( :rule ) ) air:justifies 
+           { :R air:compliant-with mgl66a:MGL_Ann_66A-1 .
+	     :R fusion:authorized_purpose :FUNCTION . } } ;
+    air:then [ 
+        air:description ( :R " performing function " :FUNCTION " is a member of a Criminal Justice Agency as defined by MGL 66A-1." );
+#        air:assert [ air:statement { :R air:compliant-with :MGL_66A-1 . } ] ] .
+        air:assert [ air:statement { :R a mglcja:member . } ] ] .
+
+# Old version of the MGL_66 implementation.  Superceded by the call out with air:justifies.
+# This is necessary as a separate rule because, after we extract the fusion:authorized_purpose
+# using log:includes, we must assert it as a truth in order to reason about it later.
+# Currently that is the only way to then do a cross-ontology test where we include
+# information into the knowledge base that says a function in one ontology is the same
+# as a function in another.
+
+:MGL_66_old a air:Belief-rule;
+    rdfs:comment "Compute our agency affiliation.";
+    air:if {
+        :EVENT a mgl:Disseminate, mgl:Request;
+            mgl:by :S;
+            mgl:to :R;
+            mgl:data :INFO;
+            mgl:doc-data :DATA.
+        :S log:semantics :SENDER.
+        :R log:semantics :RECEIVER.
+        :DATA log:semantics :DOC-DATA.
+	# :SENDER log:includes { :S foaf:government_type mgl:MA_Executive_Branch. }. # Turn off this test.
+        :RECEIVER log:includes {:R fusion:authorized_purpose :FUNCTION. }.
+        # :SITUATION log:semantics :HERE.
+        # Add extract of who INFO is about when doc has it added.
+        # :DOC-DATA log:includes { :INFO rdf:about :SUBJECT. }.
+    };
+    air:then [ 
+	air:description (  :R " performs function " :FUNCTION ".");
+	air:assert [air:statement {:R fusion:authorized_purpose :FUNCTION.} ]
+    ].
+
+# We pull organizational membership from the Receiver's FOAF file if it exists.
+:MGL_Org_Membership a air:Belief-rule;
+    rdfs:comment "Compute our agency affiliation.";
+    air:if {
+        :EVENT a mgl:Disseminate, mgl:Request;
+            mgl:by :S;
+            mgl:to :R;
+            mgl:data :INFO;
+            mgl:doc-data :DATA.
+        :R log:semantics :RECEIVER.
+        :RECEIVER log:includes {:R foaf:member :MEMBERSHIP. }.
+    };
+    air:then [ 
+	air:description (  :R " is a member of organization " :MEMBERSHIP ".");
+	air:assert [air:statement {:R foaf:member :MEMBERSHIP.} ]
+#	air:assert [air:statement {:EVENT air:compliant-with :MGL_Org_Membership.}]
+    ].
+
+:MGL_Personal_Characteristics a air:Belief-rule;
+    air:if {
+        :EVENT a mgl:Disseminate, mgl:Request;
+            mgl:by :S;
+            mgl:to :R;
+            mgl:data :INFO;
+            mgl:doc-data :DATA.
+        :S log:semantics :SENDER.
+        :DATA log:semantics :DOC-DATA.
+	:SENDER log:includes { :S foaf:government_type mgl:MA_Executive_Branch. }.
+    };
+    air:then [ 
+	air:rule :MGL_subject_name ].
+
+:MGL_subject_name a air:Belief-rule;
+    air:if {
+        :DOC-DATA log:includes {:INFO mgl:subject_name :SUBJECT. }.
+    };
+    air:then [ 
+	air:description (  :INFO " is named " :SUBJECT ".");
+	air:assert [air:statement {
+		   :INFO mgl:subject_name :SUBJECT;
+		       mgl:personal_characteristics mgl:subject_name.
+        } ]];
+    air:else [ air:rule :MGL_subject_fingerprints ].
+
+:MGL_subject_fingerprints a air:Belief-rule;
+    air:if {
+        :DOC-DATA log:includes {:INFO mgl:subject_fingerprints :SUBJECT. }.
+    };
+    air:then [ 
+	air:description (  :INFO " has fingerprints: " :SUBJECT ".");
+	air:assert [air:statement {
+		   :INFO mgl:subject_fingerprints :SUBJECT;
+		       mgl:personal_characteristics mgl:subject_fingerprints.
+        } ]];
+    air:else [ air:rule :MGL_subject_other ].
+
+:MGL_subject_other a air:Belief-rule;
+    air:if {
+        :DOC-DATA log:includes {:INFO mgl:subject_other :SUBJECT. }.
+    };
+    air:then [ 
+	air:description (  :INFO " has other personally identifiable characteristic: " :SUBJECT ".");
+	air:assert [air:statement {
+		   :INFO mgl:subject_name :SUBJECT;
+		       mgl:personal_characteristics mgl:subject_other.
+        } ]].
+
+#:MGL_6_172_Para_1_Sent_1 a air:Belief-rule;	
+#    rdfs:comment "No agency or individual shall have access to criminal offender record information.";
+#    air:if {
+#        :EVENT a mgl:Disseminate, mgl:Request;
+#            mgl:by :S;
+#            mgl:to :R;
+#            mgl:data :INFO;
+#            mgl:doc-data :DATA.
+#        :S log:semantics :SENDER.
+#        :R log:semantics :RECEIVER.
+#        :DATA log:semantics :DOC-DATA.
+#	:SENDER log:includes { :S foaf:government_type mgl:MA_Executive_Branch. }.
+#        # Add extract of who INFO is about when doc has it added.
+#        # :DOC-DATA log:includes { :INFO mgl:about :SUBJECT. }.
+#    };
+#    air:then [ 
+#	air:description (  :INFO " is a dissemination by " :S " to " :R ", designated as " :EVENT);
+#	air:rule :MGL_6_172_Para_1_Sent_1_a
+#    ].
+
+:MGL_6_172_Para_1_Sent_1 a air:Belief-rule;
+    rdfs:comment "No agency or individual shall have access to criminal offender record information.";
+    air:if {
+        :EVENT a mgl:Disseminate, mgl:Request;
+            mgl:by :S;
+            mgl:to :R;
+            mgl:data :INFO;
+            mgl:doc-data :DATA.
+        :S log:semantics :SENDER.
+        :R log:semantics :RECEIVER.
+        :DATA log:semantics :DOC-DATA.
+        :SENDER log:includes { :S foaf:government_type mgl:MA_Executive_Branch. }.
+        # Add extract of who INFO is about when doc has it added.
+        # :DOC-DATA log:includes { :INFO mgl:about :SUBJECT. }.
+    };
+#    air:then [
+#        #test
+#        air:assert [air:statement {:EVENT air:non-compliant-with :MGL_6_172_Para_1_Sent_1_a.}]
+#    ];
+    air:then [
+        #dig0001, 1(a)
+        air:description (  :INFO " is a dissemination by " :S " to " :R ", designated as " :EVENT);
+        air:rule :MGL_6_172_Para_1_Sent_1_a
+    ];
+    air:then [
+        #dig0002, 1(b)
+        air:rule :MGL_6_172_Para_1_Sent_1_b
+    ];
+    air:then [
+        #dig0003, 1(c)
+        air:rule :MGL_6_172_Para_1_Sent_1_c
+    ];
+    air:then [
+        #dig0015, 6
+        air:rule :MGL_6_172_Para_6
+    ];
+    air:then [
+        #dig0020, 7_2
+        air:rule :MGL_6_172_Para_7_Sent_2
+    ];
+    # This should be a cleanup rule
+    air:then [
+#        air:description (  :INFO " is a dissemination by " :S " to " :R ", designated as " :EVENT);
+        air:rule :MGL_6_172_Para_1_Sent_1_conclude
+    ].
+
+#dig00001
+:MGL_6_172_Para_1_Sent_1_a a air:Belief-rule;
+    # Conditioned on dig0004 and dig0008, and (dig0011 or dig0013)
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172 Paragraph, 1, Sentence 1 (a)";
+    rdfs:comment "Except as otherwise provided in this section and sections one hundred and seventy-three to one hundred and seventy-five, inclusive, criminal offender record information, and where present, evaluative information, shall be disseminated, whether directly or through any intermediary, only to criminal justice agencies.";
+    air:if {
+        :R a mglcja:member .
+    	:ABOUT a mgl:Criminal_Offender_Record_Information.
+    };
+    air:then [
+        air:description
+            ( :INFO " contains " mgl:Criminal_Offender_Record_Information ", and " 
+	    :R
+	    " is a member of a Criminal Justice Agency as defined by MGL 66A-1.");
+        # Continue at dig0004 for more conditions
+        air:rule :MGL_6_172_Para_1_Sent_2_Cl_1 ];
+    air:else [
+#        air:description (:R "does not appear to be a member of a Criminal Justice Agency as required by MGL 6-172, Para. 1, Sent. 1(a).  This may be because" :R " has not been identified as associated with a Criminal Justice Agency or may not be identified as performing a function listed by MGL 66A-1 to be recognized as a member of a Criminal Justice Agency.  Compliant dissemination may be possible under other criteria.");
+        air:comment "Try the other classes of dissemination.  Linkage back to this from other policies that assert the exception to this rule will also need to be made. For now the exceptions are other rules run in sequence.";
+	# Continue at dig0002 for other classes of dissemination.
+  
+        # Don't fire rule 1_b, assert mgl:non-compliance instead
+	#air:rule :MGL_6_172_Para_1_Sent_1_b 
+        air:assert [air:statement {:EVENT mgl:non-compliant-with :MGL_6_172_Para_1_Sent_1_a.}]
+    ].
+
+#dig0002
+:MGL_6_172_Para_1_Sent_1_b a air:Belief-rule;
+    # Conditioned on dig0005 and dig0008, dig0011 and  dig0012.
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172 Paragraph, 1, Sentence 1 (b)";
+    rdfs:comment "Except as otherwise provided in this section and sections one hundred and seventy-three to one hundred and seventy-five, inclusive, criminal offender record information, and where present, evaluative information, shall be disseminated, whether directly or through any intermediary, only to such other agencies and individuals required to have access to such information by statute including United States Armed Forces recruiting offices for the purpose of determining whether a person enlisting has been convicted of a felony as set forth in Title 10, section 504 of the United States Code; to the active or organized militia of the commonwealth for the purpose of determining whether a person enlisting has been convicted of a felony.";
+    air:if {
+        :DOC-DATA log:includes { :INFO a mgl:Enlistment_Inquiry }. # XXX Add this to MGL.n3 ontology.
+	:ABOUT a mgl:Criminal_Offender_Record_Information.
+        # :DOC-DATA log:includes { :INFO a mgl:Criminal_Offender_Record_Information }.
+    };
+    air:then [
+        air:description
+	    ( :INFO " contains " mgl:Criminal_Offender_Record_Information ", and subject is enlisting as required by MGL_6-172, Sentence 1 (b). ");
+	# Continue with dig0005 for conditionals.
+        air:rule :MGL_6_172_Para_1_Sent_2_Cl_2 ];
+    air:else [
+        air:description ( "Subject is not enlisting.  Compliant dissemination may be possible under other criteria.");
+	# Continue at dig0003 for another class of dissemination.
+	
+        # Don't fire rule 1_c, assert mgl:non-compliance instead
+        #air:rule :MGL_6_172_Para_1_Sent_1_c 
+        air:assert [air:statement {:EVENT mgl:non-compliant-with :MGL_6_172_Para_1_Sent_1_b.}]
+    ].
+
+
+#dig0003
+:MGL_6_172_Para_1_Sent_1_c a air:Belief-rule;
+    # Conditioned on dig0006, dig0011 and  dig0012
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 1, Sentence 1 (c)";
+    rdfs:comment "Except as otherwise provided in this section and sections one hundred and seventy-three to one hundred and seventy-five, inclusive, criminal offender record information, and where present, evaluative information, shall be disseminated, whether directly or through any intermediary, only to any other agencies and individuals where it has been determined that the public interest in disseminating such information to these parties clearly outweighs the interest in security and privacy.";
+    air:if {
+        :SITUATION mgl:context :Public_interest_outweights_privacy. # XXX This is something we need to get from user dialog.
+        :ABOUT a mgl:Criminal_Offender_Record_Information.
+	# :DOC-DATA log:includes { :INFO a mgl:Criminal_Offender_Record_Information }.
+    };
+    air:then [
+	air:description
+	    ( :INFO " contains " mgl:Criminal_Offender_Record_Information ", and public interest outweighs privacy as required by MGL_6-172, Sentence 1 (c). ");
+        # Continue at dig0006 for more conditions.
+        air:rule :MGL_6_172_Para_1_Sent_2_Cl_3 ];
+    air:else [
+        air:comment "Cannot be disseminated in compliance with MGL 6-172 Para. 1, Sent. 1 (a), (b) or (c).  Try additional criteria."; 
+
+        # Don't fire rule 6, assert mgl:non-compliance instead
+	#air:rule :MGL_6_172_Para_6 
+        air:assert [air:statement {:EVENT mgl:non-compliant-with :MGL_6_172_Para_1_Sent_1_c.}]
+    ].			# Test for a valid written request by anyone.  dig0015
+
+#dig000new
+:MGL_6_172_Para_1_Sent_1_conclude a air:Belief-rule;
+    air:if {
+        :EVENT    mgl:non-compliant-with :MGL_6_172_Para_1_Sent_1_a, :MGL_6_172_Para_1_Sent_1_b, :MGL_6_172_Para_1_Sent_1_c.
+    } ;
+    air:then [
+        air:description ("The facts presented do not match the criteria for compliance with MGL 6-172, Para. 1, Sent. 1(a), (b), or (c).");
+        air:assert [air:statement {:EVENT air:non-compliant-with :MGL_6_172_Para_1_Sent_1.}]] ;
+
+    #air:then [
+    #    air:assert { :EVENT air:non-compliant-with :MGL_6_172_Para_1_Sent_1. 
+#	air:description ("The facts presented do not match the criteria for compliance with MGL 6-172, Para. 1, Sent. 1(a), (b), or (c).");
+# } 
+#    ] ;
+
+    air:else [
+        air:assert { :EVENT air:compliant-with :MGL_6_172_Para_1_Sent_1. } ].
+ 
+ 
+
+#dig0004
+# This will need to obtain information from the outside to assert subjective criteria.
+:MGL_6_172_Para_1_Sent_2_Cl_1 a air:Belief-rule;
+    # Is a condition of dig0001
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172 Paragraph 1 Sentence 2, Clause 1.";
+    rdfs:comment "The extent of such access shall be limited to that necessary for the actual performance of the criminal justice duties of criminal justice agencies under clause (a).";
+    air:if {
+        :EVENT a mgl:Disseminate. # Trivially true statement because otherwise our air:if is empty and therefore False.
+#        :SITUATION mgl:context :necessary_for_performance_of_duties. # XXX Subjective criteria. We can't handle this yet.
+#        :SITUATION mgl:context :actually_performing_duties. # XXX Subjective criteria. We can't handle this yet.
+    };
+    # Conditioned on dig0008, and (dig0011 or dig0013)
+    air:then [
+	air:description
+	    ("Compliance additionally requires: "
+             :R " is " mgl:performing " " mgl:Criminal_Justice_Duties " and "
+             :INFO " limited to data " mgl:necessary_for " " :R "'s "mgl:Criminal_Justice_Duties ", as required by MGL 6-172, Para. 1, Sent. 2, Cl. 1: ");
+        # Continue at dig0008 for more conditions.
+        air:rule :MGL_6_172_Para_2 ];
+    air:else [
+        air:comment "Either :R not performing criminal justice duties, or :INFO not limited to data necessary for Criminal Justice Duties. Try under different criteria.";
+	air:rule :MGL_6_172_Para_6 ].			# Test for a valid written request by anyone.  dig0015
+
+#dig0005
+:MGL_6_172_Para_1_Sent_2_Cl_2 a air:Belief-rule;
+    # Is a condition of dig0002
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172 Paragraph 1 Sentence 2, Clause 2.";
+    rdfs:comment "The extent of such access shall be limited to that necessary for the actual performance of the criminal justice duties of criminal justice agencies under clause (b).";
+    air:if {
+        :EVENT a mgl:Disseminate. # Trivially true statement because otherwise our air:if is empty and therefore False.
+        #:SITUATION  <>. # mgl:context :necessary_for_performance_of_statutory_duties. # XXX Subjective criteria. We can't handle this yet.
+    };
+    air:then [
+        air:description
+	    ( "Compliance additionally requires: " :S "'s " :INFO " is "
+            mgl:necessary_for " " mgl:Criminal_Justice_Duties ", and " :R " is " mgl:performing " " 
+            mgl:Criminal_Justice_Duties ", as required by MGL 6-172, Para. 2. " :S " can disseminate " :INFO " to " :R
+            " as required by MGL 6-172, Paragraph 1, Sentence 2, Clause 2.");
+	# Continue with dig0008 for more conditions.
+        air:rule :MGL_6_172_Para_2];
+    air:else [
+        air:comment ":INFO not certified as necessary for Criminal Justice Duties, or :R not perfoming criminal justice duties.  Try under other criteria.";
+	air:rule :MGL_6_172_Para_6 ].			# Test for a valid written request by anyone.  dig0015
+
+
+#dig0006
+:MGL_6_172_Para_1_Sent_2_Cl_3 a air:Belief-rule;
+    # Is a condition of dig0003
+    # May be conditioned by dig0007
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 1, Sentence 2, Clause 3.";
+    rdfs:comment "The extent of such access shall be limited to that necessary for the actual performance of the actions or duties sustaining the public interest as to agencies or individuals granted access under clause (c).";
+    air:if {
+        :EVENT a mgl:Disseminate. # Trivially true statement because otherwise our air:if is empty and therefore False.
+        #:SITUATION mgl:context mgl:necessary_for_performance_of_actions_sustaining_public_interest. # XXX We can't handle this yet.
+    };
+    air:then [
+	air:description
+            ( :INFO " must be limited to that neccessary for performance by " :R " of actions or duties sustaining the public interest, as required by MGL 6-172, Para. 1, Sent. 2, Cl. 3.");
+	# Continue at dig0007 for more conditions.
+        air:rule :MGL_6_172_Para_1_Sent_3 ];
+    air:else [
+        air:comment ":INFO was not limited to that neccessary for performance by :R of actions or duties sustaining the public interest, as required by MGL 6-172, Para. 1, Sent. 2, Cl. 3. Try other criteria.";
+	air:rule :MGL_6_172_Para_6 ].			# Test for a valid written request by anyone.  dig0015
+
+#dig0007
+:MGL_6_172_Para_1_Sent_3 a air:Belief-rule;
+    # May be a condition of dig0006
+    # XXX What is the sense of this conditional?
+    #   A "The board explicitly approves, so we're ok"  OR
+    #   B "The board explicitly rejects, so we're cannot comply" OR
+    #   C "The board has not explicitly approved, but we're ok" OR
+    #   D "The board has not explicitly rejected, but we're ok"
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 1, Sentence 3";
+    rdfs:comment "Agencies or individuals granted access under clause (c) shall be eligible to receive criminal offender record information obtained through interstate systems if the board determines that such information is necessary for the performance of the actions or duties sustaining the public interest with respect to such agencies or individuals.";
+    air:if {mgl:board_approves_dissemination.};
+    air:then [ 
+	air:description
+            ( "The Board has determined that " :INFO " is necessary for performance of actions or duties sustaining the public interest, as required by MGL 6-172, Para. 1, Sent. 3.");
+	# Continue at dig0008 for more conditions.
+        air:rule :MGL_6_172_Para_2 ];
+    air:else [
+        air:description ("The board has made no public-interest-related determination.");
+	air:comment "Continue as if it does not matter.";
+	# Continue at dig0008 for more conditions.
+        air:rule :MGL_6_172_Para_2 ].
+
+#dig0008
+:MGL_6_172_Para_2 a air:Belief-rule;
+    # Is a condition of dig0004, dig0005, dig0006
+    # Conditioned on (dig0011 or dig0013)
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 2.";
+    rdfs:comment "The board shall certify those agencies and individuals requesting access to criminal offender record information that qualify for such access under clauses (a) or (b) of this section, and shall specify for each such agency or individual certified, the extent of its access. The board shall make a finding in writing of eligibility, or noneligibility of each such agency or individual which requests such access. No such information shall be disseminated to any agency or individual prior to the boardâ€™s determination of eligibility, or, in cases in which the boardâ€™s decision is appealed, prior to the final judgment of a court of competent jurisdiction that such agency or individual is so eligible.";
+    air:if { 
+        :R foaf:member :MEMBERSHIP.
+	@forSome :board_list.
+        board_cert:Board_Certified log:semantics :board_list.
+	:board_list log:includes { board_cert:Board_Certified foaf:Organization :MEMBERSHIP. }.
+	};
+    air:then [
+	air:description
+	    (:R " is a member of " :MEMBERSHIP " which is certified by the board, as required by MGL 6-172 Paragraph 2.");
+        # Continue at dig0010
+        air:rule :MGL_6_172_Para_4_Sent_1];
+    air:else [
+	air:description
+	    ("The agency to which "
+             :R " belongs is not certified by the board as required by MGL 6-172, Para. 2.");
+	air:comment "Try other criteria.";
+	air:rule :MGL_6_172_Para_6 ].			# Test for a valid written request by anyone.  dig0015
+
+#tbd0001
+:MGL_6_172_Para_3 a air:Belief-rule;
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 3.";
+    rdfs:comment "No agency or individual shall have access to criminal offender record information under clause (c), unless the board, by a two-thirds majority of the members present and voting, determines and certifies that the public interest in disseminating such information to such party clearly outweighs the interest in security and privacy. The extent of access to such information under clause (c) shall also be determined by such a two-thirds majority vote of the board. Certification for access under clause (c) may be either access to information relating to a specific identifiable individual, or individuals, on a single occasion; or a general grant of access for a specified period of time not to exceed two years. A general grant of access need not relate to a request for access by the party or parties to be certified. Except as otherwise provided in this paragraph the procedure and requirements for certifying agencies and individuals under clause (c) shall be according to the provisions of the preceding paragraphs of this section.";
+    air:if {};
+    air:then [ 
+        air:description ("We are not doing this part of the law for now.");
+	air:assert [air:statement {:EVENT air:compliant-with :MGL_6_172_Para_3.}]].
+
+#dig0010
+:MGL_6_172_Para_4_Sent_1 a air:Belief-rule;
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 3.";
+    rdfs:comment "Each agency holding or receiving criminal offender record information shall maintain, for such period as the board shall determine, a listing of the agencies or individuals to which it has released or communicated such information.";
+    air:if {
+        # In future there should be a mechanism to enforce this, not merely assert its requirement.
+        :EVENT a mgl:Disseminate. # Trivially true statement because otherwise our air:if is empty and therefore False.
+    };
+    air:then [ 
+        air:description ("Compliance additionally requires: The agency to which "
+             :S " belongs shall maintain, for such period as the board shall determine, a listing of the agencies or individuals to which it has released or communicated such information, as required by MGL 6-172, Para. 4, Sent. 1. ");
+        # Continue at dig0011 for more conditions.
+	air:rule :MGL_6_172_Para_5_Sent_1_Cl_2];
+    air:else [
+        # For now we never get here.
+        air:description ("The agency to which "
+             :S " belongs has not maintained, for such period as the board shall determine, a listing of the agencies or individuals to which it has released or communicated such information, as required by MGL 6-172, Para. 4, Sent. 1. ");
+	air:comment "Try other criteria.";
+	air:rule :MGL_6_172_Para_6 ].			# Test for a valid written request by anyone.  dig0015
+
+#tbd0002
+:MGL_6_172_Para_4_Sent_2 a air:Belief-rule;
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 4, Sentence 2.";
+    rdfs:comment "Such listings, or reasonable samples thereof, may from time to time, be reviewed by the board or the council to determine whether any statutory provisions or regulations have been violated.";
+    air:if {};
+    air:then [ 
+        air:description ("We are not doing this part of the law for now.");
+	air:assert [air:statement {:EVENT air:compliant-with :MGL_6_172_Para_4_Sent_2.}]].
+
+#tbd0003
+# K. Says this is not what the law says.  Rewrite it when we understand what it should do.
+# Meanwhile we just bypass it.
+
+:MGL_6_172_Para_5_Sent_1_Cl_1 a air:Belief-rule;
+    # Determine dissemination is for the purpose of researcn program approved under section 174.
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 5, Sentence 1, Clause 1.";
+    rdfs:comment "Dissemination of criminal offender record information shall, **except as provided in this section and for purposes of research programs approved under section one hundred and seventy-four**, be permitted only if the inquiry is based upon name, fingerprints, or other personal identifying characteristics.";
+    # XXX Add mgl:Approved_Research_Program to ontology.
+    air:if {:DOC-DATA log:includes {:INFO a mgl:Approved_Research_Program }.};
+    air:then [ 
+        air:description (:INFO " is approved for research purposes under MGL 6-174, as required by MGL 6-172 Para. 5, Sent. 1, Cl. 2.  No requirement is imposed on the inquiry being based on personal identifying characteristics.");
+	air:rule :MGL_6_172_Para_6_Sent_1_b_Cl_3];	# Check conflict of rules dig0018
+    air:else [
+    air:description (:INFO " was not approved for research purposes therefore dissemination request must be based on personally identifiable characteristics");
+    # Continue at dig0011
+    air:rule :MGL_6_172_Para_5_Sent_1_Cl_2 ].
+
+#dig0011
+:MGL_6_172_Para_5_Sent_1_Cl_2 a air:Belief-rule;
+    # Is a condition of dig0001, dig0002, dig0003
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 5, Sentence 1, Clause 2.";
+    rdfs:comment "Dissemination of criminal offender record information shall, except as provided in this section and for purposes of research programs approved under section one hundred and seventy-four, be permitted only if the inquiry is based upon name, fingerprints, or other personal identifying characteristics.";
+    # There are two ways to do this: One with air:owlEntails as follows:
+    air:if {
+	 <http://dig.csail.mit.edu/2010/DHS-fusion/MA/rules/MGL_6-172_ONT.n3> log:semantics :ONTOLOGY .
+	 (:ONTOLOGY :DOC-DATA) log:conjunction :CONJUNCTION .
+	 :CONJUNCTION air:owlEntails { :INFO mgl:personal_characteristics :SUBJECT } .
+    # Or from having run the air:Belief-rule :MGL_Personal_Characteristics to assert what kind of Characteristic we have.
+    # Those assertions are fetched from that rule in the two lines below.
+    #   :INFO mgl:personal_characteristics :CHAR-SUB-PROPERTY.
+    #   :INFO :CHAR-SUB-PROPERTY :SUBJECT.
+    };
+    air:then [ 
+        air:description ("Inquiry is about " :SUBJECT " and is based on a personally identifying characteristic, "
+#        :CHAR-SUB-PROPERTY ", "
+        "as required by MGL 6-172 Para. 5, Sent. 1, Cl. 2.");
+	air:rule :MGL_6_172_Para_6_Sent_1_b_Cl_3];	# Check conflict of rules dig0018
+    air:else [
+        air:description ("Inquiry by is not based on personal characteristics, but may be permissible based on rules adopted by the board.");
+	air:rule :MGL_6_172_Para_5_Sent_2_Cl_1 ].
+
+#dig0012
+:MGL_6_172_Para_5_Sent_2_Cl_1 a air:Belief-rule;
+    # Is a condition of dig0002, dig0003
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 5, Sentence 2, Clause 1.";
+    rdfs:comment "The board shall adopt rules to prevent dissemination of such information where inquiries are based upon categories of offense or data elements other than said characteristics; ";
+    # XXX Add Board_Forbidden_Characteristics to ontology.
+    air:if {:DOC-DATA log:includes {:INFO mgl:based_on mgl:Board_Forbidden_Characteristics}.};
+    air:then [ 
+        air:description (:INFO " includes characteristics for which board rules prevent dissemination.");
+	# Check for exception at dig0013
+        air:rule :MGL_6_172_Para_5_Sent_2_Cl_2 ];
+    air:else [
+	air:description (:INFO " is not based on characteristics for which board rules prevent dissemination.");
+	air:rule :MGL_6_172_Para_5_Sent_2_Cl_2 ].
+
+#dig0013
+:MGL_6_172_Para_5_Sent_2_Cl_2 a air:Belief-rule;
+    # Is an optional condition of dig0001. Has an exception called dig0014 (Spreadsheet typo: names exception dig0013.)
+    # Exception: Access by criminal justice agency on basis of elements other than PII shall be permissable.
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 5, Sentence 2, Clause 2.";
+    rdfs:comment "provided, however, that access by criminal justice agencies to criminal offender record information on the basis of data elements other than personal identifying characteristics, including but not limited to, categories of offense, mode of operation, photographs and physical descriptive data generally, shall be permissible,";
+    # We get here from more than just dig0001 so we must Re-run test for criminal justice agency.
+    air:if {
+ 	:R a mglcja:member.
+	:DOC-DATA log:includes {:INFO mgl:Categories_or_Data :CORI }.
+	};
+    air:then [ 
+        air:description (:R " as a member of a criminal justice agency, has access to " :CORI " unless limited by regulations of the board.");
+	air:rule :MGL_6_172_Para_5_Sent_2_Cl_3];
+    air:else [
+	air:comment ":R has not been identified as performing a function listed by MGL 66A-1 to be recognized as a member of a Criminial Justice Agency, and the inquiry is not based on additional board approved categories of information. Try other criteria.";
+	air:rule :MGL_6_172_Para_6 ].			# Test for a valid written request by anyone.  dig0015
+
+#dig0014
+:MGL_6_172_Para_5_Sent_2_Cl_3 a air:Belief-rule;
+    # Is an exception to dig0013.
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 5, Sentence 2, Clause 3.";
+    rdfs:comment "except as may be limited by the regulations of the board.";
+    # XXX Add mgl:CJA_Limited_by_Board_Regulations to ontology.
+    air:if {:DOC-DATA log:includes {:INFO mgl:based_on mgl:CJA_Limited_by_Board_Regulations}. };
+    air:then [ 
+        air:description ("So long as dissemination of " :INFO " to Criminal Justice Agencies is limited by regulations by the board, as stated in MGL 6-172, Para. 5, Sent. 2, Cl. 3.");
+	air:rule :MGL_6_172_Para_6_Sent_1_b_Cl_3];	# Check conflict of rules dig0018
+    air:else [
+        air:description ("Dissemination of " :INFO " is not limited by regulations of the board, as stated in MGL 6-172, Para. 5, Sent. 2, Cl. 3.");
+	air:rule :MGL_6_172_Para_6_Sent_1_b_Cl_3 ].	# Check conflict of rules dig0018
+
+#tbd0004
+:MGL_6_172_Para_5_Sent_3 a air:Belief-rule;
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 5, Sentence 3.";
+    rdfs:comment "Except as authorized by this chapter it shall be unlawful to request or require a person to provide a copy of his criminal offender record information.";
+    air:if {};
+    air:then [ 
+        air:description ("We are not doing this part of the law for now.");
+	air:assert [air:statement {:EVENT air:compliant-with :MGL_6_172_Para_5_Sent_3.}]].
+
+#tbd0005
+:MGL_6_172_Para_5_Sent_4 a air:Belief-rule;
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 5, Sentence 4.";
+    rdfs:comment "At the time of making any criminal record inquiry pursuant to clause (b) or (c) of the first paragraph of this section, the party certified to receive criminal offender record information shall submit to the board an acknowledgement that such inquiry will be undertaken, signed by the person who is the subject of such inquiry on a form prepared or approved by the board.";
+    air:if {};
+    air:then [ 
+        air:description ("We are not doing this part of the law for now.");
+	air:assert [air:statement {:EVENT air:compliant-with :MGL_6_172_Para_5_Sent_4.}]].
+
+#dig0015
+:MGL_6_172_Para_6 a air:Belief-rule;
+    # This is a DIFFERENT sort of request from that heretofore evaluated.  A written request from "Any Person".
+    # R is the requestor who will be the RECEIVER of the data.
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 6.";
+    rdfs:comment "Notwithstanding any other provisions of this section, the following information shall be available to any person upon request: ";
+    air:if {
+        # Trivially true assertion to match because all requests come in are implicitly written requests.
+        :EVENT a mgl:Disseminate.
+    };
+    air:then [ 
+        air:description (:INFO " is a request by " :R " to " :S " in writing.");
+	air:rule :MGL_6_172_Para_6_Sent_1_a ];	 # Now do the actual work.
+    air:else [
+	air:comment "Try dissemination based on other criteria.";
+	air:rule :MGL_6_172_Para_6_Sent_2 ].  	      # Test for dissemination of court data summary by parole board dig0018b
+
+:MGL_6_172_Para_6_Sent_1_a a air:Belief-rule;
+    # Has a condition dig0019 (and dig0016?)
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 6, Sentence 1 (a).";
+    rdfs:comment " (a) criminal offender record information consisting of conviction data; provided, however, that all requests for such conviction data shall be made to the board; and provided, further, that the board shall disclose only conviction data which it maintains in a standardized format in its automated criminal history file, and";
+    air:if {
+        # XXX Add back test for Maintained by the Board later
+        # :DOC-DATA log:includes {:INFO mgl:maintained_by mgl:The_Board }.
+	:INFO a mgl:Conviction_Data.
+    };
+    air:then [ 
+        air:description ( :INFO " contains conviction data "
+	:CONVICTION_DATA " and therefore shall be available to any person upon written request per MGL 6-172 Para. 6, Sentence 1a.");
+	air:rule :MGL_6_172_Para_6_Sent_1_b_Cl_1 ];
+    air:else [
+       air:description ( :INFO  " does not contain conviction data." );
+       air:comment "Try clause b.";
+	# Continue with dig0016
+	air:rule :MGL_6_172_Para_6_Sent_1_b_Cl_1].
+
+#dig0016
+:MGL_6_172_Para_6_Sent_1_b_Cl_1 a air:Belief-rule;
+    # Has a condition dig0019
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 6, Sentence 1 (b), Clause 1 .";
+    rdfs:comment "(b) information indicating custody status and placement within the correction system; provided, however, that no information shall be disclosed that identifies family members, friends, medical or psychological history, or any other personal information unless";
+    air:if {
+        :INFO mgl:has_custody_status :CUSTODY_STATUS.
+    };
+    air:then [ 
+        air:description ( :INFO " contains information indicating custody status and placement within the correction system, and therefore shall be available to any person upon written request per MGL 6-172 Para. 6, Sentence 1b." );
+        air:rule :dig0016_part2 ];
+    air:else [
+	air:comment "Try dissemination based on other criteria.";
+	air:rule :MGL_6_172_Para_6_Sent_2 ].  	      # Test for dissemination of court data summary by parole board dig0018b
+
+:dig0016_part2 a air:Belief-rule;
+    rdfs:comment "identifies family members, friends, medical or psychological history, or any other personal information unless";
+    air:if { 
+        :DOC-DATA log:includes { :INFO mgl:contains mgl:personal_information }. };
+    air:then [ 
+        air:description (:INFO "identifies family members, friends, medical or psychological history, or some other personal information and therefore has additional restrictions to dissemination governing MGL 6-172 Para. 6, Sentence 1.");
+        air:rule :MGL_6_172_Para_6_Sent_1_b_Cl_2 ];
+   air:else [ 
+        air:description (:INFO " does not contain " mgl:personal_information ", as stated in MGL 6-172 Para. 6, Sent. 1 (b), Cl. 1.");
+	# Continue at Paragraph 7, dig0019.
+	air:rule :MGL_6_172_Para_7 ].
+
+#dig0017
+:MGL_6_172_Para_6_Sent_1_b_Cl_2 a air:Belief-rule;
+    # Is an exception to dig0016. Has a condition dig0019
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 6, Sentence 1 (b), Clause 2 .";
+    rdfs:comment "such information is directly relevant to such release or custody placement decision, and";
+    # We don't know how to test for relevance yet, but this should run anyway for now, and state the requirement.
+    air:if { mgl:relevant };
+    air:then [ 
+        air:description ("Compliance requires " :INFO " is directly relevant to release or custody placement decision.");
+        # Test against dig0019
+        air:rule :MGL_6_172_Para_7 ];
+    air:else [
+	air:comment "Try dissemination based on other criteria.";
+	air:rule :MGL_6_172_Para_6_Sent_2 ].  	      # Test for dissemination of court data summary by parole board dig0018b
+
+#dig0018
+:MGL_6_172_Para_6_Sent_1_b_Cl_3 a air:Belief-rule;
+    # Is an exception to dig0016 and dig0017. 
+    # We need a way to express this as conflict of rules instruction
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph  6, Sentence 1 (b), Clause 3.";
+    rdfs:comment "no information shall be provided if its release would violate any other provisions of state or federal law.";
+    air:if {
+        :EVENT a mgl:Disseminate;  #Trivially true statement.
+    };
+    air:then [ 
+        air:description ("Compliance additionally requires that release of " :INFO " would not violate any other provisions of state or federal law, as required by MGL 6-172, Para. 6, Sent. 1(b), Cl. 3. ");
+	air:assert [air:statement {:EVENT air:compliant-with :MGL_Ann_6_172.}]
+   ].
+
+#dig0018b
+:MGL_6_172_Para_6_Sent_2 a air:Belief-rule;
+    # Is conditioned on dig0019
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph  6, Sentence 2.";
+    rdfs:comment "The parole board, except as required by section one hundred and thirty of chapter one hundred and twenty-seven, the department of correction, a county correctional authority, or a probation department with the approval of a justice to the appropriate division of the trial court, may, in its discretion, make available a summary, which may include references to evaluative information, concerning a decision to release an individual on a permanent or temporary basis, to deny such release, or to change his custody status.";
+    air:if { 
+	:SENDER log:includes { :S foaf:government_type mgl:Parole_Board. }.
+    };
+    air:then [ 
+        air:description ("Parole board elects to disseminate Summary.");
+        air:rule :MGL_6_172_Para_7 ];
+    air:else [
+    	air:comment "This is now a parole board dissemination.  Try other criteria.";
+        air:rule :MGL_6_172_Para_7_Sent_2 ].	# Continue testing for compliance at dig0020.
+
+#dig0019
+:MGL_6_172_Para_7 a air:Belief-Rule;
+    # Is a condition of dig0015, dig0016, dig0017, dig0018b
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 7.";
+    air:if {
+	:INFO mgl:sentence_imposed :ENDPOINT.
+    };
+    air:then [ 
+        air:description (:INFO "Consists of Conviction Data.");
+	air:rule :MGL_6_172_Para_7_Sent_1_Cl_1 ].
+    # XXX We can get here without the info consisting of Conviction data, but Paragraph 7 is ambiguous about what to do then!
+
+:MGL_6_172_Para_7_Sent_1_Cl_1 a air:Belief-rule;
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 7, Sentence 1, Clause 1.";
+    rdfs:comment "Information shall be provided or made available pursuant to the preceding paragraph only if the individual named in the request or summary has been convicted of a crime punishable by imprisonment for a term of five years or more, or ";
+    air:if {
+	:INFO mgl:maximum_allowable_sentence_length :MAX-LENGTH.
+        :MAX-LENGTH math:notLessThan "5".
+    };
+    air:then [ 
+        air:description ("Maximum allowable sentence is imprisonment for a term of five years or more as required by MGL 6-172, Para. 7, Sent. 1, Cl. 1.");
+	air:rule :MGL_6_172_Para_6_Sent_1_b_Cl_3 ];	# Check conflict of rules dig0018
+    air:else [
+        air:description ("Maximum allowable sentence is either unspecified, or less than  5 years. MGL 6-172, Para. 7, Sent. 1, Cl. 1 does not apply.");
+        air:rule :MGL_6_172_Para_7_Sent_1_Cl_2 ].
+
+:MGL_6_172_Para_7_Sent_1_Cl_2 a air:Belief-rule;
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 7, Sentence 1, Clause 2.";
+    rdfs:comment "has been convicted of any crime and sentenced to any term of imprisonment, and at the time of the request: is serving a sentence of probation or incarceration, or is under the custody of the parole board; or ";
+    air:if {
+        :DOC-DATA log:includes { :INFO mgl:convicted_pursuant :CRIME. }.
+        # For now imprisonment is implicit in setting of "sentence_imposed".
+        # :DOC-DATA log:includes { :INFO mgl:Sentence mgl:Imprisonment. }.
+	:DOC-DATA log:includes { :INFO mgl:has_custody_status :SERVING. }.
+        # XXX Add mgl:relevant_sentence to ontology.
+        :SERVING rdfs:subClassOf mgl:Sentence.  # Requires loading mgl ontology into knowledge base..
+    };
+    air:then [ 
+        air:description ("Individual named in the request or summary has been convicted of " :CRIME " and sentenced to any term of imprisonment and at the time of the request is " :SERVING " as required by MGL 6-172, Para. 7, Sent. 1, Cl. 2.");
+	air:rule :MGL_6_172_Para_6_Sent_1_b_Cl_3 ];	# Check conflict of rules dig0018
+    air:else [
+        air:description ("Conviction or sentence to imprisonment is unspecified. MGL 6-172, Para. 7, Sent. 1, Cl. 2 does not apply.");
+        air:rule :MGL_6_172_Para_7_Release ].
+
+:MGL_6_172_Para_7_Release a air:Belief-rule;
+    # Compute our Release Date and one year in seconds.
+    air:if {
+        :DOC-DATA log:includes { :INFO mgl:release_date :RELEASE-DATE. }.
+        :RELEASE-DATE time:inSeconds :RELEASE-DATE-IN-SECS.
+        # If you wanted to be anal, you could do a leap year calculation here.  We assume 365 days in a year.
+        "31536000" a :YEAR-IN-SECS.
+        :DOC-DATA log:includes { :INFO mgl:Current_Date :CUR-DATE. }.   #Assumes current date in log file as property of P
+        :CUR-DATE time:inSeconds :CUR-DATE-IN-SECS.
+    };
+    air:then [ 
+        air:description ("Individual was released from all custody or supervision on " :RELEASE-DATE ".");
+	air:rule :MGL_6_172_Para_7_Sent_1_Cl_3 ];
+    air:else [
+        air:description ("Release date is unspecified. No compliance criteria within MGL 6-172 Para. 7 match.");
+	air:comment "Try dissemination based on other criteria.";
+	air:rule :MGL_6_172_Para_7_Sent_2 ]. 	      # Test for dissemination of court data after a conviction. dig0020
+
+:MGL_6_172_Para_7_Sent_1_Cl_3 a air:Belief-rule;
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 7, Sentence 1, Clause 3.";
+    rdfs:comment"having been convicted of a misdemeanor, has been released from all custody or supervision for not more than one year; or ";
+    air:if {
+        :DOC-DATA log:includes { :INFO mgl:crime_type mgl:felony. }.
+	(:YEAR-IN-SECS :RELEASE-DATE-IN-SECS) math:sum :ENDPOINT.
+	:ENDPOINT math:notGreaterThan :CUR-DATE-IN-SECS.
+    };
+    air:then [ 
+        air:description ("Individual has been convicted of a misdemeanor and been released from all custody or supervision for not more than one year, as required by MGL 6-172, Para. 7, Sent. 1, Cl. 3.");
+	air:rule :MGL_6_172_Para_6_Sent_1_b_Cl_3 ];	# Check conflict of rules dig0018
+    air:else [
+        air:description ("Individual has not been convicted of a misdemeanor or been released for more than one year. MGL 6-172, Para. 7, Sent. 1, Cl. 3 does not apply.");
+        air:rule :MGL_6_172_Para_7_Sent_1_Cl_4 ].
+
+:MGL_6_172_Para_7_Sent_1_Cl_4 a air:Belief-rule;
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 7, Sentence 1, Clause 4.";
+    rdfs:comment "having been convicted of a felony, has been released from all custody or supervision for not more than two years; or ";
+    air:if {
+        :DOC-DATA log:includes { :INFO mgl:crime_type mgl:felony. }.
+        (:YEAR-IN-SECS "2" ) math:product :TWO-YEARS-IN-SECS.
+	(:TWO-YEARS-IN-SECS :RELEASE-DATE-IN-SECS) math:sum :ENDPOINT.
+	:ENDPOINT math:notGreaterThan :CUR-DATE-IN-SECS.
+    };
+    air:then [ 
+        air:description ("Individual has been convicted of a felony and has been released from all custody or supervision for not more than two years, as required by MGL 6-172, Para. 7, Sent. 1, Cl. 4.");
+	air:rule :MGL_6_172_Para_6_Sent_1_b_Cl_3 ];	# Check conflict of rules dig0018
+    air:else [
+        air:description ("Individual has not been convicted of a felony, or has been released for more than two years. MGL 6-172, Para. 7, Sent. 1, Cl. 4 does not apply.");
+        air:rule :MGL_6_172_Para_7_Sent_1_Cl_5 ].
+
+
+:MGL_6_172_Para_7_Sent_1_Cl_5 a air:Belief-rule;
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 7, Sentence 1, Clause 4.";
+    rdfs:comment "having been sentenced to the custody of the department of correction, has finally been discharged therefrom, either having been denied release on parole or having been returned to penal custody for violation of parole, for not more than three years.";
+    air:if {
+        # We don't need to test for release on parole, or parole violation.  We just trigger off mgl:release_date.
+        (:YEAR-IN-SECS "3" ) math:product :THREE-YEARS-IN-SECS.
+	(:THREE-YEARS-IN-SECS :RELEASE-DATE-IN-SECS) math:sum :ENDPOINT.
+	:ENDPOINT math:notGreaterThan :CUR-DATE-IN-SECS.
+    };
+    air:then [ 
+        air:description ("Individual has been released for not more than three years as required by MGL 6-172, Para. 7, Sent. 1, Cl. 5.");
+	air:rule :MGL_6_172_Para_6_Sent_1_b_Cl_3];	# Check conflict of rules dig0018
+    air:else [
+        air:description ("Dissemination is not permitted. Individual has been released for more than three years, per MGL 6-172, Para. 7.");
+	air:comment "Try dissemination based on other criteria.";
+	air:rule :MGL_6_172_Para_7_Sent_2 ]. 	      # Test for dissemination of court data after a conviction. dig0020
+
+#dig0020
+:MGL_6_172_Para_7_Sent_2 a air:Belief-rule;
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph  7, Sentence 2.";
+    rdfs:comment "In addition to the provisions of the preceding sentence, court records for all criminal cases shall be made available for public inspection for a period of one week following conviction and imposition of sentence.";
+    air:if {
+        :DOC-DATA log:includes { :INFO a mgl:Court_Record. }.
+        ###Temporal Computation
+        :DOC-DATA log:includes { :INFO mgl:sentence_imposed_on :DATE. }.
+        :DATE time:inSeconds :DATE-IN-SECS.
+        (:DATE-IN-SECS "604800") math:sum :WEEK-FROM-DATE.
+        :DOC-DATA log:includes { :INFO mgl:Current_Date :CUR-DATE. }.   #Assumes current date in log file as property of P
+        :CUR-DATE time:inSeconds :CUR-DATE-IN-SECS.
+        :CUR-DATE-IN-SECS math:LessThan :WEEK-FROM-DATE.
+    };
+    air:then [ 
+        air:description ("Court records for all criminal cases shall be made available for public inspection for a period of one week following conviction and imposition of sentence.");
+	air:rule :MGL_6_172_Para_6_Sent_1_b_Cl_3 ];	# Check conflict of rules dig0018
+    air:else [
+	air:assert [air:statement {:EVENT air:non-compliant-with :MGL_Ann_6_172.}]].
+
+
+#tbd0006
+:MGL_6_172_Para_8 a air:Belief-rule;
+    rdfs:label "Massachusetts General Law, Part I, Title II, Chapter 6, Section 172, Paragraph 8.";
+    rdfs:comment "Any individual or agency, public or private, that receives or obtains criminal offender record information, in violation of the provisions of this statute, whether directly or through any intermediary, shall not collect, store, disseminate, or use such criminal offender record information in any manner or for any purpose. Notwithstanding the provisions of this section, the dissemination of information relative to a personâ€™s conviction of automobile law violations as defined by section one of chapter ninety C, or information relative to a personâ€™s charge of operating a motor vehicle while under the influence of intoxicating liquor which resulted in his assignment to a driver alcohol program as described in section twenty-four D of chapter ninety, shall not be prohibited where such dissemination is made, directly or indirectly, by the motor vehicle insurance merit rating board established pursuant to section one hundred and eighty-three of chapter six, to an insurance company doing motor vehicle insurance business within the commonwealth, or to such insurance companyâ€™s agents, independent contractors or insurance policyholders to be used exclusively for motor vehicle insurance purposes. Notwithstanding the provisions of this section or chapter sixty-six A, the following shall be public records: (1) police daily logs, arrest registers, or other similar records compiled chronologically, provided that no alphabetical arrestee, suspect, or similar index is available to the public, directly or indirectly; (2) chronologically maintained court records of public judicial proceedings, provided that no alphabetical or similar index of criminal defendants is available to the public, directly or indirectly; (3) published records of public court or administrative proceedings, and of public judicial administrative or legislative proceedings; and (4) decisions of the parole board as provided in section one hundred and thirty of chapter one hundred and twenty-seven.";
+    air:if {};
+    air:then [ 
+        air:description ("We are not doing this part of the law for now.");
+	air:assert [air:statement {:EVENT air:compliant-with :MGL_6_172_Para_8.}]].
