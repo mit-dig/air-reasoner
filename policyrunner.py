@@ -743,6 +743,10 @@ much how the rule was represented in the rdf network
             index = workingContext._index
             for triple in patterns:
                 triple = triple.substitution(environment)
+                # p cannot be a built-in (because built-ins are
+                # inherently asserted by something other than a rule)
+                if isinstance(triple[PRED], BuiltIn):
+                    continue
                 (s, p, o), newVars = canonicalizeVariables(triple, substituted_self.vars)
                 substituted_self.eventLoop.addAssertion(AuxTripleJustifier(substituted_self.tms, GOAL, s, p, o, newVars, substituted_self.sourceNode, [substituted_self.tms.getThing(substituted_self)]))
 
@@ -1364,6 +1368,266 @@ store = llyn.RDFStore()
 
 n3NS = store.newSymbol('http://www.w3.org/2000/10/swap/grammar/n3#n3')
 
+def makeRDFSRules(logFormula, rdfsFormula, rdfsRuleset):
+    """Search logFormula for interesting RDFS/OWL ontology properties
+    (e.g. owl:sameAs, rdfs:domain, etc.), create appropriate
+    air:belief-rules in rdfsFormula for those properties, and append the
+    rules to the rdfsRuleset.
+
+    NOTE: Although this fixes the behavior of ontologies provided as
+    INPUT, ontological statements asserted in rules will NOT be
+    evaluated (i.e. this only works for static ontologies provided as
+    an input log).
+
+    Otherwise we'd have to build a rete looking for appropriate
+    ontology statements which, on success, builds one of these
+    specialized rules.  (That way, when a new ontology statement is
+    asserted, the "success" action will fire and a new specialized
+    ontology rule will be created)
+    """
+    rdf = rdfsFormula.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
+    rdfs = logFormula.newSymbol('http://www.w3.org/2000/01/rdf-schema')
+    owl = logFormula.newSymbol('http://www.w3.org/2002/07/owl')
+    p = rdfsFormula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
+
+    # Variables (could be anything)
+    fillerA = rdfsFormula.newUniversal(rdfsFormula.store.genId())
+    fillerB = rdfsFormula.newUniversal(rdfsFormula.store.genId())
+    fillerC = rdfsFormula.newUniversal(rdfsFormula.store.genId())
+
+    # owl:sameAs
+    for statement in logFormula.statementsMatching(pred=owl['sameAs']):
+        # :subj :A :B -> :obj :A :B
+        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
+        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+
+        ifPattern = rdfsFormula.newFormula()
+        ifPattern.add(statement[SUBJ], fillerA, fillerB)
+        ifPattern = ifPattern.close()
+        rdfsFormula.add(ruleName, p['if'], ifPattern)
+
+        thenPattern = rdfsFormula.newFormula()
+        thenPattern.add(statement[OBJ], fillerA, fillerB)
+        thenPattern = thenPattern.close()
+        assertObj = rdfsFormula.newBlankNode()
+        rdfsFormula.add(assertObj, p['assert'], thenPattern)
+        rdfsFormula.add(ruleName, p['then'], assertObj)
+
+        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+
+        # :obj :A :B -> :subj :A :B
+        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
+        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+
+        ifPattern = rdfsFormula.newFormula()
+        ifPattern.add(statement[OBJ], fillerA, fillerB)
+        ifPattern = ifPattern.close()
+        rdfsFormula.add(ruleName, p['if'], ifPattern)
+
+        thenPattern = rdfsFormula.newFormula()
+        thenPattern.add(statement[SUBJ], fillerA, fillerB)
+        thenPattern = thenPattern.close()
+        assertObj = rdfsFormula.newBlankNode()
+        rdfsFormula.add(assertObj, p['assert'], thenPattern)
+        rdfsFormula.add(ruleName, p['then'], assertObj)
+
+        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+
+        # :A :subj :B -> :A :obj :B
+        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
+        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+
+        ifPattern = rdfsFormula.newFormula()
+        ifPattern.add(fillerA, statement[SUBJ], fillerB)
+        ifPattern = ifPattern.close()
+        rdfsFormula.add(ruleName, p['if'], ifPattern)
+
+        thenPattern = rdfsFormula.newFormula()
+        thenPattern.add(fillerA, statement[OBJ], fillerB)
+        thenPattern = thenPattern.close()
+        assertObj = rdfsFormula.newBlankNode()
+        rdfsFormula.add(assertObj, p['assert'], thenPattern)
+        rdfsFormula.add(ruleName, p['then'], assertObj)
+
+        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+
+        # :A :obj :B -> :A :subj :B
+        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
+        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+
+        ifPattern = rdfsFormula.newFormula()
+        ifPattern.add(fillerA, statement[OBJ], fillerB)
+        ifPattern = ifPattern.close()
+        rdfsFormula.add(ruleName, p['if'], ifPattern)
+
+        thenPattern = rdfsFormula.newFormula()
+        thenPattern.add(fillerA, statement[SUBJ], fillerB)
+        thenPattern = thenPattern.close()
+        assertObj = rdfsFormula.newBlankNode()
+        rdfsFormula.add(assertObj, p['assert'], thenPattern)
+        rdfsFormula.add(ruleName, p['then'], assertObj)
+
+        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+
+        # :A :B :subj -> :A :B :obj
+        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
+        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+
+        ifPattern = rdfsFormula.newFormula()
+        ifPattern.add(fillerA, fillerB, statement[SUBJ])
+        ifPattern = ifPattern.close()
+        rdfsFormula.add(ruleName, p['if'], ifPattern)
+
+        thenPattern = rdfsFormula.newFormula()
+        thenPattern.add(fillerA, fillerB, statement[OBJ])
+        thenPattern = thenPattern.close()
+        assertObj = rdfsFormula.newBlankNode()
+        rdfsFormula.add(assertObj, p['assert'], thenPattern)
+        rdfsFormula.add(ruleName, p['then'], assertObj)
+
+        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+
+        # :A :B :obj -> :A :B :subj
+        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
+        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+
+        ifPattern = rdfsFormula.newFormula()
+        ifPattern.add(fillerA, fillerB, statement[OBJ])
+        ifPattern = ifPattern.close()
+        rdfsFormula.add(ruleName, p['if'], ifPattern)
+
+        thenPattern = rdfsFormula.newFormula()
+        thenPattern.add(fillerA, fillerB, statement[SUBJ])
+        thenPattern = thenPattern.close()
+        assertObj = rdfsFormula.newBlankNode()
+        rdfsFormula.add(assertObj, p['assert'], thenPattern)
+        rdfsFormula.add(ruleName, p['then'], assertObj)
+
+        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+
+    # rdfs:domain
+    for statement in logFormula.statementsMatching(pred=rdfs['domain']):
+        # :A :subj :B -> :A a :obj
+        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
+        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+
+        ifPattern = rdfsFormula.newFormula()
+        ifPattern.add(fillerA, statement[SUBJ], fillerB)
+        ifPattern = ifPattern.close()
+        rdfsFormula.add(ruleName, p['if'], ifPattern)
+
+        thenPattern = rdfsFormula.newFormula()
+        thenPattern.add(fillerA, rdf['type'], statement[OBJ])
+        thenPattern = thenPattern.close()
+        assertObj = rdfsFormula.newBlankNode()
+        rdfsFormula.add(assertObj, p['assert'], thenPattern)
+        rdfsFormula.add(ruleName, p['then'], assertObj)
+
+        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+
+    # rdfs:range
+    for statement in logFormula.statementsMatching(pred=rdfs['range']):
+        # :A :subj :B -> :B a :obj
+        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
+        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+
+        ifPattern = rdfsFormula.newFormula()
+        ifPattern.add(fillerA, statement[SUBJ], fillerB)
+        ifPattern = ifPattern.close()
+        rdfsFormula.add(ruleName, p['if'], ifPattern)
+
+        thenPattern = rdfsFormula.newFormula()
+        thenPattern.add(fillerB, rdf['type'], statement[OBJ])
+        thenPattern = thenPattern.close()
+        assertObj = rdfsFormula.newBlankNode()
+        rdfsFormula.add(assertObj, p['assert'], thenPattern)
+        rdfsFormula.add(ruleName, p['then'], assertObj)
+
+        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+
+    # rdfs:subClassOf
+    for statement in logFormula.statementsMatching(pred=rdfs['subClassOf']):
+        # :A a :subj -> :A a :obj
+        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
+        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+
+        ifPattern = rdfsFormula.newFormula()
+        ifPattern.add(fillerA, rdf['type'], statement[SUBJ])
+        ifPattern = ifPattern.close()
+        rdfsFormula.add(ruleName, p['if'], ifPattern)
+
+        thenPattern = rdfsFormula.newFormula()
+        thenPattern.add(fillerA, rdf['type'], statement[OBJ])
+        thenPattern = thenPattern.close()
+        assertObj = rdfsFormula.newBlankNode()
+        rdfsFormula.add(assertObj, p['assert'], thenPattern)
+        rdfsFormula.add(ruleName, p['then'], assertObj)
+
+        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+
+    # rdfs:subPropertyOf
+    for statement in logFormula.statementsMatching(pred=rdfs['subClassOf']):
+        # :A :subj :B -> :A :obj :B
+        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
+        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+
+        ifPattern = rdfsFormula.newFormula()
+        ifPattern.add(fillerA, statement[SUBJ], fillerB)
+        ifPattern = ifPattern.close()
+        rdfsFormula.add(ruleName, p['if'], ifPattern)
+
+        thenPattern = rdfsFormula.newFormula()
+        thenPattern.add(fillerA, statement[OBJ], fillerB)
+        thenPattern = thenPattern.close()
+        assertObj = rdfsFormula.newBlankNode()
+        rdfsFormula.add(assertObj, p['assert'], thenPattern)
+        rdfsFormula.add(ruleName, p['then'], assertObj)
+
+        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+
+    # owl:SymmetricProperty
+    for statement in logFormula.statementsMatching(pred=rdf['type'],
+                                                   obj=owl['SymmetricProperty']):
+        # :A :subj :B -> :B :subj :A
+        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
+        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+
+        ifPattern = rdfsFormula.newFormula()
+        ifPattern.add(fillerA, statement[SUBJ], fillerB)
+        ifPattern = ifPattern.close()
+        rdfsFormula.add(ruleName, p['if'], ifPattern)
+
+        thenPattern = rdfsFormula.newFormula()
+        thenPattern.add(fillerB, statement[SUBJ], fillerA)
+        thenPattern = thenPattern.close()
+        assertObj = rdfsFormula.newBlankNode()
+        rdfsFormula.add(assertObj, p['assert'], thenPattern)
+        rdfsFormula.add(ruleName, p['then'], assertObj)
+
+        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+
+    # owl:TransitiveProperty
+    for statement in logFormula.statementsMatching(pred=rdf['type'],
+                                                   obj=owl['TransitiveProperty']):
+        # :A :subj :B . :B :subj :C -> :A :subj :C
+        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
+        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+
+        ifPattern = rdfsFormula.newFormula()
+        ifPattern.add(fillerA, statement[SUBJ], fillerB)
+        ifPattern.add(fillerB, statement[SUBJ], fillerC)
+        ifPattern = ifPattern.close()
+        rdfsFormula.add(ruleName, p['if'], ifPattern)
+
+        thenPattern = rdfsFormula.newFormula()
+        thenPattern.add(fillerA, statement[SUBJ], fillerC)
+        thenPattern = thenPattern.close()
+        assertObj = rdfsFormula.newBlankNode()
+        rdfsFormula.add(assertObj, p['assert'], thenPattern)
+        rdfsFormula.add(ruleName, p['then'], assertObj)
+
+        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+
 def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with'], verbose=False, customBaseFactsURI=False, customBaseRulesURI=False):
     trace, result = runPolicy(logURIs, policyURIs, logFormula=logFormula, ruleFormula=ruleFormula, filterProperties=filterProperties, verbose=verbose, customBaseFactsURI=customBaseFactsURI, customBaseRulesURI=customBaseRulesURI)
     return trace.n3String()
@@ -1414,6 +1678,24 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
         fCopy.loadFormulaWithSubstitution(ruleFormulaObj, Env())
         policyFormulae.append(fCopy)
 #    baseRulesFormula = store.load(baseRulesURI)
+
+    # NOTE: We also need to parse every log for meaningful RDFS rules
+    # to instantiate.
+    rdfsFormula = store.newFormula()
+
+    # Make the air:Policy.
+    rdfsRuleset = rdfsFormula.newSymbol(store.genId())
+    rdf = rdfsFormula.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
+    p = rdfsFormula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
+    rdfsFormula.add(rdfsRuleset, rdf['type'], p['Policy'])
+
+    # And add rules to that policy.
+    for logFormula in logFormulae:
+        makeRDFSRules(logFormula, rdfsFormula, rdfsRuleset)
+
+    # Finally add to the policy formulae to be compiled.
+    rdfsFormula.close()
+    policyFormulae.append(rdfsFormula)
 
 #    rdfsRulesFormula = store.load('http://python-dlp.googlecode.com/files/pD-rules.n3')
     

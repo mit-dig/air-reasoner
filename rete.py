@@ -1031,7 +1031,7 @@ with a method to call when the match succeeds
         self.task(token.flatten())
 
     def updateFromAbove(self):
-        for token in self.parent.items:
+        for token in frozenset(self.parent.items):
             self.leftActivate(token)
 
     def removeItem(self, item):
