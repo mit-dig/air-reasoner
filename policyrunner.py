@@ -1738,6 +1738,10 @@ def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterPro
 
 goalWildcards = {}
 
+def mem(size="rss"):
+    """ Generalization: memory sizes: rss, rsz, vsz. """
+    return int(os.popen('ps -p %d -o %s | tail -1' % (os.getpid(),size)).read())
+
 def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with'], logFormulaObjs=[], ruleFormulaObjs=[], store=store, verbose=False, customBaseFactsURI=False, customBaseRulesURI=False):
     global baseFactsURI, baseRulesURI
     if OFFLINE[0]:
@@ -1757,6 +1761,7 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
     workingContext = formulaTMS.workingContext
 
 ## We are done with cwm setup
+    startSize = mem("rss")
     startTime = time.time()
     
     logFormulae = []
@@ -1802,6 +1807,7 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
         
 #    formulaTMS.getTriple(p['data'], rdf['type'], owl['TransitiveProperty']).assume()
 
+    compileStartSize = mem("rss")
     compileStartTime = time.time()
 
     rdfsRules = [] #[Rule.compileCwmRule(eventLoop, formulaTMS, rdfsRulesFormula, x) for x in rdfsRulesFormula.statementsMatching(pred=store.implies)]
@@ -1843,7 +1849,8 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
         a  = formulaTMS.getThing(rule)
         ruleAssumptions.append(a)
         a.assume()
-
+ 
+    eventStartSize = mem("rss")
     eventStartTime = time.time()
     Formula._isReasoning = True
     FormulaTMS.tracking = False
@@ -1855,7 +1862,11 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
 
 # See how long it took (minus output)
     now = time.time()
+    nowSize = mem("rss")
+
     totalTime = now - startTime
+    totalSize = nowSize - startSize
+
     if verbose:
         print 'time reasoning took=', totalTime
         print '  of which %s was after loading, and %s was actual reasoning' % (now-compileStartTime, now-eventStartTime)
