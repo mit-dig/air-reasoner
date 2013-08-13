@@ -1368,265 +1368,369 @@ store = llyn.RDFStore()
 
 n3NS = store.newSymbol('http://www.w3.org/2000/10/swap/grammar/n3#n3')
 
-def makeRDFSRules(logFormula, rdfsFormula, rdfsRuleset):
-    """Search logFormula for interesting RDFS/OWL ontology properties
-    (e.g. owl:sameAs, rdfs:domain, etc.), create appropriate
-    air:belief-rules in rdfsFormula for those properties, and append the
-    rules to the rdfsRuleset.
-
-    NOTE: Although this fixes the behavior of ontologies provided as
-    INPUT, ontological statements asserted in rules will NOT be
-    evaluated (i.e. this only works for static ontologies provided as
-    an input log).
-
-    Otherwise we'd have to build a rete looking for appropriate
-    ontology statements which, on success, builds one of these
-    specialized rules.  (That way, when a new ontology statement is
-    asserted, the "success" action will fire and a new specialized
-    ontology rule will be created)
+def makeRDFSRules(eventLoop, tms):
+    """Create retes to search the tms for interesting RDFS/OWL ontology
+    properties (e.g. owl:sameAs, rdfs:domain, etc.) and create
+    appropriate non-goal-directed rules for any discovered RDFS/OWL
+    statements.
     """
+    class FakeRule(object):
+        """A mock Rule object, required as RuleFire objects require something
+        that looks like a Rule object."""
+        pass
+
+    # Make the new formula we're going to create patterns in.
+    rdfsFormula = store.newFormula()
     rdf = rdfsFormula.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
-    rdfs = logFormula.newSymbol('http://www.w3.org/2000/01/rdf-schema')
-    owl = logFormula.newSymbol('http://www.w3.org/2002/07/owl')
+    rdfs = rdfsFormula.newSymbol('http://www.w3.org/2000/01/rdf-schema')
+    owl = rdfsFormula.newSymbol('http://www.w3.org/2002/07/owl')
     p = rdfsFormula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
 
     # Variables (could be anything)
     fillerA = rdfsFormula.newUniversal(rdfsFormula.store.genId())
     fillerB = rdfsFormula.newUniversal(rdfsFormula.store.genId())
     fillerC = rdfsFormula.newUniversal(rdfsFormula.store.genId())
+    vars = frozenset([fillerA, fillerB, fillerC])
+
+    # Pattern match RDFS/OWL statements in the main context.
+    index = tms.workingContext._index
+
+    doNothing = lambda: 1
+    def makePatternAssertionThunk(parentTriples, statement, description):
+        """Make the pattern assertion thunk for use with a rete onsuccess
+        call.  This thunk will create a RuleFire object, asserting the
+        statements in the formula specified by the argument statement
+        (with description).  triples in parentTriples will not count
+        as matches (so that copies of the owl:sameAs statement will be
+        ignored, for example).  sourceNode is a convenience for
+        fakeRule, and should be the predicate responsible for this
+        pattern assertion."""
+        prompt = SubstitutingList()
+
+        result = [
+            SubstitutingTuple(
+                (Assertion(statement),
+                 description,
+                 prompt))
+            ]
+
+        def assertPattern((triples, environment, penalty)):
+            # Ignore the statement that generated this.
+            if triples == parentTriples:
+                return
+
+            fakeRule = FakeRule()
+            fakeRule.tms = tms
+            fakeRule.matchName = None
+            fakeRule.goal = True
+            fakeRule.vars = frozenset()
+            fakeRule.sourceNode = parentTriples[0][PRED]
+
+            event = RuleFire(fakeRule, triples, environment, penalty, result)
+            eventLoop.add(event)
+
+        return assertPattern
 
     # owl:sameAs
-    for statement in logFormula.statementsMatching(pred=owl['sameAs']):
-        # :subj :A :B -> :obj :A :B
-        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
-        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+    def buildOWLSameAs((triples, environment, penalty)):
+        """Build the non-goal rules for an owl:sameAs property."""
+        # Assert rules in both goals and non-goals.
+        for context in (tms.getContext(GOAL), tms.workingContext):
+            index = context._index
 
-        ifPattern = rdfsFormula.newFormula()
-        ifPattern.add(statement[SUBJ], fillerA, fillerB)
-        ifPattern = ifPattern.close()
-        rdfsFormula.add(ruleName, p['if'], ifPattern)
+            # :subj :A :B -> :obj :A :B
+            ifPattern = rdfsFormula.newFormula()
+            ifPattern.add(environment[fillerA], fillerA, fillerB)
+            ifPattern = ifPattern.close()
 
-        thenPattern = rdfsFormula.newFormula()
-        thenPattern.add(statement[OBJ], fillerA, fillerB)
-        thenPattern = thenPattern.close()
-        assertObj = rdfsFormula.newBlankNode()
-        rdfsFormula.add(assertObj, p['assert'], thenPattern)
-        rdfsFormula.add(ruleName, p['then'], assertObj)
+            statement = rdfsFormula.newFormula()
+            statement.add(environment[fillerB], fillerA, fillerB)
+            statement.close()
+            description = SubstitutingList([rdfsFormula.newList([
+                            environment[fillerA],
+                            rdfsFormula.newLiteral(" is the same as "),
+                            environment[fillerB]])])
+            patternAssertionThunk = makePatternAssertionThunk(triples, statement, description)
 
-        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+            bottomBeta = MM.compilePattern(index, ifPattern.statements, vars, rdfsFormula, supportBuiltin=False, reachedGoal=lambda: False)
+            trueBottom =  MM.ProductionNode(bottomBeta, patternAssertionThunk, doNothing)
 
-        # :obj :A :B -> :subj :A :B
-        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
-        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+            # :obj :A :B -> :subj :A :B
+            ifPattern = rdfsFormula.newFormula()
+            ifPattern.add(environment[fillerB], fillerA, fillerB)
+            ifPattern = ifPattern.close()
 
-        ifPattern = rdfsFormula.newFormula()
-        ifPattern.add(statement[OBJ], fillerA, fillerB)
-        ifPattern = ifPattern.close()
-        rdfsFormula.add(ruleName, p['if'], ifPattern)
+            statement = rdfsFormula.newFormula()
+            statement.add(environment[fillerA], fillerA, fillerB)
+            statement.close()
+            description = SubstitutingList([rdfsFormula.newList([
+                            environment[fillerB],
+                            rdfsFormula.newLiteral(" is the same as "),
+                            environment[fillerA]])])
+            patternAssertionThunk = makePatternAssertionThunk(triples, statement, description)
 
-        thenPattern = rdfsFormula.newFormula()
-        thenPattern.add(statement[SUBJ], fillerA, fillerB)
-        thenPattern = thenPattern.close()
-        assertObj = rdfsFormula.newBlankNode()
-        rdfsFormula.add(assertObj, p['assert'], thenPattern)
-        rdfsFormula.add(ruleName, p['then'], assertObj)
+            bottomBeta = MM.compilePattern(index, ifPattern.statements, vars, rdfsFormula, supportBuiltin=False, reachedGoal=lambda: False)
+            trueBottom =  MM.ProductionNode(bottomBeta, patternAssertionThunk, doNothing)
 
-        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+            # :A :subj :B -> :A :obj :B
+            ifPattern = rdfsFormula.newFormula()
+            ifPattern.add(fillerA, environment[fillerA], fillerB)
+            ifPattern = ifPattern.close()
 
-        # :A :subj :B -> :A :obj :B
-        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
-        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+            statement = rdfsFormula.newFormula()
+            statement.add(fillerA, environment[fillerB], fillerB)
+            statement.close()
+            description = SubstitutingList([rdfsFormula.newList([
+                            environment[fillerA],
+                            rdfsFormula.newLiteral(" is the same as "),
+                            environment[fillerB]])])
+            patternAssertionThunk = makePatternAssertionThunk(triples, statement, description)
 
-        ifPattern = rdfsFormula.newFormula()
-        ifPattern.add(fillerA, statement[SUBJ], fillerB)
-        ifPattern = ifPattern.close()
-        rdfsFormula.add(ruleName, p['if'], ifPattern)
+            bottomBeta = MM.compilePattern(index, ifPattern.statements, vars, rdfsFormula, supportBuiltin=False, reachedGoal=lambda: False)
+            trueBottom =  MM.ProductionNode(bottomBeta, patternAssertionThunk, doNothing)
 
-        thenPattern = rdfsFormula.newFormula()
-        thenPattern.add(fillerA, statement[OBJ], fillerB)
-        thenPattern = thenPattern.close()
-        assertObj = rdfsFormula.newBlankNode()
-        rdfsFormula.add(assertObj, p['assert'], thenPattern)
-        rdfsFormula.add(ruleName, p['then'], assertObj)
+            # :A :obj :B -> :A :subj :B
+            ifPattern = rdfsFormula.newFormula()
+            ifPattern.add(fillerA, environment[fillerB], fillerB)
+            ifPattern = ifPattern.close()
 
-        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+            statement = rdfsFormula.newFormula()
+            statement.add(fillerA, environment[fillerA], fillerB)
+            statement.close()
+            description = SubstitutingList([rdfsFormula.newList([
+                            environment[fillerB],
+                            rdfsFormula.newLiteral(" is the same as "),
+                            environment[fillerA]])])
+            patternAssertionThunk = makePatternAssertionThunk(triples, statement, description)
 
-        # :A :obj :B -> :A :subj :B
-        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
-        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+            bottomBeta = MM.compilePattern(index, ifPattern.statements, vars, rdfsFormula, supportBuiltin=False, reachedGoal=lambda: False)
+            trueBottom =  MM.ProductionNode(bottomBeta, patternAssertionThunk, doNothing)
 
-        ifPattern = rdfsFormula.newFormula()
-        ifPattern.add(fillerA, statement[OBJ], fillerB)
-        ifPattern = ifPattern.close()
-        rdfsFormula.add(ruleName, p['if'], ifPattern)
+            # :A :B :subj -> :A :B :obj
+            ifPattern = rdfsFormula.newFormula()
+            ifPattern.add(fillerA, fillerB, environment[fillerA])
+            ifPattern = ifPattern.close()
 
-        thenPattern = rdfsFormula.newFormula()
-        thenPattern.add(fillerA, statement[SUBJ], fillerB)
-        thenPattern = thenPattern.close()
-        assertObj = rdfsFormula.newBlankNode()
-        rdfsFormula.add(assertObj, p['assert'], thenPattern)
-        rdfsFormula.add(ruleName, p['then'], assertObj)
+            statement = rdfsFormula.newFormula()
+            statement.add(fillerA, fillerB, environment[fillerB])
+            statement.close()
+            description = SubstitutingList([rdfsFormula.newList([
+                            environment[fillerA],
+                            rdfsFormula.newLiteral(" is the same as "),
+                            environment[fillerB]])])
+            patternAssertionThunk = makePatternAssertionThunk(triples, statement, description)
 
-        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+            bottomBeta = MM.compilePattern(index, ifPattern.statements, vars, rdfsFormula, supportBuiltin=False, reachedGoal=lambda: False)
+            trueBottom =  MM.ProductionNode(bottomBeta, patternAssertionThunk, doNothing)
 
-        # :A :B :subj -> :A :B :obj
-        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
-        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+            # :A :B :obj -> :A :B :subj
+            ifPattern = rdfsFormula.newFormula()
+            ifPattern.add(fillerA, fillerB, environment[fillerB])
+            ifPattern = ifPattern.close()
 
-        ifPattern = rdfsFormula.newFormula()
-        ifPattern.add(fillerA, fillerB, statement[SUBJ])
-        ifPattern = ifPattern.close()
-        rdfsFormula.add(ruleName, p['if'], ifPattern)
+            statement = rdfsFormula.newFormula()
+            statement.add(fillerA, fillerB, environment[fillerA])
+            statement.close()
+            description = SubstitutingList([rdfsFormula.newList([
+                            environment[fillerB],
+                            rdfsFormula.newLiteral(" is the same as "),
+                            environment[fillerA]])])
+            patternAssertionThunk = makePatternAssertionThunk(triples, statement, description)
 
-        thenPattern = rdfsFormula.newFormula()
-        thenPattern.add(fillerA, fillerB, statement[OBJ])
-        thenPattern = thenPattern.close()
-        assertObj = rdfsFormula.newBlankNode()
-        rdfsFormula.add(assertObj, p['assert'], thenPattern)
-        rdfsFormula.add(ruleName, p['then'], assertObj)
+            bottomBeta = MM.compilePattern(index, ifPattern.statements, vars, rdfsFormula, supportBuiltin=False, reachedGoal=lambda: False)
+            trueBottom =  MM.ProductionNode(bottomBeta, patternAssertionThunk, doNothing)
 
-        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
-
-        # :A :B :obj -> :A :B :subj
-        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
-        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
-
-        ifPattern = rdfsFormula.newFormula()
-        ifPattern.add(fillerA, fillerB, statement[OBJ])
-        ifPattern = ifPattern.close()
-        rdfsFormula.add(ruleName, p['if'], ifPattern)
-
-        thenPattern = rdfsFormula.newFormula()
-        thenPattern.add(fillerA, fillerB, statement[SUBJ])
-        thenPattern = thenPattern.close()
-        assertObj = rdfsFormula.newBlankNode()
-        rdfsFormula.add(assertObj, p['assert'], thenPattern)
-        rdfsFormula.add(ruleName, p['then'], assertObj)
-
-        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+    # Search for owl:sameAs statements.
+    ifPattern = rdfsFormula.newFormula()
+    ifPattern.add(fillerA, owl['sameAs'], fillerB)
+    ifPattern = ifPattern.close()
+    bottomBeta = MM.compilePattern(index, ifPattern.statements, vars, rdfsFormula, supportBuiltin=False, reachedGoal=lambda: False)
+    trueBottom =  MM.ProductionNode(bottomBeta, buildOWLSameAs, doNothing)
 
     # rdfs:domain
-    for statement in logFormula.statementsMatching(pred=rdfs['domain']):
-        # :A :subj :B -> :A a :obj
-        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
-        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+    def buildRDFSDomain((triples, environment, penalty)):
+        """Build the non-goal rules for an rdfs:domain property."""
+        # Assert rules in both goals and non-goals.
+        for context in (tms.getContext(GOAL), tms.workingContext):
+            index = context._index
 
-        ifPattern = rdfsFormula.newFormula()
-        ifPattern.add(fillerA, statement[SUBJ], fillerB)
-        ifPattern = ifPattern.close()
-        rdfsFormula.add(ruleName, p['if'], ifPattern)
+            # :A :subj :B -> :A a :obj
+            ifPattern = rdfsFormula.newFormula()
+            ifPattern.add(fillerA, environment[fillerA], fillerB)
+            ifPattern = ifPattern.close()
 
-        thenPattern = rdfsFormula.newFormula()
-        thenPattern.add(fillerA, rdf['type'], statement[OBJ])
-        thenPattern = thenPattern.close()
-        assertObj = rdfsFormula.newBlankNode()
-        rdfsFormula.add(assertObj, p['assert'], thenPattern)
-        rdfsFormula.add(ruleName, p['then'], assertObj)
+            statement = rdfsFormula.newFormula()
+            statement.add(fillerA, rdf['type'], environment[fillerB])
+            statement.close()
+            description = SubstitutingList([rdfsFormula.newList([
+                            environment[fillerA],
+                            rdfsFormula.newLiteral(" has domain "),
+                            environment[fillerB]])])
+            patternAssertionThunk = makePatternAssertionThunk(triples, statement, description)
 
-        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+            bottomBeta = MM.compilePattern(index, ifPattern.statements, vars, rdfsFormula, supportBuiltin=False, reachedGoal=lambda: False)
+            trueBottom =  MM.ProductionNode(bottomBeta, patternAssertionThunk, doNothing)
+
+    # Search for rdfs:domain statements.
+    ifPattern = rdfsFormula.newFormula()
+    ifPattern.add(fillerA, rdfs['domain'], fillerB)
+    ifPattern = ifPattern.close()
+    bottomBeta = MM.compilePattern(index, ifPattern.statements, vars, rdfsFormula, supportBuiltin=False, reachedGoal=lambda: False)
+    trueBottom =  MM.ProductionNode(bottomBeta, buildRDFSDomain, doNothing)
 
     # rdfs:range
-    for statement in logFormula.statementsMatching(pred=rdfs['range']):
-        # :A :subj :B -> :B a :obj
-        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
-        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+    def buildRDFSRange((triples, environment, penalty)):
+        """Build the non-goal rules for an rdfs:range property."""
+        # Assert rules in both goals and non-goals.
+        for context in (tms.getContext(GOAL), tms.workingContext):
+            index = context._index
 
-        ifPattern = rdfsFormula.newFormula()
-        ifPattern.add(fillerA, statement[SUBJ], fillerB)
-        ifPattern = ifPattern.close()
-        rdfsFormula.add(ruleName, p['if'], ifPattern)
+            # :A :subj :B -> :B a :obj
+            ifPattern = rdfsFormula.newFormula()
+            ifPattern.add(fillerA, environment[fillerA], fillerB)
+            ifPattern = ifPattern.close()
 
-        thenPattern = rdfsFormula.newFormula()
-        thenPattern.add(fillerB, rdf['type'], statement[OBJ])
-        thenPattern = thenPattern.close()
-        assertObj = rdfsFormula.newBlankNode()
-        rdfsFormula.add(assertObj, p['assert'], thenPattern)
-        rdfsFormula.add(ruleName, p['then'], assertObj)
+            statement = rdfsFormula.newFormula()
+            statement.add(fillerB, rdf['type'], environment[fillerB])
+            statement.close()
+            description = SubstitutingList([rdfsFormula.newList([
+                            environment[fillerA],
+                            rdfsFormula.newLiteral(" has range "),
+                            environment[fillerB]])])
+            patternAssertionThunk = makePatternAssertionThunk(triples, statement, description)
 
-        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+            bottomBeta = MM.compilePattern(index, ifPattern.statements, vars, rdfsFormula, supportBuiltin=False, reachedGoal=lambda: False)
+            trueBottom =  MM.ProductionNode(bottomBeta, patternAssertionThunk, doNothing)
+
+    # Search for rdfs:range statements.
+    ifPattern = rdfsFormula.newFormula()
+    ifPattern.add(fillerA, rdfs['range'], fillerB)
+    ifPattern = ifPattern.close()
+    bottomBeta = MM.compilePattern(index, ifPattern.statements, vars, rdfsFormula, supportBuiltin=False, reachedGoal=lambda: False)
+    trueBottom =  MM.ProductionNode(bottomBeta, buildRDFSRange, doNothing)
 
     # rdfs:subClassOf
-    for statement in logFormula.statementsMatching(pred=rdfs['subClassOf']):
-        # :A a :subj -> :A a :obj
-        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
-        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+    def buildRDFSSubClassOf((triples, environment, penalty)):
+        """Build the non-goal rules for an rdfs:subClassOf property."""
+        # Assert rules in both goals and non-goals.
+        for context in (tms.getContext(GOAL), tms.workingContext):
+            index = context._index
 
-        ifPattern = rdfsFormula.newFormula()
-        ifPattern.add(fillerA, rdf['type'], statement[SUBJ])
-        ifPattern = ifPattern.close()
-        rdfsFormula.add(ruleName, p['if'], ifPattern)
+            # :A a :subj -> :A a :obj
+            ifPattern = rdfsFormula.newFormula()
+            ifPattern.add(fillerA, rdf['type'], environment[fillerA])
+            ifPattern = ifPattern.close()
 
-        thenPattern = rdfsFormula.newFormula()
-        thenPattern.add(fillerA, rdf['type'], statement[OBJ])
-        thenPattern = thenPattern.close()
-        assertObj = rdfsFormula.newBlankNode()
-        rdfsFormula.add(assertObj, p['assert'], thenPattern)
-        rdfsFormula.add(ruleName, p['then'], assertObj)
+            statement = rdfsFormula.newFormula()
+            statement.add(fillerA, rdf['type'], environment[fillerB])
+            statement.close()
+            description = SubstitutingList([rdfsFormula.newList([
+                            environment[fillerA],
+                            rdfsFormula.newLiteral(" is a sub-class of "),
+                            environment[fillerB]])])
+            patternAssertionThunk = makePatternAssertionThunk(triples, statement, description)
 
-        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+            bottomBeta = MM.compilePattern(index, ifPattern.statements, vars, rdfsFormula, supportBuiltin=False, reachedGoal=lambda: False)
+            trueBottom =  MM.ProductionNode(bottomBeta, patternAssertionThunk, doNothing)
+
+    # Search for rdfs:subClassOf statements.
+    ifPattern = rdfsFormula.newFormula()
+    ifPattern.add(fillerA, rdfs['subClassOf'], fillerB)
+    ifPattern = ifPattern.close()
+    bottomBeta = MM.compilePattern(index, ifPattern.statements, vars, rdfsFormula, supportBuiltin=False, reachedGoal=lambda: False)
+    trueBottom =  MM.ProductionNode(bottomBeta, buildRDFSSubClassOf, doNothing)
 
     # rdfs:subPropertyOf
-    for statement in logFormula.statementsMatching(pred=rdfs['subClassOf']):
-        # :A :subj :B -> :A :obj :B
-        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
-        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+    def buildRDFSSubPropertyOf((triples, environment, penalty)):
+        """Build the non-goal rules for an rdfs:subPropertyOf property."""
+        # Assert rules in both goals and non-goals.
+        for context in (tms.getContext(GOAL), tms.workingContext):
+            index = context._index
 
-        ifPattern = rdfsFormula.newFormula()
-        ifPattern.add(fillerA, statement[SUBJ], fillerB)
-        ifPattern = ifPattern.close()
-        rdfsFormula.add(ruleName, p['if'], ifPattern)
+            # :A :subj :B -> :A :obj :B
+            ifPattern = rdfsFormula.newFormula()
+            ifPattern.add(fillerA, environment[fillerA], fillerB)
+            ifPattern = ifPattern.close()
 
-        thenPattern = rdfsFormula.newFormula()
-        thenPattern.add(fillerA, statement[OBJ], fillerB)
-        thenPattern = thenPattern.close()
-        assertObj = rdfsFormula.newBlankNode()
-        rdfsFormula.add(assertObj, p['assert'], thenPattern)
-        rdfsFormula.add(ruleName, p['then'], assertObj)
+            statement = rdfsFormula.newFormula()
+            statement.add(fillerA, environment[fillerB], fillerB)
+            statement.close()
+            description = SubstitutingList([rdfsFormula.newList([
+                            environment[fillerA],
+                            rdfsFormula.newLiteral(" is a sub-property of "),
+                            environment[fillerB]])])
+            patternAssertionThunk = makePatternAssertionThunk(triples, statement, description)
 
-        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+            bottomBeta = MM.compilePattern(index, ifPattern.statements, vars, rdfsFormula, supportBuiltin=False, reachedGoal=lambda: False)
+            trueBottom =  MM.ProductionNode(bottomBeta, patternAssertionThunk, doNothing)
+
+    # Search for rdfs:subPropertyOf statements.
+    ifPattern = rdfsFormula.newFormula()
+    ifPattern.add(fillerA, rdfs['subPropertyOf'], fillerB)
+    ifPattern = ifPattern.close()
+    bottomBeta = MM.compilePattern(index, ifPattern.statements, vars, rdfsFormula, supportBuiltin=False, reachedGoal=lambda: False)
+    trueBottom =  MM.ProductionNode(bottomBeta, buildRDFSSubPropertyOf, doNothing)
 
     # owl:SymmetricProperty
-    for statement in logFormula.statementsMatching(pred=rdf['type'],
-                                                   obj=owl['SymmetricProperty']):
-        # :A :subj :B -> :B :subj :A
-        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
-        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+    def buildOWLSymmetricProperty((triples, environment, penalty)):
+        """Build the non-goal rules for an owl:SymmetricProperty property."""
+        # Assert rules in both goals and non-goals.
+        for context in (tms.getContext(GOAL), tms.workingContext):
+            index = context._index
 
-        ifPattern = rdfsFormula.newFormula()
-        ifPattern.add(fillerA, statement[SUBJ], fillerB)
-        ifPattern = ifPattern.close()
-        rdfsFormula.add(ruleName, p['if'], ifPattern)
+            # :A :subj :B -> :B :subj :A
+            ifPattern = rdfsFormula.newFormula()
+            ifPattern.add(fillerA, environment[fillerA], fillerB)
+            ifPattern = ifPattern.close()
 
-        thenPattern = rdfsFormula.newFormula()
-        thenPattern.add(fillerB, statement[SUBJ], fillerA)
-        thenPattern = thenPattern.close()
-        assertObj = rdfsFormula.newBlankNode()
-        rdfsFormula.add(assertObj, p['assert'], thenPattern)
-        rdfsFormula.add(ruleName, p['then'], assertObj)
+            statement = rdfsFormula.newFormula()
+            statement.add(fillerB, environment[fillerA], fillerA)
+            statement.close()
+            description = SubstitutingList([rdfsFormula.newList([
+                            environment[fillerA],
+                            rdfsFormula.newLiteral(" is a symmetric property")])])
+            patternAssertionThunk = makePatternAssertionThunk(triples, statement, description)
 
-        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+            bottomBeta = MM.compilePattern(index, ifPattern.statements, vars, rdfsFormula, supportBuiltin=False, reachedGoal=lambda: False)
+            trueBottom =  MM.ProductionNode(bottomBeta, patternAssertionThunk, doNothing)
+
+    # Search for owl:SymmetricProperty statements.
+    ifPattern = rdfsFormula.newFormula()
+    ifPattern.add(fillerA, rdf['type'], owl['SymmetricProperty'])
+    ifPattern = ifPattern.close()
+    bottomBeta = MM.compilePattern(index, ifPattern.statements, vars, rdfsFormula, supportBuiltin=False, reachedGoal=lambda: False)
+    trueBottom =  MM.ProductionNode(bottomBeta, buildOWLSymmetricProperty, doNothing)
 
     # owl:TransitiveProperty
-    for statement in logFormula.statementsMatching(pred=rdf['type'],
-                                                   obj=owl['TransitiveProperty']):
-        # :A :subj :B . :B :subj :C -> :A :subj :C
-        ruleName = rdfsFormula.newSymbol(rdfsFormula.store.genId())
-        rdfsFormula.add(ruleName, rdf['type'], p['Belief-rule'])
+    def buildOWLTransitiveProperty((triples, environment, penalty)):
+        """Build the non-goal rules for an owl:TransitiveProperty property."""
+        # Assert rules in both goals and non-goals.
+        for context in (tms.getContext(GOAL), tms.workingContext):
+            index = context._index
 
-        ifPattern = rdfsFormula.newFormula()
-        ifPattern.add(fillerA, statement[SUBJ], fillerB)
-        ifPattern.add(fillerB, statement[SUBJ], fillerC)
-        ifPattern = ifPattern.close()
-        rdfsFormula.add(ruleName, p['if'], ifPattern)
+            # :A :subj :B . :B :subj :C -> :A :subj :C
+            ifPattern = rdfsFormula.newFormula()
+            ifPattern.add(fillerA, environment[fillerA], fillerB)
+            ifPattern.add(fillerB, environment[fillerA], fillerC)
+            ifPattern = ifPattern.close()
 
-        thenPattern = rdfsFormula.newFormula()
-        thenPattern.add(fillerA, statement[SUBJ], fillerC)
-        thenPattern = thenPattern.close()
-        assertObj = rdfsFormula.newBlankNode()
-        rdfsFormula.add(assertObj, p['assert'], thenPattern)
-        rdfsFormula.add(ruleName, p['then'], assertObj)
+            statement = rdfsFormula.newFormula()
+            statement.add(fillerA, environment[fillerA], fillerC)
+            statement.close()
+            description = SubstitutingList([rdfsFormula.newList([
+                            environment[fillerA],
+                            rdfsFormula.newLiteral(" is a transitive property")])])
+            patternAssertionThunk = makePatternAssertionThunk(triples, statement, description)
 
-        rdfsFormula.add(rdfsRuleset, p['rule'], ruleName)
+            bottomBeta = MM.compilePattern(index, ifPattern.statements, vars, rdfsFormula, supportBuiltin=False, reachedGoal=lambda: False)
+            trueBottom =  MM.ProductionNode(bottomBeta, patternAssertionThunk, doNothing)
+
+    # Search for owl:TransitiveProperty statements.
+    ifPattern = rdfsFormula.newFormula()
+    ifPattern.add(fillerA, rdf['type'], owl['TransitiveProperty'])
+    ifPattern = ifPattern.close()
+    bottomBeta = MM.compilePattern(index, ifPattern.statements, vars, rdfsFormula, supportBuiltin=False, reachedGoal=lambda: False)
+    trueBottom =  MM.ProductionNode(bottomBeta, buildOWLTransitiveProperty, doNothing)
 
 def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with'], verbose=False, customBaseFactsURI=False, customBaseRulesURI=False):
     trace, result = runPolicy(logURIs, policyURIs, logFormula=logFormula, ruleFormula=ruleFormula, filterProperties=filterProperties, verbose=verbose, customBaseFactsURI=customBaseFactsURI, customBaseRulesURI=customBaseRulesURI)
@@ -1681,21 +1785,7 @@ def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProp
 
     # NOTE: We also need to parse every log for meaningful RDFS rules
     # to instantiate.
-    rdfsFormula = store.newFormula()
-
-    # Make the air:Policy.
-    rdfsRuleset = rdfsFormula.newSymbol(store.genId())
-    rdf = rdfsFormula.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
-    p = rdfsFormula.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
-    rdfsFormula.add(rdfsRuleset, rdf['type'], p['Policy'])
-
-    # And add rules to that policy.
-    for logFormula in logFormulae:
-        makeRDFSRules(logFormula, rdfsFormula, rdfsRuleset)
-
-    # Finally add to the policy formulae to be compiled.
-    rdfsFormula.close()
-    policyFormulae.append(rdfsFormula)
+    makeRDFSRules(eventLoop, formulaTMS)
 
 #    rdfsRulesFormula = store.load('http://python-dlp.googlecode.com/files/pD-rules.n3')
     
