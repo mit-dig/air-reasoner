@@ -73,10 +73,12 @@ SubstitutingTuple.substitution = \
 class FormulaTMS(object):
     """This is the interface between the TMS and the rdf side of things
 It keeps a Formula of all facts currently believed.
-The job of activating rules also goes on this
+The job of activating rules also goes on this in the event() method.
 """
     tracking = True
     def __init__(self, workingContext):
+        """Create the TMS to be associated with the specified working context
+        (IndexedFormula)."""
         self.tms = tms.TMS('FormulaTMS', self.event)
         self.nodes = WVD()
         self.workingContext = workingContext
@@ -106,6 +108,8 @@ This is currently only used for goals
         return self.nodes[(auxid, subject, predicate, object, variables)]
 
     def justifyAuxTriple(self, auxid, subject, predicate, object, variables, rule, antecedents):
+        """Get an aux triple (e.g. for goals) and justify it with the
+        specified antecedents and rule."""
         auxnode = self.getAuxTriple(auxid, subject, predicate, object, variables)
         node = self.getTriple(subject, predicate, object)
         a = tms.AndExpression(list(antecedents))
@@ -114,17 +118,23 @@ This is currently only used for goals
 
 
     def getContext(self, id):
+        """Get the context (other than the working context) which matches the
+        specified ID (e.g. GOAL context as opposed to the working
+        context)"""
         if id not in self.contexts:
             self.contexts[id] = self.workingContext.newFormula()
         return self.contexts[id]
 
     def getTriple(self, subject, predicate, object, variables=None):
+        """Get the TMS node which corresponds to the given triple."""
         if (subject, predicate, object, variables) not in self.nodes:
             a = tms.Node(self.tms, (subject, predicate, object, variables))
             self.nodes[(subject, predicate, object, variables)] = a
         return self.nodes[(subject, predicate, object, variables)]
 
     def getThing(self, thing):
+        """Get a value stored in the TMS (e.g. thing may be a tuple (subject,
+        predicate, object, variables), or a Rule object)"""
         if thing not in self.nodes:
             a = tms.Node(self.tms, thing)
             self.nodes[thing] = a
@@ -136,17 +146,28 @@ This is currently only used for goals
         return self.getThing(thing)
     
     def getStatement(self, (subject, predicate, object, variables)):
+        """Get the statement which matches the specified SPO triple from the
+        corresponding working context."""
         return self.workingContext.statementsMatching(subj=subject, pred=predicate, obj=object)[0]
 
     def getAuxStatement(self, (auxid, subject, predicate, object, variables)):
+        """Get the aux triple which matches the specified SPO triple.  Note
+        that auxid is used to select the auxiliary context (e.g. GOAL)."""
         return self.getContext(auxid).statementsMatching(subj=subject, pred=predicate, obj=object)[0]
 
     def event(self, node, justification):
+        """Called when justifying a TMS node using Node.justify().  Examines
+        the datum of the node and activates or deactivates the node
+        appropriately (e.g. by constructing a Rete if it is a rule, asserting
+        or removing a triple if it is an Assertion, etc."""
+        # Add a premise
         if isinstance(justification, tms.Premise):
             if isinstance(node.datum, tuple) and len(node.datum) == 2:
                 pass # Better than the alternative?
             else:
                 self.premises.add(node)
+
+        # Remove statements if the justification is false.
         if justification is False:
             if isinstance(node.datum, Rule):
                 pass # not worth the work
@@ -158,6 +179,8 @@ This is currently only used for goals
 #                    self.getContext(GOAL).removeStatement(self.getStatement(node.datum))
                 else:
                     self.getContext(GOAL).removeStatement(self.getAuxStatement(node.datum))
+
+        # Assert/activate/compile a rule.
         if isinstance(node.datum, Rule):
             if debugLevel >= 3:
                 if node.datum.goal:
@@ -297,7 +320,7 @@ def canonicalizeVariables(statement, variables):
     return (canNode(subj), canNode(pred), canNode(obj)), frozenset(varMapping.values())
 
 class Assertion(object):
-    """An assertion can be asserted. It tracks what its support will be when asserted
+    """An assertion is something which can be asserted (e.g. triples). It tracks what its support (dependencies) will be when asserted
 """
     def __init__(self, pattern, support=None, rule=None, validToRename=None):
         self.pattern = pattern
@@ -344,7 +367,7 @@ class Assertion(object):
 class AuxTripleJustifier(object):
     """A thunk, to separate the work of creating aux triples from
 building the rules whose support created them.
-These are then passed to the scheduler
+These are then passed to the scheduler to be evaluated at an appropriate time.
 """
     def __init__(self, tms, *args):
         self.tms = tms
@@ -354,6 +377,7 @@ These are then passed to the scheduler
         self.tms.justifyAuxTriple(*self.args)
 
 class RuleName(object):
+    """A name for a rule (???)"""
     def __init__(self, name, descriptions, prompts):
         assert isinstance(name, Term)
         assert all(isinstance(x, Term) for x in descriptions)
@@ -370,7 +394,10 @@ class RuleName(object):
 
 
 class RuleFire(object):
-    """A thunk, passed to the scheduler when a rule fires
+    """A thunk, passed to the scheduler when a rule fires, to be called at
+    the earliest convenience.  When called, it handles the appropriate
+    action for the rule (e.g. to justify a triple in the TMS (based on a
+    closed world if needed), activate a nested rule, or import a ruleset.
 """
     def __init__(self, rule, triples, env, penalty, result, alt=False):
         self.rule = rule
@@ -590,7 +617,9 @@ much how the rule was represented in the rdf network
         matchName=%s''' % (tms, self.vars, label, pattern, result, alt, matchName)
 
     def discoverReachableGoals(self, goalEnvironment=None):
-        """Find all goals reachable from this rule."""
+        """Find all goals reachable from this rule and set
+        self.reachableGoals, so that these goals may be matched against to
+        determine when the actual Rete of this rule should be built."""
         # We now have THIS rule, but not the goal rules it should be
         # contingent on.
 
@@ -661,6 +690,18 @@ much how the rule was represented in the rdf network
         return '%s with vars %s' % (self.label.encode('utf_8'), self.vars)
 
     def compileToRete(self):
+        """Compile the GOAL Rete (i.e. which matches the goals which can be
+        reached from this rule and compiles the real Rete only when at
+        least one of those goals exists.).
+
+        Also builds a Rete which looks for when a goal is reached so
+        as to turn off the main Rete and no longer process when a goal
+        is reached.  Note that the main Rete will only ever consider
+        its goal reached if all air:assert patterns that can be
+        reached from this rule assert patterns of the form {A B C .}
+        where A and C are the same for all assertions and B is a) the
+        same for all assertions or b) a mixture of air:compliant-with
+        or air:non-compliant-with for all assertions)."""
         patterns = self.pattern.statements
         if self.goal:
             workingContext = self.tms.getContext(GOAL)
@@ -708,6 +749,8 @@ much how the rule was represented in the rdf network
                 trueBottom =  MM.ProductionNode(bottomBeta, self.onReachedGoal, lambda: True)
 
     def supportBuiltin(self, triple):
+        """Called by the compiled Rete to support a built-in function's triple
+        in the associated formulaTMS."""
         # Create the TMS node representing this triple's extraction.
         self.tms.getTriple(*triple.spo()).assumeBuiltin()
     
@@ -717,6 +760,8 @@ much how the rule was represented in the rdf network
         self.tms.getTriple(*triple.spo()).retract()
 
     def assertNewGoals(self, (triples, environment, penalty)):
+        """Called when a goal exists (by the GOAL Rete) to create the real
+        rete based on what matched."""
         # Assert new goals of this rule by substituting in the matched
         # environments of goals this rule can satisfy.
         if environment not in self.goalEnvironments:
@@ -765,12 +810,16 @@ much how the rule was represented in the rdf network
             self.eventLoop.pushPostGoal(reallyCompileRete)
 
     def onSuccess(self, (triples, environment, penalty)):
+        """Add the success (air:then) event to the event loop to be fired at
+        the next available opportunity."""
         event = RuleFire(self, triples, environment, penalty, self.result)
 #        print "succeeded", self.pattern.statements, event
         self.success = True
         self.eventLoop.add(event)
 
     def onFailure(self):
+        """Add the failure (air:else) event to the event loop to be fired at
+        the next available opportunity."""
         assert not self.success
         if self.alt:
             event = RuleFire(self, [], Env(), 0, self.alt, alt=True)
@@ -778,9 +827,12 @@ much how the rule was represented in the rdf network
             self.eventLoop.addAlternate(event)
 
     def onReachedGoal(self, (triples, environment, penalty)):
+        """Called when a goal of this rule is reached to force the
+        disconnection of the main Rete. (c.f. compileToRete)"""
         self.reachedGoal = True
 
     def substitution(self, env):
+        """Called to substitute variables in this Rule."""
         if not env:
             return self
         pattern = self.pattern.substitution(env)
@@ -1110,6 +1162,7 @@ much how the rule was represented in the rdf network
 
     @classmethod
     def compileCwmRule(cls, eventLoop, tms, F, triple):
+        """Compile an old-form cwm rule (log:implies)"""
         assert tms is not None
         label = "Rule from cwm with pattern %s" % triple.subject()
         pattern = triple.subject()
@@ -1130,6 +1183,7 @@ much how the rule was represented in the rdf network
 
     @classmethod
     def compileFormula(cls, eventLoop, formulaTMS, pf, base=False, goalWildcards={}):
+        """Compile all rules in a formula."""
         rdf = pf.newSymbol('http://www.w3.org/1999/02/22-rdf-syntax-ns')
         p = pf.newSymbol('http://dig.csail.mit.edu/TAMI/2007/amord/air')
         # New AIR terminology.
@@ -1188,6 +1242,25 @@ is a FIFO of thunks to be called.
 
 Note that this eventloop support altevents (for else clauses) which
 fire only when there are no events to fire.
+
+The order of phases is as follows:
+
+1. The eventloop is initially OPEN.
+2. When all positive events have been exhausted, the eventloop is
+CLOSED and all alternate events are run.  Any assertions made during
+the alternate event SHOULD be placed on the assertion queue (to be
+evaluated after all alternate events have run).  Any alternate events
+made during the CLOSED phase should be placed on a "next alternate
+event queue" to be run after the eventloop has had a chance to enter
+the OPEN state at least once.
+3. When all alternate events have been exhausted, the eventloop is
+REOPENing and all assertion events asserted as a result of the
+alternate events are run.
+4. If no positive, alternate, or assertion events remain, post-goal
+events are run (i.e. creating retes) and the world is officially OPEN.
+5. When the loop shifts from the CLOSED state to a REOPEN or an OPEN
+state, any alternate events queued in the "next alternate event queue"
+during the CLOSED state are moved to the normal alternate event queue.
 """
     PHASE_OPEN = 0
     PHASE_CLOSED = 1
@@ -1202,12 +1275,19 @@ fire only when there are no events to fire.
         self.newAlternateEvents = deque()
 
     def add(self, event):
+        """Add an event to be called during the OPEN phase of the event
+        loop."""
 #        if hasattr(event, 'rule'):
 #            print "add", event.rule
 #        print "add", event
         self.events.appendleft(event)
 
     def addAlternate(self, event):
+        """Add an event to be called during the CLOSED phase of the event
+        loop.  If the eventloop is CLOSED, the event is added to a
+        "next alternate event" queue so that the event loop will get a
+        chance to return to the OPEN state before those alternate
+        events are added."""
 #        print "addAlternate", event.rule
 #        print "addAlternate", event
         if self.phase != EventLoop.PHASE_CLOSED:
@@ -1216,6 +1296,9 @@ fire only when there are no events to fire.
             self.newAlternateEvents.appendleft(event)
 
     def pushPostGoal(self, event):
+        """Add an event to run as a result of matching a goal (i.e. compiling
+        a Rete tree for a rule).  This will only be run when the loop
+        is in the REOPEN phase."""
         # Only ever run this event once we're done with normal
         # events. (i.e. once all necessary goal-rules have been
         # matched.)
@@ -1226,6 +1309,8 @@ fire only when there are no events to fire.
         self.postGoalEvents.append(event)
     
     def addAssertion(self, event):
+        """Make an assertion.  If the eventloop is not in the OPEN phase, the
+        assertion event is queued until such time as it is OPEN again."""
 #        print "addAssertion", event
         if self.phase != EventLoop.PHASE_OPEN:
             self.assertionEvents.appendleft(event)
@@ -1293,6 +1378,8 @@ fire only when there are no events to fire.
             
 
 def setupTMS(store):
+    """Create the working context and associate a formulaTMS (returned)
+    with it."""
     workingContext = store.newFormula()
     workingContext.keepOpen = True
     formulaTMS = FormulaTMS(workingContext)
@@ -1300,6 +1387,8 @@ def setupTMS(store):
     
 
 def loadFactFormula(formulaTMS, uri, closureMode=""): #what to do about closureMode?
+    """Load a fact formula from a URI and assume each triple in the
+    formula by "extraction" in the TMS from that formula."""
 ##    We're not ready for this yet!
 ##    store = formulaTMS.workingContext.store
 ##    s = store.newSymbol(uri)
@@ -1312,6 +1401,7 @@ def loadFactFormula(formulaTMS, uri, closureMode=""): #what to do about closureM
     return f
 
 def _loadF(formulaTMS, uri, closureMode=""):
+    """Load and return a formula from a URI"""
     if loadFactFormula.pClosureMode:
         closureMode += "p"
     store = formulaTMS.workingContext.store
@@ -1321,6 +1411,7 @@ def _loadF(formulaTMS, uri, closureMode=""):
     return f
 
 def parseN3(store, f, string):
+    """Parse an N3 file and return the formula."""
     import notation3
     p = notation3.SinkParser(store, f)
 
@@ -1333,6 +1424,7 @@ def parseN3(store, f, string):
 
 
 def loadFactFormulaObj(formulaTMS, f, closureMode=""):
+    """Assume the contents of a formula object in the TMS."""
     if loadFactFormula.pClosureMode:
         closureMode += "p"
     fCopy = store.newFormula()
@@ -1344,6 +1436,7 @@ def loadFactFormulaObj(formulaTMS, f, closureMode=""):
 
 
 def loadFactN3(formulaTMS, string, closureMode=""):
+    """LOad the contents of a fact formula in the TMS from an N3 string."""
     if loadFactFormula.pClosureMode:
         closureMode += "p"
     store = formulaTMS.workingContext.store
@@ -1733,6 +1826,8 @@ def makeRDFSRules(eventLoop, tms):
     trueBottom =  MM.ProductionNode(bottomBeta, buildOWLTransitiveProperty, doNothing)
 
 def testPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with'], verbose=False, customBaseFactsURI=False, customBaseRulesURI=False):
+    """Test a policy by running it and return the output justification as
+    an N3 string."""
     trace, result = runPolicy(logURIs, policyURIs, logFormula=logFormula, ruleFormula=ruleFormula, filterProperties=filterProperties, verbose=verbose, customBaseFactsURI=customBaseFactsURI, customBaseRulesURI=customBaseRulesURI)
     return trace.n3String()
 
@@ -1743,6 +1838,11 @@ def mem(size="rss"):
     return int(os.popen('ps -p %d -o %s | tail -1' % (os.getpid(),size)).read())
 
 def runPolicy(logURIs, policyURIs, logFormula=None, ruleFormula=None, filterProperties=['http://dig.csail.mit.edu/TAMI/2007/amord/air#compliant-with', 'http://dig.csail.mit.edu/TAMI/2007/amord/air#non-compliant-with'], logFormulaObjs=[], ruleFormulaObjs=[], store=store, verbose=False, customBaseFactsURI=False, customBaseRulesURI=False):
+    """Run a policy with the specified fact formula URIs, policy URIs,
+    etc., generate a justification for any assertions concluded, and
+    filter those justifications for assertions having a property that is
+    one of the specified filterProperties.  Returns a Formula object
+    containing the justification."""
     global baseFactsURI, baseRulesURI
     if OFFLINE[0]:
         baseFactsURI = uripath.join(uripath.base(),

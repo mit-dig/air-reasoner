@@ -21,7 +21,9 @@ class TMS(object):
         self.contradiction = Node(self, "contradiction")
 
 class Node(object):
-    """A node in a TMS tree."""
+    """A node in a TMS tree.  Usually has an associated datum (if it is an
+    assertion, for example), as well as pointers to those things which it
+    uses as support and those things that are consequents thereof."""
     nodeCount = 0
     
     def __init__(self, tms, datum=None):

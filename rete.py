@@ -92,7 +92,9 @@ class CyclicError(ValueError):
 
 def sortPatterns(patterns, vars, ignoreBuiltins=False):
     """Sort the given patterns topologically, such that built-ins are
-    satisfied as late as possible."""
+    satisfied as late as possible, but maintaining the order of
+    built-ins so that any bindings required by a built-in are met
+    before it is matched."""
 
     # We don't care about general patterns, really (all triples that
     # will match should already be present).  We just care that the
@@ -128,10 +130,13 @@ def sortPatterns(patterns, vars, ignoreBuiltins=False):
         # requires or provides at this time, and it's currently
         # unresolvable.
         if pattern.predicate() != pattern.predicate().store.sameAs:
+            # c.f. StoredStatement.requires() in formula.py
             for var in pattern.requires(vars):
                 requires.setdefault(var, set()).add(pattern)
+        # c.f. StoredStatement.provides() in formula.py
         for var in pattern.provides(vars):
             provides.setdefault(var, set()).add(pattern)
+        # c.f. StoredStatement.isUnresolvable() in formula.py
         if pattern.isUnresolvable(vars):
             unresolvables.add(pattern)
 
@@ -331,6 +336,8 @@ generates variable bindings
 
     varCounter = itertools.count()
     def rightActivate(self, s):
+        """This actually handles right-activation from (say) someone adding a
+        triple matching this pattern."""
         # AlphaMemory is shared, so this is a bad idea.
 #        if self.reachedGoal():
 #            # We reached a goal, so this rule should be turned off.
@@ -367,6 +374,9 @@ generates variable bindings
     @classmethod
     def construct(cls, index, pattern, vars, context, supportBuiltin,
                   reachedGoal):
+        """Constructs an AlphaFilter object for the specified
+        pattern/vars/context, etc. and attaches it as the object stored in the
+        index of the context IndexedFormula."""
         def replaceWithNil(x):
             if isinstance(x, Formula) or x.occurringIn(vars):
                 return None
@@ -378,6 +388,10 @@ generates variable bindings
         parents = []
         secondaryAlpha = cls(pattern, vars, context, index, parents,
                              supportBuiltin, reachedGoal)
+        # Get the master pattern tuple for this AlphaFilter and use it
+        # to construct each relevant pattern tuple used for indexing
+        # in the IndexedFormula to connect this AlphaFilter to the
+        # corresponding node.
         p, s, o = masterPatternTuple
         V = VAR_PLACEHOLDER
         pts = [(p, s, o)]
@@ -401,6 +415,9 @@ generates variable bindings
         
 
     def triplesMatching(self, successor, env, includeMissing=False): # This is fast enough
+        """This is the biggest function here.  It does the heavy lifting to
+        find which triples match the alpha pattern, and tests and asserts any
+        builtins associated with this AlphaMemory."""
         retVal = self   # No reason to do additional work here
         assert self.initialized
         builtInMade = []
@@ -512,6 +529,7 @@ generates variable bindings
                     builtInMade.append(TripleWithBinding(newAssumption, env))
                     self.supportBuiltin(builtInMade[-1].triple)
                 prod = ProductionNode(node, onSuccess, onFailure)
+
             # Alright, if we are ACTING as a function, we need to bind
             # the object.
             elif self.pattern.predicateActsAs(self.pattern.freeVariables(),
@@ -592,7 +610,9 @@ generates variable bindings
 
 class GoalAlphaFilter(AlphaFilter):
     """An AlphaFilter that explicitly matches goals (including non-binding
-    goal-wildcard variables)."""
+    goal-wildcard variables).  Most of this is similar to AlphaFilter
+    except that we care about wildcards in the goal (where those
+    wildcards can match anything, but the binding is irrelevant)"""
     def __init__(self, pattern, vars, context, index, parents,
                  goalWildcards, supportBuiltin):
         AlphaFilter.__init__(self, pattern, vars, context, index, parents,
